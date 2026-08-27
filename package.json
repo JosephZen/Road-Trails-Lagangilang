@@ -1,0 +1,30 @@
+{
+  "name": "360-street-view-explorer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "node server/index.cjs",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "concurrently": "^10.0.4",
+    "cors": "^2.8.6",
+    "exifreader": "^4.41.3",
+    "express": "^5.2.1",
+    "mapillary-js": "^4.1.2",
+    "maplibre-gl": "^6.0.0",
+    "multer": "^2.2.0",
+    "pannellum": "^2.5.7",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.5",
+    "vite": "^8.2.0"
+  }
+}

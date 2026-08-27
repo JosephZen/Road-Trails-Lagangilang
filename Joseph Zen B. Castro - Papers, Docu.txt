@@ -1,0 +1,57 @@
+Joseph Zen B. Castro - Papers, Documentation, Programmer, Manager
+Gerald Palcon - Papers, Documentation, Programmer
+Julian Brent Trinidad - Programmer, Tools
+Seankeith Besas - Tester, Runner
+
+
+
+1. this is the API token: MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9
+2. use openfreemap or what MapLibre uses
+3. lets do JSON
+4. I have ready 360 images (give me an uploader)
+5. Yes, add an uploader UI
+
+
+
+
+Im missing a few features like, having the mapillary api, I have already have some uploaded 360 images in the website/cloud but it didn't show in the program, there is no also a streetview experience, I would like to have the starting top-down map of Lagangilang, Abra, Philippines. Is it possible for the program to immediately extract the gps coordinates of the images that is locally uploaded? and those local storage is gonna be uploaded on mapillary eventually, but I saw some inconsistency on the site itself, it doesn't 100% connect all the images despite only being meters apart
+
+
+
+in the map, I can already see the green lines which are the mapilarry 360 images I already uploaded, and not all of them are in a single folder, so can you extract all 360 I uploaded on my account? give me instruction on how and what should I give you to make that possible, make those images available on the cloud version, since i can only see the local json on both local and cloud.
+
+
+
+Mapillary API Integration - Cloud Images Upload, Navigation, Blur Faces & Plates
+MapLibre OpenFreeMap Map - Map, POI
+Image Connectivity - Local & Cloud should have minimal Cache Loading
+Map View - Dynamic, Different MAP style, Search
+Map & Street View Navigation - Arrow Consistency, Working Next Image, POI
+ Map & Street View Navigation  UI - Dynamic
+Image Uploader - 360 image is Read properly with EXIF format
+File Handling - No Inconsistency
+Duplication - Same EXIF image shouldn't stack up
+Database - PostgreSQL, JSON, Mapillary API
+Tourist Feature - Highlight Tourist Spots, Tourist Spot Route, Basic Itinerary Description
+Point of Interest - Attached 360 Image, Pinned Location, Basic Info
+CRUD - Admin Control, Delete, Edit, Retrieve 
+GPS - Current location, Real-time tracking, Routing
+
+Panoramic
+
+GitHub
+Database Design
+Database Implementation 
+
+
+Mapillary API
+Tourist Attractions
+Routing System
+Point-of-Interest 
+
+
+
+
+
+ 
+

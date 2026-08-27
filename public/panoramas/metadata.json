@@ -1,0 +1,251 @@
+{
+  "panoramas": [
+    {
+      "id": "pano_1785434840169_sqgpeq",
+      "filename": "pano_1785434840169_sqgpeq.jpg",
+      "thumbnail": "thumbnails/pano_1785434840169_sqgpeq_thumb.jpg",
+      "lat": 29.69999999999729,
+      "lng": 17.099999999976774,
+      "heading": 0,
+      "label": "UA",
+      "timestamp": "2026-07-30T18:07:25.546Z",
+      "neighbors": []
+    },
+    {
+      "id": "pano_1785458227165_1j20c9",
+      "filename": "pano_1785458227165_1j20c9.jpg",
+      "thumbnail": "thumbnails/pano_1785458227165_1j20c9_thumb.jpg",
+      "lat": 17.60825,
+      "lng": 120.738083,
+      "heading": 0,
+      "label": "",
+      "timestamp": "2026-07-31T00:37:08.716Z",
+      "neighbors": [
+        "pano_1785458811653_j5vnmy",
+        "pano_1785458933279_gohnbu",
+        "pano_1785458951667_shihgp",
+        "pano_1785458989281_9tzwfy",
+        "pano_1785459001017_b2f54t",
+        "pano_1785458901520_jb1b5w",
+        "pano_1785458903585_a9jv8p",
+        "pano_1785458905671_wa1e0g"
+      ]
+    },
+    {
+      "id": "pano_1785458811653_j5vnmy",
+      "filename": "pano_1785458811653_j5vnmy.jpg",
+      "thumbnail": "thumbnails/pano_1785458811653_j5vnmy_thumb.jpg",
+      "lat": 17.608194,
+      "lng": 120.738083,
+      "heading": 0,
+      "label": "UA",
+      "timestamp": "2026-07-31T00:46:52.774Z",
+      "neighbors": [
+        "pano_1785458933279_gohnbu",
+        "pano_1785458951667_shihgp",
+        "pano_1785458989281_9tzwfy",
+        "pano_1785459001017_b2f54t",
+        "pano_1785458901520_jb1b5w",
+        "pano_1785458903585_a9jv8p",
+        "pano_1785458905671_wa1e0g",
+        "pano_1785458907688_3ycntg",
+        "pano_1785458227165_1j20c9"
+      ]
+    },
+    {
+      "id": "pano_1785458901520_jb1b5w",
+      "filename": "pano_1785458901520_jb1b5w.jpg",
+      "thumbnail": "thumbnails/pano_1785458901520_jb1b5w_thumb.jpg",
+      "lat": 17.608167,
+      "lng": 120.738111,
+      "heading": 0,
+      "label": "UA",
+      "timestamp": "2026-07-31T00:48:22.544Z",
+      "neighbors": [
+        "pano_1785458903585_a9jv8p",
+        "pano_1785458905671_wa1e0g",
+        "pano_1785458907688_3ycntg",
+        "pano_1785458911472_jf2n58",
+        "pano_1785458933279_gohnbu",
+        "pano_1785458951667_shihgp",
+        "pano_1785458989281_9tzwfy",
+        "pano_1785459001017_b2f54t",
+        "pano_1785458227165_1j20c9",
+        "pano_1785458811653_j5vnmy"
+      ]
+    },
+    {
+      "id": "pano_1785458903585_a9jv8p",
+      "filename": "pano_1785458903585_a9jv8p.jpg",
+      "thumbnail": "thumbnails/pano_1785458903585_a9jv8p_thumb.jpg",
+      "lat": 17.608167,
+      "lng": 120.738111,
+      "heading": 0,
+      "label": "UA",
+      "timestamp": "2026-07-31T00:48:24.673Z",
+      "neighbors": [
+        "pano_1785458901520_jb1b5w",
+        "pano_1785458905671_wa1e0g",
+        "pano_1785458907688_3ycntg",
+        "pano_1785458911472_jf2n58",
+        "pano_1785458933279_gohnbu",
+        "pano_1785458951667_shihgp",
+        "pano_1785458989281_9tzwfy",
+        "pano_1785459001017_b2f54t",
+        "pano_1785458227165_1j20c9",
+        "pano_1785458811653_j5vnmy"
+      ]
+    },
+    {
+      "id": "pano_1785458905671_wa1e0g",
+      "filename": "pano_1785458905671_wa1e0g.jpg",
+      "thumbnail": "thumbnails/pano_1785458905671_wa1e0g_thumb.jpg",
+      "lat": 17.608167,
+      "lng": 120.738111,
+      "heading": 0,
+      "label": "UA",
+      "timestamp": "2026-07-31T00:48:26.651Z",
+      "neighbors": [
+        "pano_1785458901520_jb1b5w",
+        "pano_1785458903585_a9jv8p",
+        "pano_1785458907688_3ycntg",
+        "pano_1785458911472_jf2n58",
+        "pano_1785458933279_gohnbu",
+        "pano_1785458951667_shihgp",
+        "pano_1785458989281_9tzwfy",
+        "pano_1785459001017_b2f54t",
+        "pano_1785458227165_1j20c9",
+        "pano_1785458811653_j5vnmy"
+      ]
+    },
+    {
+      "id": "pano_1785458907688_3ycntg",
+      "filename": "pano_1785458907688_3ycntg.jpg",
+      "thumbnail": "thumbnails/pano_1785458907688_3ycntg_thumb.jpg",
+      "lat": 17.608167,
+      "lng": 120.738111,
+      "heading": 0,
+      "label": "UA",
+      "timestamp": "2026-07-31T00:48:28.727Z",
+      "neighbors": [
+        "pano_1785458901520_jb1b5w",
+        "pano_1785458903585_a9jv8p",
+        "pano_1785458905671_wa1e0g",
+        "pano_1785458911472_jf2n58",
+        "pano_1785458933279_gohnbu",
+        "pano_1785458951667_shihgp",
+        "pano_1785458989281_9tzwfy",
+        "pano_1785459001017_b2f54t",
+        "pano_1785458811653_j5vnmy"
+      ]
+    },
+    {
+      "id": "pano_1785458911472_jf2n58",
+      "filename": "pano_1785458911472_jf2n58.jpg",
+      "thumbnail": "thumbnails/pano_1785458911472_jf2n58_thumb.jpg",
+      "lat": 17.608167,
+      "lng": 120.738111,
+      "heading": 0,
+      "label": "UA",
+      "timestamp": "2026-07-31T00:48:32.643Z",
+      "neighbors": [
+        "pano_1785458901520_jb1b5w",
+        "pano_1785458903585_a9jv8p",
+        "pano_1785458905671_wa1e0g",
+        "pano_1785458907688_3ycntg",
+        "pano_1785458933279_gohnbu",
+        "pano_1785458951667_shihgp",
+        "pano_1785458989281_9tzwfy",
+        "pano_1785459001017_b2f54t"
+      ]
+    },
+    {
+      "id": "pano_1785458933279_gohnbu",
+      "filename": "pano_1785458933279_gohnbu.jpg",
+      "thumbnail": "thumbnails/pano_1785458933279_gohnbu_thumb.jpg",
+      "lat": 17.608167,
+      "lng": 120.738083,
+      "heading": 0,
+      "label": "",
+      "timestamp": "2026-07-31T00:48:54.371Z",
+      "neighbors": [
+        "pano_1785458951667_shihgp",
+        "pano_1785458989281_9tzwfy",
+        "pano_1785459001017_b2f54t",
+        "pano_1785458901520_jb1b5w",
+        "pano_1785458903585_a9jv8p",
+        "pano_1785458905671_wa1e0g",
+        "pano_1785458907688_3ycntg",
+        "pano_1785458911472_jf2n58",
+        "pano_1785458227165_1j20c9",
+        "pano_1785458811653_j5vnmy"
+      ]
+    },
+    {
+      "id": "pano_1785458951667_shihgp",
+      "filename": "pano_1785458951667_shihgp.jpg",
+      "thumbnail": "thumbnails/pano_1785458951667_shihgp_thumb.jpg",
+      "lat": 17.608167,
+      "lng": 120.738083,
+      "heading": 0,
+      "label": "",
+      "timestamp": "2026-07-31T00:49:12.761Z",
+      "neighbors": [
+        "pano_1785458933279_gohnbu",
+        "pano_1785458989281_9tzwfy",
+        "pano_1785459001017_b2f54t",
+        "pano_1785458901520_jb1b5w",
+        "pano_1785458903585_a9jv8p",
+        "pano_1785458905671_wa1e0g",
+        "pano_1785458907688_3ycntg",
+        "pano_1785458911472_jf2n58",
+        "pano_1785458227165_1j20c9",
+        "pano_1785458811653_j5vnmy"
+      ]
+    },
+    {
+      "id": "pano_1785458989281_9tzwfy",
+      "filename": "pano_1785458989281_9tzwfy.jpg",
+      "thumbnail": "thumbnails/pano_1785458989281_9tzwfy_thumb.jpg",
+      "lat": 17.608167,
+      "lng": 120.738083,
+      "heading": 0,
+      "label": "",
+      "timestamp": "2026-07-31T00:49:50.433Z",
+      "neighbors": [
+        "pano_1785458933279_gohnbu",
+        "pano_1785458951667_shihgp",
+        "pano_1785459001017_b2f54t",
+        "pano_1785458901520_jb1b5w",
+        "pano_1785458903585_a9jv8p",
+        "pano_1785458905671_wa1e0g",
+        "pano_1785458907688_3ycntg",
+        "pano_1785458911472_jf2n58",
+        "pano_1785458227165_1j20c9",
+        "pano_1785458811653_j5vnmy"
+      ]
+    },
+    {
+      "id": "pano_1785459001017_b2f54t",
+      "filename": "pano_1785459001017_b2f54t.jpg",
+      "thumbnail": "thumbnails/pano_1785459001017_b2f54t_thumb.jpg",
+      "lat": 17.608167,
+      "lng": 120.738083,
+      "heading": 0,
+      "label": "",
+      "timestamp": "2026-07-31T00:50:02.142Z",
+      "neighbors": [
+        "pano_1785458933279_gohnbu",
+        "pano_1785458951667_shihgp",
+        "pano_1785458989281_9tzwfy",
+        "pano_1785458901520_jb1b5w",
+        "pano_1785458903585_a9jv8p",
+        "pano_1785458905671_wa1e0g",
+        "pano_1785458907688_3ycntg",
+        "pano_1785458911472_jf2n58",
+        "pano_1785458227165_1j20c9",
+        "pano_1785458811653_j5vnmy"
+      ]
+    }
+  ]
+}
