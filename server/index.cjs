@@ -66,10 +66,10 @@ function writeMetadata(data) {
 }
 
 /**
- * Auto-link neighbors based on proximity.
- * Ensures bidirectional linking and wider search radius.
+ * Auto-link neighbors based on a chronological linear sequence.
+ * This prevents zig-zagging and random jumps, forming a straight path.
  */
-function autoLinkNeighbors(panoramas, maxDistance = 200, maxNeighbors = 8) {
+function autoLinkNeighbors(panoramas, maxDistance = 500) {
   const toRad = (deg) => (deg * Math.PI) / 180;
 
   function haversine(lat1, lng1, lat2, lng2) {
@@ -82,30 +82,31 @@ function autoLinkNeighbors(panoramas, maxDistance = 200, maxNeighbors = 8) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  // Calculate nearest neighbors for each panorama
-  let linkedPanoramas = panoramas.map((pano) => {
-    const nearby = panoramas
-      .filter((p) => p.id !== pano.id)
-      .map((p) => ({ id: p.id, dist: haversine(pano.lat, pano.lng, p.lat, p.lng) }))
-      .filter((p) => p.dist <= maxDistance)
-      .sort((a, b) => a.dist - b.dist)
-      .slice(0, maxNeighbors)
-      .map((p) => p.id);
+  // Sort by timestamp to ensure chronological linear order
+  const sorted = [...panoramas].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
 
-    return { ...pano, neighbors: nearby };
-  });
+  return panoramas.map((pano) => {
+    const index = sorted.findIndex(p => p.id === pano.id);
+    const neighbors = [];
 
-  // Ensure bidirectional links (if A is a neighbor of B, B must be a neighbor of A)
-  linkedPanoramas.forEach((pano) => {
-    pano.neighbors.forEach((neighborId) => {
-      const neighbor = linkedPanoramas.find((p) => p.id === neighborId);
-      if (neighbor && !neighbor.neighbors.includes(pano.id)) {
-        neighbor.neighbors.push(pano.id);
+    // Link to previous image in sequence
+    if (index > 0) {
+      const prev = sorted[index - 1];
+      if (haversine(pano.lat, pano.lng, prev.lat, prev.lng) <= maxDistance) {
+        neighbors.push(prev.id);
       }
-    });
-  });
+    }
 
-  return linkedPanoramas;
+    // Link to next image in sequence
+    if (index < sorted.length - 1) {
+      const next = sorted[index + 1];
+      if (haversine(pano.lat, pano.lng, next.lat, next.lng) <= maxDistance) {
+        neighbors.push(next.id);
+      }
+    }
+
+    return { ...pano, neighbors };
+  });
 }
 
 /**
@@ -191,7 +192,7 @@ app.post('/api/panoramas', upload.single('panorama'), async (req, res) => {
       return res.status(400).json({ error: 'No image file provided' });
     }
 
-    const { lat, lng, heading, label } = req.body;
+    const { lat, lng, heading, label, description } = req.body;
     if (!lat || !lng) {
       return res.status(400).json({ error: 'lat and lng are required' });
     }
@@ -214,6 +215,7 @@ app.post('/api/panoramas', upload.single('panorama'), async (req, res) => {
       lng: parseFloat(lng),
       heading: parseFloat(heading) || 0,
       label: label || '',
+      description: description || '',
       timestamp: new Date().toISOString(),
       neighbors: [],
     };

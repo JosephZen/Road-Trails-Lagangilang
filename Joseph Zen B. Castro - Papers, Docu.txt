@@ -50,8 +50,41 @@ Routing System
 Point-of-Interest 
 
 
+Prompt
+
+- add more theme options for the map, light mode, sattelite version, 
+biege map version, the 360 streetview navigation is not going to the next image rather 
+when clicking the next arrow to the next image to move forward or backward, 
+it goes back to the start, and when clicking a random image from both local and 
+mappiliary images they'll choose a a specific image rather than the one I choose, 
+and when connecting all images it should atleast connect in a linear straight pass, 
+even if it zig zags, but not going back. the mini map doesn't have much use yet, 
+and create a separate version from a user to a admin map, since im th admin, 
+add a view-only version and admin I should add description to the image as well 
+to be ready for the point of interest feature
 
 
+- mapilliary and local has different navigation design and it doesnt look good, 
+for the arrow navigation, make up your mind, choose a design and use it completely, 
+mapilliary is still stuck , and mke the dot in the map more bigger, 
+and lets make sure we can actually go to the next 360 image
 
+lets create a database of all the tourist spots, what should I give you to make that possible, 
+make sure its a json file, and each data includes an image, location, description, and name, 
+and connect it to the map, make it in lagangilang, abra, and the description
+should be included on the streetview once the user clicks the tourist spot pin on the map, 
+and when the user clicks the pin on the map, it should also navigate to the 360 image of the 
+tourist spot, next make the description interactive, meaning once the user clicks
+the description, it should navigate to the 360 image of the tourist spot, the tourist spots 
+can be set by admin even without the image lets say psuedo image for now and just use
+the pin location for the streetview, and also connect it to the 360 images, each data 
+should have an id, name, location, description, image, and connect it to the 360 images,
+lets use the fullstack capabiltiies of this tools, do not use the node, lets use the 
+postgre and the react directly with the web services of vercel, render, neon, and lets align this base
+on our objectives in our research paper; 1. determine the existing challenges in digital mapping of Lagangilang’s tourist spots, specifically concerning coverage gaps and the lack of points of interest (POIs);
+2. identify the features of the proposed "Road and Trail" system in terms of 360° views, POI integration, and web-based access and
+3. evaluate the level of software quality and usability of the developed system based on the ISO/IEC 25010 standards in terms of Functional Suitability, Usability, and Accessibility.
+also include the ERD, database table, into a mermaid-formatted diagram, for the json localstorage, this can double as a 2-step upload system, meaning in case of internet disconnetion, 
+it can store the images locally first, then the user can upload it later, and also serve as a upload in the local file first, verify, and then upload to the database
  
 

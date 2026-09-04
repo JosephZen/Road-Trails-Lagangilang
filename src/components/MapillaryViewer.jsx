@@ -15,43 +15,34 @@ export default function MapillaryViewer({
   const viewerRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const currentImageIdRef = useRef(null);
 
+  // Effect 1: Initialize Viewer
   useEffect(() => {
-    if (!containerRef.current || !imageId) return;
+    if (!containerRef.current) return;
 
-    let viewer = viewerRef.current;
+    let viewer;
+    let isMounted = true;
 
     const initViewer = async () => {
       try {
-        // Dynamic import since mapillary-js is an ESM module
         const { Viewer } = await import('mapillary-js');
         await import('mapillary-js/dist/mapillary.css');
 
-        if (viewer) {
-          // Just navigate to new image
-          setIsLoading(true);
-          viewer.moveTo(imageId).catch((err) => {
-            console.error('Mapillary navigation error:', err);
-            setError('Failed to load image');
-            setIsLoading(false);
-          });
-          return;
-        }
+        if (!isMounted) return;
 
-        // Create new viewer
         viewer = new Viewer({
           accessToken: MAPILLARY_ACCESS_TOKEN,
           container: containerRef.current,
-          imageId: imageId,
+          imageId: imageId || '123456789', // Fallback if somehow null
         });
 
-        // Listen for image changes
         viewer.on('image', (event) => {
           setIsLoading(false);
           setError(null);
-
           const image = event.image;
           if (image) {
+            currentImageIdRef.current = image.id;
             onPositionChange?.({
               lat: image.lngLat?.lat,
               lng: image.lngLat?.lng,
@@ -60,7 +51,6 @@ export default function MapillaryViewer({
           }
         });
 
-        // Listen for bearing changes
         viewer.on('pov', (event) => {
           onHeadingChange?.(event.bearing);
         });
@@ -70,21 +60,46 @@ export default function MapillaryViewer({
         });
 
         viewerRef.current = viewer;
+
+        // If imageId changed while initializing, move to it
+        if (imageId && currentImageIdRef.current !== imageId) {
+          currentImageIdRef.current = imageId;
+          viewer.moveTo(imageId).catch(console.error);
+        }
+
       } catch (err) {
         console.error('Failed to initialize Mapillary viewer:', err);
-        setError('Failed to initialize Mapillary viewer');
-        setIsLoading(false);
+        if (isMounted) {
+          setError('Failed to initialize Mapillary viewer');
+          setIsLoading(false);
+        }
       }
     };
 
     initViewer();
 
     return () => {
+      isMounted = false;
       if (viewerRef.current) {
         viewerRef.current.remove();
         viewerRef.current = null;
       }
     };
+  }, []); // Run only once on mount
+
+  // Effect 2: Handle imageId changes
+  useEffect(() => {
+    if (viewerRef.current && imageId) {
+      if (currentImageIdRef.current === imageId) return; // Already on this image
+      
+      setIsLoading(true);
+      currentImageIdRef.current = imageId;
+      viewerRef.current.moveTo(imageId).catch((err) => {
+        console.error('Mapillary navigation error:', err);
+        setError('Failed to load image');
+        setIsLoading(false);
+      });
+    }
   }, [imageId]);
 
   return (

@@ -7,11 +7,65 @@ import { calculateBearing } from '../utils/geoUtils';
 
 setWorkerUrl(maplibreWorkerUrl);
 
+// Coverage Gaps & Road/Trail Corridors in Lagangilang, Abra (Research Objective 1)
+const LAGANGILANG_TRAIL_CORRIDORS = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      properties: {
+        name: 'Surveyed Road Corridor (Poblacion - ASIST - Town Plaza)',
+        status: 'surveyed',
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [120.738083, 17.60825],
+          [120.738111, 17.608167],
+          [120.735, 17.6158],
+          [120.734, 17.6142],
+        ],
+      },
+    },
+    {
+      type: 'Feature',
+      properties: {
+        name: 'Unsurveyed Mountain Trail Gap: Mount Mag-atong Eco-Trail',
+        status: 'gap',
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [120.734, 17.6142],
+          [120.742, 17.625],
+          [120.751, 17.632],
+        ],
+      },
+    },
+    {
+      type: 'Feature',
+      properties: {
+        name: 'Unsurveyed River Corridor Gap: Bawa Rapids to Abra Riverbank',
+        status: 'gap',
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [120.742, 17.625],
+          [120.728, 17.621],
+          [120.725, 17.6015],
+        ],
+      },
+    },
+  ],
+};
+
 /**
  * MapView component using MapLibre GL JS with OpenFreeMap tiles.
- * Displays panorama location markers, coverage lines, and handles click-to-view.
+ * Displays panorama location markers, coverage lines, POI markers, and handles click-to-view.
  */
 export default function MapView({
+  theme = 'dark',
   panoramas,
   activePanoId,
   onSelectPano,
@@ -19,11 +73,47 @@ export default function MapView({
   viewerHeading,
   mapCenter,
   mapZoom,
+  touristSpots = [],
+  activeTouristSpotId = null,
+  onSelectTouristSpot,
+  showCoverageGaps = true,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  const poiMarkersRef = useRef([]);
   const coneLayerAdded = useRef(false);
+
+  // Get style URL based on theme
+  const getStyleObj = useCallback((t) => {
+    switch (t) {
+      case 'light': return 'https://tiles.openfreemap.org/styles/liberty';
+      case 'beige': return 'https://tiles.openfreemap.org/styles/positron';
+      case 'satellite': return {
+        version: 8,
+        sources: {
+          'esri-satellite': {
+            type: 'raster',
+            tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+            tileSize: 256,
+            attribution: 'Tiles &copy; Esri'
+          }
+        },
+        layers: [
+          {
+            id: 'satellite',
+            type: 'raster',
+            source: 'esri-satellite',
+            minzoom: 0,
+            maxzoom: 19
+          }
+        ]
+      };
+      case 'dark':
+      default:
+        return 'https://tiles.openfreemap.org/styles/dark';
+    }
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -31,7 +121,7 @@ export default function MapView({
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: 'https://tiles.openfreemap.org/styles/dark',
+      style: getStyleObj(theme),
       center: mapCenter || [120.9842, 14.5995], // Default: Manila
       zoom: mapZoom || 15,
       pitch: 0,
@@ -115,6 +205,39 @@ export default function MapView({
         },
       });
 
+      // Add Trail Corridors & Coverage Gaps Source (Research Objective 1)
+      map.addSource('trail-corridors', {
+        type: 'geojson',
+        data: LAGANGILANG_TRAIL_CORRIDORS,
+      });
+
+      // Surveyed road corridors (Solid Emerald)
+      map.addLayer({
+        id: 'trail-surveyed-layer',
+        type: 'line',
+        source: 'trail-corridors',
+        filter: ['==', ['get', 'status'], 'surveyed'],
+        paint: {
+          'line-color': '#06d6a0',
+          'line-width': 3.5,
+          'line-opacity': 0.8,
+        },
+      });
+
+      // Unsurveyed mountain & river trail gaps (Dashed Amber)
+      map.addLayer({
+        id: 'trail-gaps-layer',
+        type: 'line',
+        source: 'trail-corridors',
+        filter: ['==', ['get', 'status'], 'gap'],
+        paint: {
+          'line-color': '#f59e0b',
+          'line-width': 3,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.9,
+        },
+      });
+
       coneLayerAdded.current = true;
     });
 
@@ -171,6 +294,104 @@ export default function MapView({
     };
   }, []);
 
+  // Update theme dynamically
+  useEffect(() => {
+    if (!mapRef.current) return;
+    mapRef.current.setStyle(getStyleObj(theme));
+    
+    // We need to re-add the Mapillary layers and coverage lines after style changes
+    // setStyle replaces everything, so we listen for the next 'style.load'
+    mapRef.current.once('style.load', () => {
+      coneLayerAdded.current = false; // Trigger cone layer re-add if needed
+      
+      // Re-add sources and layers (extracting the logic from initial load)
+      if (!mapRef.current.getSource('mapillary')) {
+        mapRef.current.addSource('mapillary', {
+          type: 'vector',
+          tiles: [
+            'https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9'
+          ],
+          minzoom: 6,
+          maxzoom: 14
+        });
+      }
+
+      if (!mapRef.current.getLayer('mapillary-sequences')) {
+        mapRef.current.addLayer({
+          id: 'mapillary-sequences',
+          type: 'line',
+          source: 'mapillary',
+          'source-layer': 'sequence',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-opacity': 0.6, 'line-color': '#05CB63', 'line-width': 2 }
+        });
+      }
+
+      if (!mapRef.current.getLayer('mapillary-images')) {
+        mapRef.current.addLayer({
+          id: 'mapillary-images',
+          type: 'circle',
+          source: 'mapillary',
+          'source-layer': 'image',
+          paint: { 'circle-radius': 3, 'circle-color': '#05CB63', 'circle-opacity': 0.8 },
+          minzoom: 14
+        });
+      }
+
+      if (!mapRef.current.getSource('coverage-lines')) {
+        mapRef.current.addSource('coverage-lines', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        mapRef.current.addLayer({
+          id: 'coverage-lines-layer',
+          type: 'line',
+          source: 'coverage-lines',
+          paint: { 'line-color': '#4361ee', 'line-width': 3, 'line-opacity': 0.5 },
+        });
+      }
+
+      if (!mapRef.current.getSource('view-cone')) {
+        mapRef.current.addSource('view-cone', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        mapRef.current.addLayer({
+          id: 'view-cone-layer',
+          type: 'fill',
+          source: 'view-cone',
+          paint: { 'fill-color': '#4cc9f0', 'fill-opacity': 0.2 },
+        });
+      }
+
+      if (!mapRef.current.getSource('trail-corridors')) {
+        mapRef.current.addSource('trail-corridors', {
+          type: 'geojson',
+          data: LAGANGILANG_TRAIL_CORRIDORS,
+        });
+        mapRef.current.addLayer({
+          id: 'trail-surveyed-layer',
+          type: 'line',
+          source: 'trail-corridors',
+          filter: ['==', ['get', 'status'], 'surveyed'],
+          paint: { 'line-color': '#06d6a0', 'line-width': 3.5, 'line-opacity': 0.8 },
+        });
+        mapRef.current.addLayer({
+          id: 'trail-gaps-layer',
+          type: 'line',
+          source: 'trail-corridors',
+          filter: ['==', ['get', 'status'], 'gap'],
+          paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-dasharray': [2, 2], 'line-opacity': 0.9 },
+        });
+      }
+
+      coneLayerAdded.current = true;
+      
+      // Force trigger the data updates
+      window.dispatchEvent(new Event('map-style-loaded'));
+    });
+  }, [theme, getStyleObj]);
+
   // Update markers when panoramas change
   useEffect(() => {
     const map = mapRef.current;
@@ -186,12 +407,14 @@ export default function MapView({
     panoramas.forEach((pano) => {
       const el = document.createElement('div');
       el.className = 'map-marker';
+      el.style.transform = 'scale(1.5)';
       if (pano.id === activePanoId) {
         el.classList.add('active');
       }
       el.dataset.panoId = pano.id;
 
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent map click (which might trigger Mapillary search)
         onSelectPano?.(pano);
       });
 
@@ -229,10 +452,16 @@ export default function MapView({
       });
     });
 
-    const source = map.getSource('coverage-lines');
-    if (source) {
-      source.setData({ type: 'FeatureCollection', features });
-    }
+    const updateLines = () => {
+      const source = mapRef.current?.getSource('coverage-lines');
+      if (source) {
+        source.setData({ type: 'FeatureCollection', features });
+      }
+    };
+    
+    updateLines();
+    window.addEventListener('map-style-loaded', updateLines);
+    return () => window.removeEventListener('map-style-loaded', updateLines);
   }, [panoramas, activePanoId, onSelectPano]);
 
   // Update active marker and fly to it
@@ -269,24 +498,112 @@ export default function MapView({
     const activePano = panoramas?.find((p) => p.id === activePanoId);
     if (!activePano) return;
 
-    // Generate a cone polygon representing the viewing direction
-    const cone = generateViewCone(activePano.lat, activePano.lng, viewerHeading, 30, 0.0003);
-    const source = map.getSource('view-cone');
-    if (source) {
-      source.setData({
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            geometry: {
-              type: 'Polygon',
-              coordinates: [cone],
+    const updateCone = () => {
+      const map = mapRef.current;
+      if (!map) return;
+      // Generate a cone polygon representing the viewing direction
+      const cone = generateViewCone(activePano.lat, activePano.lng, viewerHeading, 30, 0.0003);
+      const source = map.getSource('view-cone');
+      if (source) {
+        source.setData({
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [cone],
+              },
             },
-          },
-        ],
-      });
-    }
+          ],
+        });
+      }
+    };
+    
+    updateCone();
+    window.addEventListener('map-style-loaded', updateCone);
+    return () => window.removeEventListener('map-style-loaded', updateCone);
   }, [viewerHeading, activePanoId, panoramas]);
+
+  // Update Tourist Spot (POI) markers
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Clear existing POI markers
+    poiMarkersRef.current.forEach((m) => m.remove());
+    poiMarkersRef.current = [];
+
+    if (!touristSpots || touristSpots.length === 0) return;
+
+    touristSpots.forEach((spot) => {
+      const lat = spot.location?.lat ?? spot.lat;
+      const lng = spot.location?.lng ?? spot.lng;
+      if (lat === undefined || lng === undefined) return;
+
+      const el = document.createElement('div');
+      el.className = `poi-marker ${spot.id === activeTouristSpotId ? 'active' : ''} ${
+        spot.sync_status === 'staged_local' ? 'staged' : ''
+      }`;
+      el.dataset.poiId = spot.id;
+
+      el.innerHTML = `
+        <div class="poi-marker-pin">
+          <span class="poi-marker-icon">⭐</span>
+        </div>
+        <div class="poi-marker-tooltip">${spot.name}</div>
+      `;
+
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onSelectTouristSpot?.(spot);
+      });
+
+      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([lng, lat])
+        .addTo(map);
+
+      poiMarkersRef.current.push(marker);
+    });
+
+    return () => {
+      poiMarkersRef.current.forEach((m) => m.remove());
+      poiMarkersRef.current = [];
+    };
+  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot]);
+
+  // Fly to active tourist spot when selected
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !activeTouristSpotId) return;
+
+    const spot = touristSpots?.find((s) => s.id === activeTouristSpotId);
+    if (spot) {
+      const lat = spot.location?.lat ?? spot.lat;
+      const lng = spot.location?.lng ?? spot.lng;
+      if (lat && lng) {
+        map.flyTo({
+          center: [lng, lat],
+          zoom: Math.max(map.getZoom(), 16),
+          duration: 800,
+        });
+      }
+    }
+  }, [activeTouristSpotId, touristSpots]);
+
+  // Toggle Coverage Gaps & Trail Corridors visibility (Research Objective 1)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const visibility = showCoverageGaps ? 'visible' : 'none';
+
+    if (map.getLayer('trail-surveyed-layer')) {
+      map.setLayoutProperty('trail-surveyed-layer', 'visibility', visibility);
+    }
+    if (map.getLayer('trail-gaps-layer')) {
+      map.setLayoutProperty('trail-gaps-layer', 'visibility', visibility);
+    }
+  }, [showCoverageGaps]);
 
   return (
     <div className="map-container" ref={mapContainerRef} />

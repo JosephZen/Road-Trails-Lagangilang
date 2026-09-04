@@ -58,10 +58,12 @@ function loadPannellum() {
 export default function PanoramaViewer({
   panorama,
   panoramas,
+  viewerHeading,
   getCachedUrl,
   onNavigate,
   onHeadingChange,
   onPitchChange,
+  steerTarget,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
@@ -95,26 +97,49 @@ export default function PanoramaViewer({
         // ignore
       }
 
-      createViewer(imageUrl, hotSpots, panorama.heading || 0);
+      createViewer(imageUrl, hotSpots, panorama.heading || 0, viewerHeading);
       currentPanoRef.current = panorama.id;
       return;
     }
 
     // First-time initialization
-    createViewer(imageUrl, hotSpots, panorama.heading || 0);
+    createViewer(imageUrl, hotSpots, panorama.heading || 0, viewerHeading);
     currentPanoRef.current = panorama.id;
-  }, [panorama, viewerReady, panoramas, getCachedUrl]);
+  }, [panorama, viewerReady, panoramas, getCachedUrl]); // intentional omit viewerHeading so it doesn't trigger reload when just looking around
+
+  // Handle steering / orienting camera to face a tourist landmark
+  useEffect(() => {
+    if (!viewerRef.current || !steerTarget) return;
+    const yaw = (steerTarget.heading - (panorama?.heading || 0));
+    try {
+      if (typeof viewerRef.current.lookAt === 'function') {
+        viewerRef.current.lookAt(steerTarget.pitch ?? 0, yaw, 100, 1000);
+      } else if (typeof viewerRef.current.setYaw === 'function') {
+        viewerRef.current.setYaw(yaw);
+        if (typeof viewerRef.current.setPitch === 'function') {
+          viewerRef.current.setPitch(steerTarget.pitch ?? 0);
+        }
+      }
+      onHeadingChange?.(steerTarget.heading);
+    } catch (e) {
+      console.warn('Could not orient Pannellum camera:', e);
+    }
+  }, [steerTarget, panorama, onHeadingChange]);
 
   /**
    * Create a new Pannellum viewer instance.
    */
-  const createViewer = useCallback((imageUrl, hotSpots, heading) => {
+  const createViewer = useCallback((imageUrl, hotSpots, heading, currentAbsoluteHeading) => {
     if (!containerRef.current || !window.pannellum) return;
 
     // Clear the container
     containerRef.current.innerHTML = '';
 
     setIsLoading(true);
+
+    const initialYaw = currentAbsoluteHeading !== undefined 
+      ? (currentAbsoluteHeading - (heading || 0)) 
+      : 0;
 
     const viewer = window.pannellum.viewer(containerRef.current, {
       type: 'equirectangular',
@@ -124,6 +149,7 @@ export default function PanoramaViewer({
       showZoomCtrl: false,
       showFullscreenCtrl: false,
       compass: false,
+      yaw: initialYaw,
       northOffset: heading || 0,
       hfov: 100,
       minHfov: 50,
@@ -186,13 +212,12 @@ export default function PanoramaViewer({
           cssClass: 'pano-hotspot-arrow',
           createTooltipFunc: (hotSpotDiv) => {
             hotSpotDiv.classList.add('pano-hotspot-arrow');
-            // Create arrow element
+            // Create chevron element
             const arrow = document.createElement('div');
             arrow.className = 'pano-hotspot-inner';
             arrow.innerHTML = `
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-                <circle cx="20" cy="20" r="18" fill="rgba(67, 97, 238, 0.6)" stroke="white" stroke-width="2"/>
-                <path d="M20 10 L28 24 L20 20 L12 24 Z" fill="white"/>
+              <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+                 <path d="M10 40 L30 15 L50 40" stroke="rgba(255,255,255,0.9)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
               </svg>
             `;
             hotSpotDiv.appendChild(arrow);
@@ -243,17 +268,23 @@ export default function PanoramaViewer({
       <style>{`
         .pano-hotspot-arrow {
           cursor: pointer;
-          transition: transform 0.2s ease;
+          transition: transform 0.2s ease, opacity 0.2s ease;
+          opacity: 0.7;
         }
         .pano-hotspot-arrow:hover {
-          transform: scale(1.3);
+          transform: scale(1.1);
+          opacity: 1;
         }
         .pano-hotspot-inner {
-          filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+          transform: perspective(400px) rotateX(65deg);
+          filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8));
+          display: flex;
+          justify-content: center;
+          align-items: center;
         }
         .pnlm-hotspot {
-          width: 40px !important;
-          height: 40px !important;
+          width: 60px !important;
+          height: 60px !important;
         }
       `}</style>
     </div>
