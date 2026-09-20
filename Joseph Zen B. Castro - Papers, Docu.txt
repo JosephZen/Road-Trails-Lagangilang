@@ -88,3 +88,6 @@ also include the ERD, database table, into a mermaid-formatted diagram, for the 
 it can store the images locally first, then the user can upload it later, and also serve as a upload in the local file first, verify, and then upload to the database
  
 
+09/14/2026
+I want to include openstreetmap, osrm, ferrostar, in this project, openstreetmap because I can edit certain map areas, draw/add new routes, fix routes, add route restrictions, since some areas are not accurate or even passable, osrm is just a good routing engine compare to others i tried, ferrostar is just good in many platforms, but we can still use maplibre, and also not forget mapillary and its 360 streetview. I want to easily import maps that I redesigned to be used on the system and the routing engine can also see that, for the zooming of the map like satellite, just stop zooming when this is no map data so its not a blank canvas.
+

@@ -1,55 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { calculateBearing } from '../utils/geoUtils';
 
-// Pannellum is loaded via CDN in index.html since it doesn't have a clean ESM build
-const PANNELLUM_CDN_CSS = 'https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css';
-const PANNELLUM_CDN_JS = 'https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js';
+import 'pannellum/build/pannellum.css';
+import 'pannellum/build/pannellum.js';
 
-const API_BASE = 'http://localhost:3001';
-
-/**
- * Load Pannellum from CDN if not already loaded.
- */
-let pannellumLoaded = false;
-function loadPannellum() {
-  return new Promise((resolve) => {
-    if (pannellumLoaded && window.pannellum) {
-      resolve();
-      return;
-    }
-
-    // Load CSS
-    if (!document.querySelector(`link[href="${PANNELLUM_CDN_CSS}"]`)) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = PANNELLUM_CDN_CSS;
-      document.head.appendChild(link);
-    }
-
-    // Load JS
-    if (!document.querySelector(`script[src="${PANNELLUM_CDN_JS}"]`)) {
-      const script = document.createElement('script');
-      script.src = PANNELLUM_CDN_JS;
-      script.onload = () => {
-        pannellumLoaded = true;
-        resolve();
-      };
-      document.head.appendChild(script);
-    } else if (window.pannellum) {
-      pannellumLoaded = true;
-      resolve();
-    } else {
-      // Wait for it to load
-      const interval = setInterval(() => {
-        if (window.pannellum) {
-          pannellumLoaded = true;
-          clearInterval(interval);
-          resolve();
-        }
-      }, 50);
-    }
-  });
-}
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 /**
  * Local 360° panorama viewer using Pannellum.
@@ -68,13 +23,8 @@ export default function PanoramaViewer({
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewerReady, setViewerReady] = useState(false);
+  const [viewerReady, setViewerReady] = useState(true);
   const currentPanoRef = useRef(null);
-
-  // Load Pannellum on mount
-  useEffect(() => {
-    loadPannellum().then(() => setViewerReady(true));
-  }, []);
 
   // Initialize or update the viewer when panorama changes
   useEffect(() => {

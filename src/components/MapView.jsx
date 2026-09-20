@@ -243,29 +243,37 @@ export default function MapView({
 
     // Handle clicks on Mapillary features or the map in general
     map.on('click', (e) => {
-      // Check if we clicked on a Mapillary image point first
-      const imageFeatures = map.queryRenderedFeatures(e.point, {
-        layers: ['mapillary-images']
-      });
+      try {
+        // Check if we clicked on a Mapillary image point first
+        if (map.getLayer('mapillary-images')) {
+          const imageFeatures = map.queryRenderedFeatures(e.point, {
+            layers: ['mapillary-images']
+          });
 
-      if (imageFeatures.length > 0) {
-        const feature = imageFeatures[0];
-        const imageId = feature.properties?.id || feature.properties?.image_id;
-        if (imageId) {
-          onMapClick?.(e.lngLat.lat, e.lngLat.lng, String(imageId));
-          return;
+          if (imageFeatures.length > 0) {
+            const feature = imageFeatures[0];
+            const imageId = feature.properties?.id || feature.properties?.image_id;
+            if (imageId) {
+              onMapClick?.(e.lngLat.lat, e.lngLat.lng, String(imageId));
+              return;
+            }
+          }
         }
-      }
 
-      // Check sequence lines (they have sequence_id but not individual image_id)
-      const seqFeatures = map.queryRenderedFeatures(e.point, {
-        layers: ['mapillary-sequences']
-      });
+        // Check sequence lines (they have sequence_id but not individual image_id)
+        if (map.getLayer('mapillary-sequences')) {
+          const seqFeatures = map.queryRenderedFeatures(e.point, {
+            layers: ['mapillary-sequences']
+          });
 
-      if (seqFeatures.length > 0) {
-        // For sequences, we do a lat/lng search to find the nearest image
-        onMapClick?.(e.lngLat.lat, e.lngLat.lng, null);
-        return;
+          if (seqFeatures.length > 0) {
+            // For sequences, we do a lat/lng search to find the nearest image
+            onMapClick?.(e.lngLat.lat, e.lngLat.lng, null);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Map feature query warning:', err);
       }
 
       // Normal map click (no Mapillary feature)
@@ -288,15 +296,29 @@ export default function MapView({
 
     mapRef.current = map;
 
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapRef.current) {
+        mapRef.current.resize();
+      }
+    });
+    if (mapContainerRef.current) {
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
-  // Update theme dynamically
+  // Update theme dynamically (only when theme actually changes)
+  const currentThemeRef = useRef(theme);
   useEffect(() => {
     if (!mapRef.current) return;
+    if (currentThemeRef.current === theme) return;
+    currentThemeRef.current = theme;
+
     mapRef.current.setStyle(getStyleObj(theme));
     
     // We need to re-add the Mapillary layers and coverage lines after style changes

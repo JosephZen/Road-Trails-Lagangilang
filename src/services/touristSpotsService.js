@@ -2,6 +2,7 @@ import seedSpots from '../data/tourist_spots.json';
 
 const STORAGE_KEY = 'lagangilang_tourist_spots_v1';
 const NEON_URL_KEY = 'lagangilang_neon_db_url';
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 /**
  * Calculate haversine distance between two coordinates in meters.
@@ -155,7 +156,49 @@ export const touristSpotsService = {
     }
 
     this.saveAllSpots(all);
+
+    // Asynchronously mirror write to local PostgreSQL via local server
+    fetch(`${API_BASE}/api/tourist-spots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSpot),
+    }).catch(() => {});
+
     return newSpot;
+  },
+
+  /**
+   * Fetch spots from local Express server (which connects to local PostgreSQL via pgAdmin 4)
+   */
+  async fetchFromLocalApi() {
+    try {
+      const res = await fetch(`${API_BASE}/api/tourist-spots`);
+      if (res.ok) {
+        const spots = await res.json();
+        if (Array.isArray(spots) && spots.length > 0) {
+          this.saveAllSpots(spots);
+          return spots;
+        }
+      }
+    } catch (e) {
+      // Local server not running, ignore
+    }
+    return this.getAllSpots();
+  },
+
+  /**
+   * Check if local PostgreSQL is reachable via the local server
+   */
+  async checkLocalPostgres() {
+    try {
+      const res = await fetch(`${API_BASE}/api/health/postgres`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      // ignore
+    }
+    return { connected: false, message: 'Local server not running' };
   },
 
   /**
@@ -264,6 +307,12 @@ export const touristSpotsService = {
     const all = this.getAllSpots();
     const filtered = all.filter((s) => s.id !== spotId);
     this.saveAllSpots(filtered);
+
+    // Asynchronously delete from local PostgreSQL via local server
+    fetch(`${API_BASE}/api/tourist-spots/${spotId}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+
     return filtered;
   },
 

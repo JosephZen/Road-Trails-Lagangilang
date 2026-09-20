@@ -4,12 +4,14 @@
       "id": "pano_1785434840169_sqgpeq",
       "filename": "pano_1785434840169_sqgpeq.jpg",
       "thumbnail": "thumbnails/pano_1785434840169_sqgpeq_thumb.jpg",
-      "lat": 29.69999999999729,
-      "lng": 17.099999999976774,
+      "lat": 17.60825,
+      "lng": 120.738083,
       "heading": 0,
       "label": "UA",
       "timestamp": "2026-07-30T18:07:25.546Z",
-      "neighbors": [],
+      "neighbors": [
+        "pano_1785458227165_1j20c9"
+      ],
       "description": "UNIVERSITY OF ABRA"
     },
     {
@@ -22,14 +24,8 @@
       "label": "",
       "timestamp": "2026-07-31T00:37:08.716Z",
       "neighbors": [
-        "pano_1785458811653_j5vnmy",
-        "pano_1785458933279_gohnbu",
-        "pano_1785458951667_shihgp",
-        "pano_1785458989281_9tzwfy",
-        "pano_1785459001017_b2f54t",
-        "pano_1785458901520_jb1b5w",
-        "pano_1785458903585_a9jv8p",
-        "pano_1785458905671_wa1e0g"
+        "pano_1785434840169_sqgpeq",
+        "pano_1785458811653_j5vnmy"
       ]
     },
     {
@@ -42,15 +38,8 @@
       "label": "UA",
       "timestamp": "2026-07-31T00:46:52.774Z",
       "neighbors": [
-        "pano_1785458933279_gohnbu",
-        "pano_1785458951667_shihgp",
-        "pano_1785458989281_9tzwfy",
-        "pano_1785459001017_b2f54t",
-        "pano_1785458901520_jb1b5w",
-        "pano_1785458903585_a9jv8p",
-        "pano_1785458905671_wa1e0g",
-        "pano_1785458907688_3ycntg",
-        "pano_1785458227165_1j20c9"
+        "pano_1785458227165_1j20c9",
+        "pano_1785458901520_jb1b5w"
       ]
     },
     {
@@ -63,16 +52,8 @@
       "label": "UA",
       "timestamp": "2026-07-31T00:48:22.544Z",
       "neighbors": [
-        "pano_1785458903585_a9jv8p",
-        "pano_1785458905671_wa1e0g",
-        "pano_1785458907688_3ycntg",
-        "pano_1785458911472_jf2n58",
-        "pano_1785458933279_gohnbu",
-        "pano_1785458951667_shihgp",
-        "pano_1785458989281_9tzwfy",
-        "pano_1785459001017_b2f54t",
-        "pano_1785458227165_1j20c9",
-        "pano_1785458811653_j5vnmy"
+        "pano_1785458811653_j5vnmy",
+        "pano_1785458903585_a9jv8p"
       ]
     },
     {
@@ -86,15 +67,7 @@
       "timestamp": "2026-07-31T00:48:24.673Z",
       "neighbors": [
         "pano_1785458901520_jb1b5w",
-        "pano_1785458905671_wa1e0g",
-        "pano_1785458907688_3ycntg",
-        "pano_1785458911472_jf2n58",
-        "pano_1785458933279_gohnbu",
-        "pano_1785458951667_shihgp",
-        "pano_1785458989281_9tzwfy",
-        "pano_1785459001017_b2f54t",
-        "pano_1785458227165_1j20c9",
-        "pano_1785458811653_j5vnmy"
+        "pano_1785458905671_wa1e0g"
       ]
     },
     {
@@ -107,16 +80,8 @@
       "label": "UA",
       "timestamp": "2026-07-31T00:48:26.651Z",
       "neighbors": [
-        "pano_1785458901520_jb1b5w",
         "pano_1785458903585_a9jv8p",
-        "pano_1785458907688_3ycntg",
-        "pano_1785458911472_jf2n58",
-        "pano_1785458933279_gohnbu",
-        "pano_1785458951667_shihgp",
-        "pano_1785458989281_9tzwfy",
-        "pano_1785459001017_b2f54t",
-        "pano_1785458227165_1j20c9",
-        "pano_1785458811653_j5vnmy"
+        "pano_1785458907688_3ycntg"
       ]
     },
     {
@@ -129,15 +94,8 @@
       "label": "UA",
       "timestamp": "2026-07-31T00:48:28.727Z",
       "neighbors": [
-        "pano_1785458901520_jb1b5w",
-        "pano_1785458903585_a9jv8p",
         "pano_1785458905671_wa1e0g",
-        "pano_1785458911472_jf2n58",
-        "pano_1785458933279_gohnbu",
-        "pano_1785458951667_shihgp",
-        "pano_1785458989281_9tzwfy",
-        "pano_1785459001017_b2f54t",
-        "pano_1785458811653_j5vnmy"
+        "pano_1785458911472_jf2n58"
       ]
     },
     {
@@ -150,14 +108,8 @@
       "label": "UA",
       "timestamp": "2026-07-31T00:48:32.643Z",
       "neighbors": [
-        "pano_1785458901520_jb1b5w",
-        "pano_1785458903585_a9jv8p",
-        "pano_1785458905671_wa1e0g",
         "pano_1785458907688_3ycntg",
-        "pano_1785458933279_gohnbu",
-        "pano_1785458951667_shihgp",
-        "pano_1785458989281_9tzwfy",
-        "pano_1785459001017_b2f54t"
+        "pano_1785458933279_gohnbu"
       ]
     },
     {
@@ -170,16 +122,8 @@
       "label": "",
       "timestamp": "2026-07-31T00:48:54.371Z",
       "neighbors": [
-        "pano_1785458951667_shihgp",
-        "pano_1785458989281_9tzwfy",
-        "pano_1785459001017_b2f54t",
-        "pano_1785458901520_jb1b5w",
-        "pano_1785458903585_a9jv8p",
-        "pano_1785458905671_wa1e0g",
-        "pano_1785458907688_3ycntg",
         "pano_1785458911472_jf2n58",
-        "pano_1785458227165_1j20c9",
-        "pano_1785458811653_j5vnmy"
+        "pano_1785458951667_shihgp"
       ]
     },
     {
@@ -193,15 +137,7 @@
       "timestamp": "2026-07-31T00:49:12.761Z",
       "neighbors": [
         "pano_1785458933279_gohnbu",
-        "pano_1785458989281_9tzwfy",
-        "pano_1785459001017_b2f54t",
-        "pano_1785458901520_jb1b5w",
-        "pano_1785458903585_a9jv8p",
-        "pano_1785458905671_wa1e0g",
-        "pano_1785458907688_3ycntg",
-        "pano_1785458911472_jf2n58",
-        "pano_1785458227165_1j20c9",
-        "pano_1785458811653_j5vnmy"
+        "pano_1785458989281_9tzwfy"
       ]
     },
     {
@@ -214,16 +150,8 @@
       "label": "",
       "timestamp": "2026-07-31T00:49:50.433Z",
       "neighbors": [
-        "pano_1785458933279_gohnbu",
         "pano_1785458951667_shihgp",
-        "pano_1785459001017_b2f54t",
-        "pano_1785458901520_jb1b5w",
-        "pano_1785458903585_a9jv8p",
-        "pano_1785458905671_wa1e0g",
-        "pano_1785458907688_3ycntg",
-        "pano_1785458911472_jf2n58",
-        "pano_1785458227165_1j20c9",
-        "pano_1785458811653_j5vnmy"
+        "pano_1785459001017_b2f54t"
       ]
     },
     {
@@ -236,16 +164,22 @@
       "label": "",
       "timestamp": "2026-07-31T00:50:02.142Z",
       "neighbors": [
-        "pano_1785458933279_gohnbu",
-        "pano_1785458951667_shihgp",
         "pano_1785458989281_9tzwfy",
-        "pano_1785458901520_jb1b5w",
-        "pano_1785458903585_a9jv8p",
-        "pano_1785458905671_wa1e0g",
-        "pano_1785458907688_3ycntg",
-        "pano_1785458911472_jf2n58",
-        "pano_1785458227165_1j20c9",
-        "pano_1785458811653_j5vnmy"
+        "pano_1789030630758_79xzfr"
+      ]
+    },
+    {
+      "id": "pano_1789030630758_79xzfr",
+      "filename": "pano_1789030630758_79xzfr.jpg",
+      "thumbnail": "thumbnails/pano_1789030630758_79xzfr_thumb.jpg",
+      "lat": 17.60825,
+      "lng": 120.738083,
+      "heading": 0,
+      "label": "",
+      "description": "",
+      "timestamp": "2026-09-10T08:57:19.422Z",
+      "neighbors": [
+        "pano_1785459001017_b2f54t"
       ]
     }
   ]

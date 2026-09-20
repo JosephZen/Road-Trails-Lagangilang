@@ -12,7 +12,7 @@ import { usePreloader } from './hooks/usePreloader';
 import { useMapillary } from './hooks/useMapillary';
 import { formatCoords } from './utils/geoUtils';
 
-const API_BASE = 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 /**
  * Main application shell.
@@ -480,8 +480,8 @@ export default function App() {
           onSelectTouristSpot={handleSelectTouristSpot}
           showCoverageGaps={showCoverageGaps}
           mapCenter={
-            panoramas.length > 0
-              ? [panoramas[0].lng, panoramas[0].lat]
+            activePano
+              ? [activePano.lng, activePano.lat]
               : [120.738083, 17.60825] // Lagangilang, Abra
           }
           mapZoom={15}
