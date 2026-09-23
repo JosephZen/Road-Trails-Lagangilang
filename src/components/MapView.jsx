@@ -77,6 +77,10 @@ export default function MapView({
   activeTouristSpotId = null,
   onSelectTouristSpot,
   showCoverageGaps = true,
+  routeGeoJSON,
+  routeOrigin,
+  routeDestination,
+  showCustomOSM = true,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -205,6 +209,36 @@ export default function MapView({
         },
       });
 
+      // Route line source & layer
+      map.addSource('route-line', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'route-line-casing',
+        type: 'line',
+        source: 'route-line',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#1e3a5f',
+          'line-width': 10,
+          'line-opacity': 0.4,
+        },
+      });
+
+      map.addLayer({
+        id: 'route-line-layer',
+        type: 'line',
+        source: 'route-line',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#3b82f6',
+          'line-width': 5,
+          'line-opacity': 0.85,
+        },
+      });
+
       // Add Trail Corridors & Coverage Gaps Source (Research Objective 1)
       map.addSource('trail-corridors', {
         type: 'geojson',
@@ -239,6 +273,95 @@ export default function MapView({
       });
 
       coneLayerAdded.current = true;
+
+      // Custom OSM Overlay (user's edited map.osm data)
+      fetch('/data/lagangilang-custom.geojson')
+        .then(r => r.json())
+        .then(geojson => {
+          if (!mapRef.current) return;
+          
+          mapRef.current.addSource('custom-osm', {
+            type: 'geojson',
+            data: geojson,
+          });
+
+          // Custom roads by type
+          mapRef.current.addLayer({
+            id: 'custom-roads-primary',
+            type: 'line',
+            source: 'custom-osm',
+            filter: ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'tertiary']]],
+            paint: {
+              'line-color': '#f59e0b',
+              'line-width': 3,
+              'line-opacity': 0.8,
+            },
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+          });
+
+          mapRef.current.addLayer({
+            id: 'custom-roads-residential',
+            type: 'line',
+            source: 'custom-osm',
+            filter: ['==', ['get', 'highway'], 'residential'],
+            paint: {
+              'line-color': '#fb923c',
+              'line-width': 2,
+              'line-opacity': 0.7,
+            },
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+          });
+
+          mapRef.current.addLayer({
+            id: 'custom-roads-paths',
+            type: 'line',
+            source: 'custom-osm',
+            filter: ['in', ['get', 'highway'], ['literal', ['path', 'track', 'footway', 'steps']]],
+            paint: {
+              'line-color': '#a3763d',
+              'line-width': 2,
+              'line-dasharray': [3, 2],
+              'line-opacity': 0.8,
+            },
+          });
+
+          // Barriers & gates (points and lines)
+          mapRef.current.addLayer({
+            id: 'custom-barriers',
+            type: 'circle',
+            source: 'custom-osm',
+            filter: ['any',
+              ['has', 'barrier'],
+              ['==', ['get', 'access'], 'no'],
+            ],
+            paint: {
+              'circle-radius': 5,
+              'circle-color': [
+                'case',
+                ['==', ['get', 'access'], 'no'], '#ef4444',
+                ['==', ['get', 'barrier'], 'gate'], '#f97316',
+                '#8b5cf6'
+              ],
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#ffffff',
+              'circle-opacity': 0.9,
+            },
+          });
+
+          // Buildings
+          mapRef.current.addLayer({
+            id: 'custom-buildings',
+            type: 'fill',
+            source: 'custom-osm',
+            filter: ['has', 'building'],
+            paint: {
+              'fill-color': '#6366f1',
+              'fill-opacity': 0.15,
+              'fill-outline-color': '#818cf8',
+            },
+          });
+        })
+        .catch(err => console.warn('Custom OSM overlay load failed:', err));
     });
 
     // Handle clicks on Mapillary features or the map in general
@@ -386,6 +509,27 @@ export default function MapView({
         });
       }
 
+      if (!mapRef.current.getSource('route-line')) {
+        mapRef.current.addSource('route-line', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        mapRef.current.addLayer({
+          id: 'route-line-casing',
+          type: 'line',
+          source: 'route-line',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#1e3a5f', 'line-width': 10, 'line-opacity': 0.4 },
+        });
+        mapRef.current.addLayer({
+          id: 'route-line-layer',
+          type: 'line',
+          source: 'route-line',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 0.85 },
+        });
+      }
+
       if (!mapRef.current.getSource('trail-corridors')) {
         mapRef.current.addSource('trail-corridors', {
           type: 'geojson',
@@ -406,6 +550,48 @@ export default function MapView({
           paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-dasharray': [2, 2], 'line-opacity': 0.9 },
         });
       }
+
+      // Custom OSM Overlay
+      fetch('/data/lagangilang-custom.geojson')
+        .then(r => r.json())
+        .then(geojson => {
+          if (!mapRef.current) return;
+          if (!mapRef.current.getSource('custom-osm')) {
+            mapRef.current.addSource('custom-osm', { type: 'geojson', data: geojson });
+            mapRef.current.addLayer({
+              id: 'custom-roads-primary', type: 'line', source: 'custom-osm',
+              filter: ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'tertiary']]],
+              paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-opacity': 0.8 },
+              layout: { 'line-cap': 'round', 'line-join': 'round' },
+            });
+            mapRef.current.addLayer({
+              id: 'custom-roads-residential', type: 'line', source: 'custom-osm',
+              filter: ['==', ['get', 'highway'], 'residential'],
+              paint: { 'line-color': '#fb923c', 'line-width': 2, 'line-opacity': 0.7 },
+              layout: { 'line-cap': 'round', 'line-join': 'round' },
+            });
+            mapRef.current.addLayer({
+              id: 'custom-roads-paths', type: 'line', source: 'custom-osm',
+              filter: ['in', ['get', 'highway'], ['literal', ['path', 'track', 'footway', 'steps']]],
+              paint: { 'line-color': '#a3763d', 'line-width': 2, 'line-dasharray': [3, 2], 'line-opacity': 0.8 },
+            });
+            mapRef.current.addLayer({
+              id: 'custom-barriers', type: 'circle', source: 'custom-osm',
+              filter: ['any', ['has', 'barrier'], ['==', ['get', 'access'], 'no']],
+              paint: {
+                'circle-radius': 5,
+                'circle-color': ['case', ['==', ['get', 'access'], 'no'], '#ef4444', ['==', ['get', 'barrier'], 'gate'], '#f97316', '#8b5cf6'],
+                'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff', 'circle-opacity': 0.9,
+              },
+            });
+            mapRef.current.addLayer({
+              id: 'custom-buildings', type: 'fill', source: 'custom-osm',
+              filter: ['has', 'building'],
+              paint: { 'fill-color': '#6366f1', 'fill-opacity': 0.15, 'fill-outline-color': '#818cf8' },
+            });
+          }
+        })
+        .catch(err => console.warn('Custom OSM overlay reload failed:', err));
 
       coneLayerAdded.current = true;
       
@@ -573,7 +759,8 @@ export default function MapView({
         <div class="poi-marker-pin">
           <span class="poi-marker-icon">⭐</span>
         </div>
-        <div class="poi-marker-tooltip">${spot.name}</div>
+        <div class="poi-marker-label">${spot.name}</div>
+        <div class="poi-marker-tooltip">${spot.category || ''}</div>
       `;
 
       el.addEventListener('click', (e) => {
@@ -626,6 +813,80 @@ export default function MapView({
       map.setLayoutProperty('trail-gaps-layer', 'visibility', visibility);
     }
   }, [showCoverageGaps]);
+
+  // Toggle Custom OSM overlay visibility
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const visibility = showCustomOSM ? 'visible' : 'none';
+    const layers = ['custom-roads-primary', 'custom-roads-residential', 'custom-roads-paths', 'custom-barriers', 'custom-buildings'];
+    layers.forEach(id => {
+      if (map.getLayer(id)) {
+        map.setLayoutProperty(id, 'visibility', visibility);
+      }
+    });
+  }, [showCustomOSM]);
+
+  // Update route line
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const updateRoute = () => {
+      const source = mapRef.current?.getSource('route-line');
+      if (!source) return;
+
+      if (routeGeoJSON) {
+        source.setData({
+          type: 'Feature',
+          geometry: routeGeoJSON,
+          properties: {},
+        });
+      } else {
+        source.setData({ type: 'FeatureCollection', features: [] });
+      }
+    };
+
+    updateRoute();
+    window.addEventListener('map-style-loaded', updateRoute);
+    return () => window.removeEventListener('map-style-loaded', updateRoute);
+  }, [routeGeoJSON]);
+
+  // Route origin & destination markers
+  const routeMarkersRef = useRef([]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Clear existing route markers
+    routeMarkersRef.current.forEach(m => m.remove());
+    routeMarkersRef.current = [];
+
+    if (routeOrigin) {
+      const el = document.createElement('div');
+      el.className = 'route-marker route-marker-origin';
+      el.innerHTML = '<div class="route-marker-dot">A</div>';
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat(routeOrigin)
+        .addTo(map);
+      routeMarkersRef.current.push(marker);
+    }
+
+    if (routeDestination) {
+      const el = document.createElement('div');
+      el.className = 'route-marker route-marker-destination';
+      el.innerHTML = '<div class="route-marker-dot">B</div>';
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat(routeDestination)
+        .addTo(map);
+      routeMarkersRef.current.push(marker);
+    }
+
+    return () => {
+      routeMarkersRef.current.forEach(m => m.remove());
+      routeMarkersRef.current = [];
+    };
+  }, [routeOrigin, routeDestination]);
 
   return (
     <div className="map-container" ref={mapContainerRef} />

@@ -11,6 +11,8 @@ import { touristSpotsService, findNearestPanorama } from './services/touristSpot
 import { usePreloader } from './hooks/usePreloader';
 import { useMapillary } from './hooks/useMapillary';
 import { formatCoords } from './utils/geoUtils';
+import RoutePlanner from './components/RoutePlanner';
+import NavigationView from './components/NavigationView';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -38,6 +40,15 @@ export default function App() {
   const [editingSpot, setEditingSpot] = useState(null);
   const [steerTarget, setSteerTarget] = useState(null);
   const [showCoverageGaps, setShowCoverageGaps] = useState(true);
+
+  // Routing State
+  const [routingMode, setRoutingMode] = useState(false);
+  const [routingProfile, setRoutingProfile] = useState('driving');
+  const [routeOrigin, setRouteOrigin] = useState(null);
+  const [routeDestination, setRouteDestination] = useState(null);
+  const [routeData, setRouteData] = useState(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [showCustomOSM, setShowCustomOSM] = useState(true);
 
   // Connectivity & 2-Step Sync State (Research Objective 3: ISO/IEC 25010 Reliability)
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -237,9 +248,23 @@ export default function App() {
     }
   };
 
+  // Handle map click for routing mode
+  const handleMapClickForRouting = useCallback((lat, lng) => {
+    if (!routeOrigin) {
+      setRouteOrigin([lng, lat]);
+    } else if (!routeDestination) {
+      setRouteDestination([lng, lat]);
+    }
+  }, [routeOrigin, routeDestination]);
+
   // Handle clicking on the map — works in both modes
   const handleMapClick = useCallback(
     async (lat, lng, clickedMapillaryId) => {
+      if (routingMode) {
+        handleMapClickForRouting(lat, lng);
+        return;
+      }
+      
       // If we clicked on a Mapillary feature (green line/dot)
       if (clickedMapillaryId) {
         setMode('cloud');
@@ -290,7 +315,32 @@ export default function App() {
     setActiveTouristSpot(null);
   }, []);
 
+  const handleRouteCalculated = useCallback((route) => {
+    setRouteData(route);
+    setRoutingMode(false);
+  }, []);
+
+  const handleClearRoute = useCallback(() => {
+    setRouteOrigin(null);
+    setRouteDestination(null);
+    setRouteData(null);
+    setRoutingMode(false);
+  }, []);
+
+  const handleStartNavigation = useCallback((route) => {
+    setRouteData(route);
+    setIsNavigating(true);
+  }, []);
+
+  const handleExitNavigation = useCallback(() => {
+    setIsNavigating(false);
+  }, []);
+
   const stagedCount = touristSpots.filter((s) => s.sync_status === 'staged_local').length;
+
+  if (isNavigating && routeData) {
+    return <NavigationView routeData={routeData} onExit={handleExitNavigation} />;
+  }
 
   return (
     <div className="app-container">
@@ -358,6 +408,25 @@ export default function App() {
             }}
           >
             🗺️ Gaps {showCoverageGaps ? 'ON' : 'OFF'}
+          </button>
+
+          {/* Custom OSM Overlay Toggle */}
+          <button
+            className={`btn btn-sm ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setShowCustomOSM(!showCustomOSM)}
+            title="Toggle Custom OSM Map Overlay"
+            style={{
+              fontSize: '0.8rem',
+              padding: '6px 10px',
+              borderRadius: 'var(--radius-full)',
+              background: showCustomOSM
+                ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                : 'rgba(0,0,0,0.6)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              color: '#ffffff',
+            }}
+          >
+            🗺️ Custom Map
           </button>
 
           {/* Offline / Online Network Indicator (Objective 3: Reliability) */}
@@ -479,12 +548,16 @@ export default function App() {
           activeTouristSpotId={activeTouristSpot?.id}
           onSelectTouristSpot={handleSelectTouristSpot}
           showCoverageGaps={showCoverageGaps}
+          showCustomOSM={showCustomOSM}
           mapCenter={
             activePano
               ? [activePano.lng, activePano.lat]
               : [120.738083, 17.60825] // Lagangilang, Abra
           }
           mapZoom={15}
+          routeGeoJSON={routeData?.geometry || null}
+          routeOrigin={routeOrigin}
+          routeDestination={routeDestination}
         />
 
         {/* Resize handle */}
@@ -546,6 +619,21 @@ export default function App() {
                   🟡 Staged ({stagedCount})
                 </button>
               )}
+              <button
+                onClick={() => setSidebarTab('routing')}
+                style={{
+                  background: sidebarTab === 'routing' ? 'var(--accent-primary)' : 'transparent',
+                  color: sidebarTab === 'routing' ? '#fff' : 'var(--text-secondary)',
+                  border: 'none',
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                🧭 Routing
+              </button>
             </div>
 
             <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
@@ -860,6 +948,23 @@ export default function App() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Tab 4: Route Planner */}
+          {sidebarTab === 'routing' && (
+            <RoutePlanner
+              routeOrigin={routeOrigin}
+              routeDestination={routeDestination}
+              routeData={routeData}
+              routingProfile={routingProfile}
+              routingMode={routingMode}
+              isNavigating={isNavigating}
+              onSetRoutingMode={setRoutingMode}
+              onSetProfile={setRoutingProfile}
+              onClearRoute={handleClearRoute}
+              onRouteCalculated={handleRouteCalculated}
+              onStartNavigation={handleStartNavigation}
+            />
           )}
         </div>
       </div>
