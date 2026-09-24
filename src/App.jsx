@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MapView from './components/MapView';
 import PanoramaViewer from './components/PanoramaViewer';
 import MapillaryViewer from './components/MapillaryViewer';
-import MiniMap from './components/MiniMap';
 import UploadModal from './components/UploadModal';
 import TouristSpotModal from './components/TouristSpotModal';
 import TouristSpotStreetViewCard from './components/TouristSpotStreetViewCard';
@@ -1060,17 +1059,7 @@ export default function App() {
               </div>
             )}
 
-            {/* Mini map in viewer */}
-            {activePano && (
-              <MiniMap
-                theme={mapTheme}
-                lat={activePano.lat}
-                lng={activePano.lng}
-                heading={viewerHeading}
-                panoramas={panoramas}
-                onSelectPano={handleSelectPano}
-              />
-            )}
+
 
             {/* Floating toolbar */}
             <div className="floating-toolbar glass-panel-sm">

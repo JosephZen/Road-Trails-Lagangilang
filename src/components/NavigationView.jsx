@@ -5,12 +5,16 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { formatDuration, formatDistance, getManeuverIcon } from '../services/routingService';
 
+// Ferrostar Core SDK for future real-time GPS state machine integration
+import { FerrostarCore } from '@stadiamaps/ferrostar';
+import '@stadiamaps/ferrostar-webcomponents';
+
 setWorkerUrl(maplibreWorkerUrl);
 
 /**
  * Full-screen turn-by-turn navigation view.
- * Simulates GPS movement along the OSRM route for development.
- * Shows maneuver instructions, distance, ETA, and animated puck.
+ * Integrates MapLibre GL JS for rendering, with hooks ready for Ferrostar's Rust/WASM Core TripState.
+ * Currently uses Simulated GPS movement along the OSRM route for development.
  */
 export default function NavigationView({ routeData, onExit }) {
   const mapContainerRef = useRef(null);

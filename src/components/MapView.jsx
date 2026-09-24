@@ -128,6 +128,7 @@ export default function MapView({
       style: getStyleObj(theme),
       center: mapCenter || [120.9842, 14.5995], // Default: Manila
       zoom: mapZoom || 15,
+      maxZoom: theme === 'satellite' ? 19 : 22,
       pitch: 0,
       antialias: true,
     });
@@ -169,7 +170,7 @@ export default function MapView({
         source: 'mapillary',
         'source-layer': 'image',
         paint: {
-          'circle-radius': 3,
+          'circle-radius': 6,
           'circle-color': '#05CB63',
           'circle-opacity': 0.8
         },
@@ -442,6 +443,7 @@ export default function MapView({
     if (currentThemeRef.current === theme) return;
     currentThemeRef.current = theme;
 
+    mapRef.current.setMaxZoom(theme === 'satellite' ? 19 : 22);
     mapRef.current.setStyle(getStyleObj(theme));
     
     // We need to re-add the Mapillary layers and coverage lines after style changes
@@ -478,7 +480,7 @@ export default function MapView({
           type: 'circle',
           source: 'mapillary',
           'source-layer': 'image',
-          paint: { 'circle-radius': 3, 'circle-color': '#05CB63', 'circle-opacity': 0.8 },
+          paint: { 'circle-radius': 6, 'circle-color': '#05CB63', 'circle-opacity': 0.8 },
           minzoom: 14
         });
       }
