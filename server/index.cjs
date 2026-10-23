@@ -65,6 +65,24 @@ try {
   console.warn('  ℹ PostgreSQL driver init failed, using local JSON buffer.');
 }
 
+// ============ Neon Serverless Cloud PostgreSQL Setup ============
+const neonDbUrl =
+  process.env.VITE_NEON_DATABASE_URL ||
+  process.env.NEON_DATABASE_URL ||
+  'postgresql://neondb_owner:npg_ZN9TowMbiJ8j@ep-gentle-water-azs3l8ig-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+
+let neonPool = null;
+try {
+  neonPool = new Pool({
+    connectionString: neonDbUrl,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5000,
+  });
+  console.log('  ✓ Neon Cloud PostgreSQL pool initialized.');
+} catch (err) {
+  console.warn('  ⚠ Neon Cloud pool init error:', err.message);
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -352,6 +370,53 @@ app.post('/api/tourist-spots', async (req, res) => {
     }
   }
 
+  // Also sync to Neon Cloud DB
+  if (neonPool) {
+    try {
+      await neonPool.query(
+        `INSERT INTO public.tourist_spots (
+          id, name, barangay, latitude, longitude, address,
+          description, image_url, is_pseudo_image, pseudo_theme,
+          primary_pano_id, target_heading, target_pitch, sync_status,
+          staged_at, synced_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'synced_cloud', NOW(), NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          barangay = EXCLUDED.barangay,
+          latitude = EXCLUDED.latitude,
+          longitude = EXCLUDED.longitude,
+          address = EXCLUDED.address,
+          description = EXCLUDED.description,
+          image_url = EXCLUDED.image_url,
+          is_pseudo_image = EXCLUDED.is_pseudo_image,
+          pseudo_theme = EXCLUDED.pseudo_theme,
+          primary_pano_id = EXCLUDED.primary_pano_id,
+          target_heading = EXCLUDED.target_heading,
+          target_pitch = EXCLUDED.target_pitch,
+          sync_status = 'synced_cloud',
+          synced_at = NOW(),
+          updated_at = NOW()`,
+        [
+          id,
+          spot.name,
+          spot.barangay || 'Poblacion',
+          lat,
+          lng,
+          spot.location?.address || '',
+          spot.description || '',
+          spot.image || null,
+          spot.isPseudoImage ?? !spot.image,
+          spot.pseudoTheme || 'indigo',
+          spot.connected360?.targetId || null,
+          parseFloat(spot.connected360?.heading) || 0,
+          parseFloat(spot.connected360?.pitch) || 0,
+        ]
+      );
+    } catch (err) {
+      console.warn('Neon write error:', err.message);
+    }
+  }
+
   // Also update local JSON file
   const spots = readLocalSpots();
   const existingIdx = spots.findIndex((s) => s.id === id);
@@ -372,10 +437,71 @@ app.post('/api/tourist-spots', async (req, res) => {
 });
 
 /**
+ * PATCH /api/tourist-spots/:id/location - Update spot coordinates
+ */
+app.patch('/api/tourist-spots/:id/location', async (req, res) => {
+  const { id } = req.params;
+  const { lat, lng } = req.body;
+  const parsedLat = parseFloat(lat);
+  const parsedLng = parseFloat(lng);
+
+  if (isNaN(parsedLat) || isNaN(parsedLng)) {
+    return res.status(400).json({ error: 'Valid lat and lng required' });
+  }
+
+  // Update in Neon Cloud DB
+  if (neonPool) {
+    try {
+      await neonPool.query(
+        'UPDATE public.tourist_spots SET latitude = $1, longitude = $2, updated_at = NOW() WHERE id = $3',
+        [parsedLat, parsedLng, id]
+      );
+    } catch (err) {
+      console.warn('Neon location update error:', err.message);
+    }
+  }
+
+  // Update in Local PostgreSQL
+  if (isPgConnected && pgPool) {
+    try {
+      await pgPool.query(
+        'UPDATE public.tourist_spots SET latitude = $1, longitude = $2, updated_at = NOW() WHERE id = $3',
+        [parsedLat, parsedLng, id]
+      );
+    } catch (err) {
+      console.warn('Local Postgres location update error:', err.message);
+    }
+  }
+
+  // Update in tourist_spots.json on disk
+  const spots = readLocalSpots();
+  const spot = spots.find((s) => s.id === id);
+  if (spot) {
+    spot.location = spot.location || {};
+    spot.location.lat = parsedLat;
+    spot.location.lng = parsedLng;
+    spot.lat = parsedLat;
+    spot.lng = parsedLng;
+    writeLocalSpots(spots);
+  }
+
+  res.json({ success: true, id, lat: parsedLat, lng: parsedLng });
+});
+
+/**
  * DELETE /api/tourist-spots/:id - Delete a tourist spot
  */
 app.delete('/api/tourist-spots/:id', async (req, res) => {
   const { id } = req.params;
+
+  // Delete from Neon Cloud DB
+  if (neonPool) {
+    try {
+      await neonPool.query('DELETE FROM public.tourist_spots WHERE id = $1', [id]);
+    } catch (err) {
+      console.warn('Neon delete error:', err.message);
+    }
+  }
 
   if (isPgConnected && pgPool) {
     try {

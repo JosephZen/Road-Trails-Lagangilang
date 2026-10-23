@@ -157,10 +157,21 @@ export default function App() {
     };
   }, []);
 
-  // Initialize Tourist Spots
+  // Initialize Tourist Spots with instant local cache + background Neon Cloud sync
   const loadTouristSpots = useCallback(() => {
+    // 1. Instant local render (offline-first, zero delay)
     const spots = touristSpotsService.getAllSpots();
     setTouristSpots(spots);
+
+    // 2. Background cloud synchronization with Neon PostgreSQL
+    touristSpotsService
+      .fetchFromCloud()
+      .then((cloudSpots) => {
+        if (Array.isArray(cloudSpots) && cloudSpots.length > 0) {
+          setTouristSpots(cloudSpots);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Filter spots by Tourist Attraction vs Service/POI and Barangay
