@@ -1,202 +1,290 @@
 [
   {
-    "id": "poi_asist_main",
-    "name": "ASIST Main Campus (University of Abra)",
-    "category": "Education & Heritage",
-    "categoryIcon": "graduation-cap",
-    "barangay": "Poblacion",
-    "location": {
-      "lat": 17.60825,
-      "lng": 120.738083,
-      "address": "Poblacion, Lagangilang, Abra, Philippines"
-    },
-    "description": "The premier state higher education institution in Abra, featuring historic academic quadrangles, lush provincial green spaces, and cultural research archives showcasing Tingguian and Abra heritage. Click to immerse yourself in the campus grounds.",
-    "image": null,
-    "isPseudoImage": true,
-    "pseudoTheme": "indigo",
-    "connected360": {
-      "type": "local",
-      "targetId": "pano_1785458227165_1j20c9",
-      "heading": 45,
-      "pitch": -5
-    },
-    "sync_status": "synced_cloud",
-    "staged_at": "2026-09-04T08:00:00.000Z",
-    "synced_at": "2026-09-04T08:00:00.000Z"
-  },
-  {
-    "id": "poi_holy_cross_parish",
-    "name": "Holy Cross Parish Church",
-    "category": "Religious & Cultural Heritage",
-    "categoryIcon": "church",
-    "barangay": "Poblacion",
-    "location": {
-      "lat": 17.6158,
-      "lng": 120.735,
-      "address": "Church Road, Poblacion, Lagangilang, Abra"
-    },
-    "description": "The spiritual heart of Lagangilang, this historic Roman Catholic parish features Spanish-colonial-inspired brick architecture and serves as the center of Holy Cross fiesta celebrations and community gatherings.",
-    "image": null,
-    "isPseudoImage": true,
-    "pseudoTheme": "amber",
-    "connected360": {
-      "type": "local",
-      "targetId": "pano_1785458811653_j5vnmy",
-      "heading": 90,
-      "pitch": 0
-    },
-    "sync_status": "synced_cloud",
-    "staged_at": "2026-09-04T08:00:00.000Z",
-    "synced_at": "2026-09-04T08:00:00.000Z"
-  },
-  {
-    "id": "poi_lagangilang_town_hall",
-    "name": "Lagangilang Municipal Town Hall & Freedom Park",
-    "category": "Civic & Public Park",
-    "categoryIcon": "landmark",
-    "barangay": "Poblacion",
-    "location": {
-      "lat": 17.6142,
-      "lng": 120.734,
-      "address": "Municipal Compound, Poblacion, Lagangilang, Abra"
-    },
-    "description": "The administrative seat of Lagangilang, surrounded by the town plaza and Freedom Park. It hosts municipal cultural festivities, open-air community sports, and showcases local Tingguian craftsmanship monuments.",
-    "image": null,
-    "isPseudoImage": true,
-    "pseudoTheme": "emerald",
-    "connected360": {
-      "type": "local",
-      "targetId": "pano_1785458901520_jb1b5w",
-      "heading": 180,
-      "pitch": 0
-    },
-    "sync_status": "synced_cloud",
-    "staged_at": "2026-09-04T08:00:00.000Z",
-    "synced_at": "2026-09-04T08:00:00.000Z"
-  },
-  {
-    "id": "poi_abra_river_viewpoint",
-    "name": "Abra River Viewpoint & Bawa Riverbanks",
+    "id": "poi_ugiao_river",
+    "name": "Ugiao River",
+    "spotType": "tourist_spot",
     "category": "Nature & Eco-Tourism",
-    "categoryIcon": "waves",
-    "barangay": "Bawa",
+    "categoryIcon": "🏞️",
+    "barangay": "Pawa",
     "location": {
-      "lat": 17.621,
-      "lng": 120.728,
-      "address": "Riverside Trail, Barangay Bawa, Lagangilang, Abra"
+      "lat": 17.6025,
+      "lng": 120.7295,
+      "address": "Ugiao River, Barangay Pawa, Lagangilang, Abra"
     },
-    "description": "A breathtaking scenic vantage point overlooking the mighty Abra River and its pebble riverbanks. Popular among trail trekkers, local fishermen, and nature photographers capturing the river gorge during sunset.",
+    "description": "Scenic freshwater river corridor featuring clear waters, pebble banks, and tranquil natural swimming spots popular for picnics and summer outings.",
     "image": null,
     "isPseudoImage": true,
     "pseudoTheme": "cyan",
     "connected360": {
-      "type": "local",
-      "targetId": "pano_1785458903585_a9jv8p",
-      "heading": 270,
-      "pitch": -10
+      "type": "mapillary",
+      "targetId": "1608965217005049",
+      "heading": 0,
+      "pitch": 0
     },
-    "sync_status": "synced_cloud",
-    "staged_at": "2026-09-04T08:00:00.000Z",
-    "synced_at": "2026-09-04T08:00:00.000Z"
+    "sync_status": "synced_cloud"
   },
   {
-    "id": "poi_mount_mag_atong",
-    "name": "Mount Mag-atong Eco-Trail & Summit",
-    "category": "Adventure & Trekking Trail",
-    "categoryIcon": "mountain",
-    "barangay": "Nagtipulan",
+    "id": "poi_quirsodan_dam",
+    "name": "Quirsodan River Dam",
+    "spotType": "tourist_spot",
+    "category": "Nature & Eco-Tourism",
+    "categoryIcon": "🌊",
+    "barangay": "San Isidro",
     "location": {
-      "lat": 17.632,
-      "lng": 120.751,
-      "address": "Mag-atong Trailhead, Barangay Nagtipulan, Lagangilang, Abra"
+      "lat": 17.5903,
+      "lng": 120.7819,
+      "address": "Sitio Quirsodan, Barangay San Isidro, Lagangilang, Abra"
     },
-    "description": "Lagangilang's iconic panoramic mountain trail, offering exhilarating hiking paths through indigenous pine and hardwood groves, culminating in a 360° summit vista of the Abra River Valley and Cordillera mountains.",
-    "image": null,
-    "isPseudoImage": true,
-    "pseudoTheme": "rose",
-    "connected360": {
-      "type": "local",
-      "targetId": "pano_1785458907688_3ycntg",
-      "heading": 315,
-      "pitch": 15
-    },
-    "sync_status": "synced_cloud",
-    "staged_at": "2026-09-04T08:00:00.000Z",
-    "synced_at": "2026-09-04T08:00:00.000Z"
-  },
-  {
-    "id": "poi_bawa_hanging_bridge",
-    "name": "Bawa Hanging Footbridge & Rapids",
-    "category": "Eco-Trail & Adventure",
-    "categoryIcon": "footprints",
-    "barangay": "Bawa",
-    "location": {
-      "lat": 17.625,
-      "lng": 120.742,
-      "address": "Bawa Crossing, Lagangilang, Abra"
-    },
-    "description": "A classic suspension footbridge spanning across the Bawa tributary waters, connecting rural agricultural farming communities with panoramic river gorge views and clear freshwater swimming spots.",
+    "description": "Scenic irrigation dam and freshwater river spillway surrounded by verdant mountain ridges, scenic river boulders, and tranquil countryside waters.",
     "image": null,
     "isPseudoImage": true,
     "pseudoTheme": "teal",
     "connected360": {
-      "type": "local",
-      "targetId": "pano_1785458911472_jf2n58",
-      "heading": 120,
-      "pitch": -8
+      "type": "mapillary",
+      "targetId": "1532761357806896",
+      "heading": 90,
+      "pitch": 0
     },
-    "sync_status": "synced_cloud",
-    "staged_at": "2026-09-04T08:00:00.000Z",
-    "synced_at": "2026-09-04T08:00:00.000Z"
+    "sync_status": "synced_cloud"
   },
   {
-    "id": "poi_tagodtod_bamboo_craft",
-    "name": "Tagodtod Bamboo Craft & Cultural Center",
-    "category": "Agri-Tourism & Cultural Handicrafts",
-    "categoryIcon": "sparkles",
-    "barangay": "Tagodtod",
+    "id": "poi_holy_cross_parish",
+    "name": "Holy Cross Parish",
+    "spotType": "tourist_spot",
+    "category": "Religious & Spiritual Site",
+    "categoryIcon": "⛪",
+    "barangay": "Poblacion",
     "location": {
-      "lat": 17.6115,
-      "lng": 120.731,
-      "address": "Barangay Tagodtod, Lagangilang, Abra"
+      "lat": 17.6158,
+      "lng": 120.735,
+      "address": "Church Road, Barangay Poblacion, Lagangilang, Abra"
     },
-    "description": "Center for Lagangilang's renowned engineered bamboo and traditional Tingguian basketry. Visitors can experience native loom-weaving demonstrations and purchase handcrafted bamboo eco-souvenirs.",
+    "description": "Historic Roman Catholic parish and spiritual sanctuary of Lagangilang, known for Spanish-colonial-inspired brick architecture and Holy Cross fiesta celebrations.",
+    "image": null,
+    "isPseudoImage": true,
+    "pseudoTheme": "amber",
+    "connected360": {
+      "type": "mapillary",
+      "targetId": "1724722945416495",
+      "heading": 180,
+      "pitch": 0
+    },
+    "sync_status": "synced_cloud"
+  },
+  {
+    "id": "poi_talinawen_spring",
+    "name": "Talinawen Spring",
+    "spotType": "tourist_spot",
+    "category": "Nature & Eco-Tourism",
+    "categoryIcon": "💧",
+    "barangay": "Paganao",
+    "location": {
+      "lat": 17.6255,
+      "lng": 120.758,
+      "address": "Talinawen Natural Spring, Lagangilang, Abra"
+    },
+    "description": "Famous natural freshwater spring pool bubbling from limestone aquifers, celebrated for its refreshing cool waters, swimming basins, and lush tropical canopy.",
+    "image": null,
+    "isPseudoImage": true,
+    "pseudoTheme": "cyan",
+    "connected360": {
+      "type": "mapillary",
+      "targetId": "1458052846269748",
+      "heading": 150,
+      "pitch": 0
+    },
+    "sync_status": "synced_cloud"
+  },
+  {
+    "id": "poi_galangugong_rocks",
+    "name": "Galangugong Rock Formation",
+    "spotType": "tourist_spot",
+    "category": "Adventure & Trekking Trail",
+    "categoryIcon": "🪨",
+    "barangay": "Bacooc",
+    "location": {
+      "lat": 17.6628,
+      "lng": 120.7925,
+      "address": "Barangay Bacooc, Lagangilang, Abra"
+    },
+    "description": "Monumental limestone karst cliffs and sculptured rock formations along the Bacooc river gorge, offering stunning geological scenery and trekking paths.",
+    "image": null,
+    "isPseudoImage": true,
+    "pseudoTheme": "rose",
+    "connected360": {
+      "type": "mapillary",
+      "targetId": "1778693856687129",
+      "heading": 0,
+      "pitch": 0
+    },
+    "sync_status": "synced_cloud"
+  },
+  {
+    "id": "poi_banat_caves",
+    "name": "BANAT Caves 1 & 2",
+    "spotType": "tourist_spot",
+    "category": "Adventure & Trekking Trail",
+    "categoryIcon": "🦇",
+    "barangay": "Bacooc",
+    "location": {
+      "lat": 17.6645,
+      "lng": 120.7938,
+      "address": "Barangay Bacooc, Lagangilang, Abra"
+    },
+    "description": "DENR-assessed subterranean cave network in Bacooc featuring twin caverns with intricate stalactites, limestone chambers, and thrilling spelunking trails.",
     "image": null,
     "isPseudoImage": true,
     "pseudoTheme": "violet",
     "connected360": {
-      "type": "local",
-      "targetId": "pano_1785458933279_gohnbu",
-      "heading": 60,
+      "type": "mapillary",
+      "targetId": "1556968976199743",
+      "heading": 90,
       "pitch": 0
     },
-    "sync_status": "synced_cloud",
-    "staged_at": "2026-09-04T08:00:00.000Z",
-    "synced_at": "2026-09-04T08:00:00.000Z"
+    "sync_status": "synced_cloud"
   },
   {
-    "id": "poi_don_mariano_bridge_view",
-    "name": "Don Mariano Marcos Bridge Scenic Overlook",
-    "category": "Scenic Highway & Overlook",
-    "categoryIcon": "camera",
-    "barangay": "Laguiben",
+    "id": "poi_ua_main_campus",
+    "name": "University of Abra Main Campus",
+    "spotType": "tourist_spot",
+    "category": "Historical & Cultural Heritage",
+    "categoryIcon": "🎓",
+    "barangay": "Poblacion",
     "location": {
-      "lat": 17.6015,
-      "lng": 120.725,
-      "address": "Abra-Kalinga National Road, Lagangilang, Abra"
+      "lat": 17.60825,
+      "lng": 120.738083,
+      "address": "University of Abra Main Campus, Poblacion, Lagangilang, Abra"
     },
-    "description": "The historic steel bridge entryway to eastern Abra, offering panoramic views of the Abra River canyon, river transport bancas, and the surrounding Cordillera mountain ridges.",
+    "description": "The premier higher education institution in Abra (formerly ASIST), featuring historic academic quadrangles, lush provincial green spaces, and cultural research archives.",
+    "image": null,
+    "isPseudoImage": true,
+    "pseudoTheme": "indigo",
+    "connected360": {
+      "type": "mapillary",
+      "targetId": "1724722945416495",
+      "heading": 180,
+      "pitch": 0
+    },
+    "sync_status": "synced_cloud"
+  },
+  {
+    "id": "poi_ua_fish_pond",
+    "name": "University of Abra - Fish Pond",
+    "spotType": "tourist_spot",
+    "category": "Agri-Tourism & Cultural Handicrafts",
+    "categoryIcon": "🐟",
+    "barangay": "Poblacion",
+    "location": {
+      "lat": 17.6068,
+      "lng": 120.7392,
+      "address": "Aquaculture Research Center, UA Main Campus, Lagangilang, Abra"
+    },
+    "description": "University of Abra freshwater aquaculture research facility and fish ponds, demonstrating sustainable tilapia breeding, fish farming, and aquatic agro-fishery practices.",
+    "image": null,
+    "isPseudoImage": true,
+    "pseudoTheme": "teal",
+    "connected360": {
+      "type": "mapillary",
+      "targetId": "1735531687819496",
+      "heading": 154,
+      "pitch": 0
+    },
+    "sync_status": "synced_cloud"
+  },
+  {
+    "id": "poi_ua_tamarind_farm",
+    "name": "University of Abra - Tamarind Farm",
+    "spotType": "tourist_spot",
+    "category": "Agri-Tourism & Cultural Handicrafts",
+    "categoryIcon": "🌳",
+    "barangay": "Poblacion",
+    "location": {
+      "lat": 17.6095,
+      "lng": 120.741,
+      "address": "Horticulture Field Station, UA Main Campus, Lagangilang, Abra"
+    },
+    "description": "Specialized sweet tamarind research orchard and genetic conservation genebank producing high-value tamarind cultivars and fruit processing demonstrations.",
+    "image": null,
+    "isPseudoImage": true,
+    "pseudoTheme": "emerald",
+    "connected360": {
+      "type": "mapillary",
+      "targetId": "2194203998167208",
+      "heading": 165,
+      "pitch": 0
+    },
+    "sync_status": "synced_cloud"
+  },
+  {
+    "id": "poi_ua_cacao_garden",
+    "name": "University of Abra - Cacao Clonal Garden",
+    "spotType": "tourist_spot",
+    "category": "Agri-Tourism & Cultural Handicrafts",
+    "categoryIcon": "🍫",
+    "barangay": "Poblacion",
+    "location": {
+      "lat": 17.6075,
+      "lng": 120.7418,
+      "address": "Agroforestry Research Zone, UA Main Campus, Lagangilang, Abra"
+    },
+    "description": "High-density cacao clonal propagation nursery and agroforestry demonstration farm supplying certified cacao scions and research across the Cordilleras.",
     "image": null,
     "isPseudoImage": true,
     "pseudoTheme": "orange",
     "connected360": {
-      "type": "local",
-      "targetId": "pano_1785458951667_shihgp",
-      "heading": 210,
-      "pitch": -5
+      "type": "mapillary",
+      "targetId": "1735531687819496",
+      "heading": 154,
+      "pitch": 0
     },
-    "sync_status": "synced_cloud",
-    "staged_at": "2026-09-04T08:00:00.000Z",
-    "synced_at": "2026-09-04T08:00:00.000Z"
+    "sync_status": "synced_cloud"
+  },
+  {
+    "id": "poi_dj_farm",
+    "name": "DJ Farm",
+    "spotType": "tourist_spot",
+    "category": "Agri-Tourism & Cultural Handicrafts",
+    "categoryIcon": "🌾",
+    "barangay": "Nagtupacan",
+    "location": {
+      "lat": 17.5901,
+      "lng": 120.7402,
+      "address": "Barangay Nagtupacan, Lagangilang, Abra"
+    },
+    "description": "Prominent integrated agricultural and livestock eco-farm in Barangay Nagtupacan featuring dragon fruit orchards, poultry farming, and agricultural tourism.",
+    "image": null,
+    "isPseudoImage": true,
+    "pseudoTheme": "emerald",
+    "connected360": {
+      "type": "mapillary",
+      "targetId": "1858716472228937",
+      "heading": 158,
+      "pitch": 0
+    },
+    "sync_status": "synced_cloud"
+  },
+  {
+    "id": "poi_rizalista_cave",
+    "name": "Rizalista Cave",
+    "spotType": "tourist_spot",
+    "category": "Historical & Cultural Heritage",
+    "categoryIcon": "⛰️",
+    "barangay": "Laguiben",
+    "location": {
+      "lat": 17.6125,
+      "lng": 120.7462,
+      "address": "Barangay Laguiben, Lagangilang, Abra"
+    },
+    "description": "DENR Class II protected cave system in Barangay Laguiben revered for its unique karst topography and sacred spiritual heritage among local pilgrims.",
+    "image": null,
+    "isPseudoImage": true,
+    "pseudoTheme": "amber",
+    "connected360": {
+      "type": "mapillary",
+      "targetId": "1761125488711823",
+      "heading": 161,
+      "pitch": 0
+    },
+    "sync_status": "synced_cloud"
   }
 ]

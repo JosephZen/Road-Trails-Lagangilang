@@ -145,9 +145,11 @@ body {
   position: relative;
   flex: 1;
   height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   background: var(--bg-primary);
   overflow: hidden;
-  transition: flex var(--transition-slow);
 }
 
 .panel-viewer.hidden {
@@ -1125,12 +1127,43 @@ body {
 
 /* ========== Tourist Spot (POI) Markers & Animations ========== */
 .poi-marker {
+  cursor: grab;
+  user-select: none;
+  z-index: 15;
+  pointer-events: auto;
+  /* CRITICAL: Never apply CSS transform or transition: transform to .poi-marker.
+     MapLibre GL JS positions this root element via inline transform: translate(...). */
+}
+
+.poi-marker:active,
+.poi-marker.is-dragging {
+  cursor: grabbing !important;
+  z-index: 999 !important;
+}
+
+.poi-marker-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
-  cursor: pointer;
-  z-index: 15;
-  transition: transform var(--transition-fast);
+  transform-origin: bottom center;
+  transition: transform var(--transition-fast), filter var(--transition-fast);
+  pointer-events: auto;
+}
+
+.poi-marker:hover .poi-marker-inner {
+  transform: scale(1.18);
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+}
+
+.poi-marker:active .poi-marker-inner,
+.poi-marker.is-dragging .poi-marker-inner {
+  transform: scale(1.28);
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.7));
+}
+
+.poi-marker.is-dragging .poi-marker-pin {
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.95) !important;
+  border-color: #ffd700 !important;
 }
 
 .poi-marker-pin {
@@ -1147,10 +1180,60 @@ body {
   transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
+.poi-marker-pin.pin-tourist {
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.5);
+}
+
+.poi-marker-pin.pin-poi {
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.55);
+}
+
+.poi-service .poi-marker-tooltip {
+  border-color: rgba(6, 182, 212, 0.5);
+}
+
+/* Spot filter pills in sidebar */
+.spot-filter-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.spot-filter-pill {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.73rem;
+  font-weight: 600;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.spot-filter-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.spot-filter-pill.active {
+  background: var(--accent-primary);
+  color: #fff;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 10px rgba(67, 97, 238, 0.35);
+}
+
 .poi-marker-icon {
   transform: rotate(45deg);
   font-size: 14px;
   line-height: 1;
+  pointer-events: none;
+  user-select: none;
 }
 
 .poi-marker-tooltip {
@@ -1188,7 +1271,6 @@ body {
 }
 
 .poi-marker:hover {
-  transform: scale(1.25);
   z-index: 25;
 }
 
@@ -1569,4 +1651,563 @@ body {
   border-radius: var(--radius-full);
   z-index: 10;
   letter-spacing: 0.05em;
+}
+/* ========== Role-Based UI ========== */
+
+/* Role Indicator Badge */
+.role-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  backdrop-filter: blur(12px);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  user-select: none;
+}
+
+.role-indicator.admin {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(220, 38, 38, 0.15) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+.role-indicator.admin:hover {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(220, 38, 38, 0.3) 100%);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.3);
+}
+
+.role-indicator.tourist {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.12) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #86efac;
+}
+
+.role-indicator.tourist:hover {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.35) 0%, rgba(16, 185, 129, 0.25) 100%);
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.3);
+}
+
+.role-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.role-indicator.admin .role-indicator-dot {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.role-indicator.tourist .role-indicator-dot {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+}
+
+/* Admin Toolbar Strip */
+.admin-toolbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-controls);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: linear-gradient(180deg, transparent 0%, rgba(239, 68, 68, 0.08) 100%);
+  border-top: 1px solid rgba(239, 68, 68, 0.2);
+  backdrop-filter: blur(12px);
+}
+
+.admin-toolbar-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(239, 68, 68, 0.7);
+  margin-right: auto;
+}
+
+.admin-toolbar .btn {
+  font-size: 0.75rem;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+}
+
+/* Tourist Quick-Route Card */
+.quick-route-card {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: var(--z-controls);
+  padding: var(--space-md);
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  max-width: 340px;
+  animation: slideUp var(--transition-normal) ease-out;
+}
+
+.quick-route-card h4 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.quick-route-card p {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+  line-height: 1.4;
+}
+
+/* Destination Search / Picker */
+.destination-picker {
+  padding: var(--space-md);
+}
+
+.destination-picker-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.destination-search-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+  font-family: var(--font-primary);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  margin-bottom: var(--space-md);
+}
+
+.destination-search-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+}
+
+.destination-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.destination-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.destination-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.destination-item:hover {
+  border-color: var(--accent-primary);
+  background: rgba(67, 97, 238, 0.1);
+}
+
+.destination-item.selected {
+  border-color: var(--accent-glow);
+  background: rgba(76, 201, 240, 0.1);
+  box-shadow: 0 0 8px rgba(76, 201, 240, 0.15);
+}
+
+.destination-item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.destination-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.destination-item-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.destination-item-address {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.destination-item-route-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.destination-item-route-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+
+/* Route Info Panel for Tourist */
+.route-info-panel {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-md);
+}
+
+.route-info-destination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.route-info-destination-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.route-info-destination-badge {
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+/* My Location Button */
+.my-location-btn {
+  position: absolute;
+  bottom: 70px;
+  right: 16px;
+  z-index: var(--z-controls);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-md);
+}
+
+.my-location-btn:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.my-location-btn.active {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  border-color: #3b82f6;
+}
+
+/* Admin border glow on map panel */
+.panel-map.admin-mode {
+  border-bottom: 2px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Tourist welcome banner */
+.tourist-welcome {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(16, 185, 129, 0.06) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.tourist-welcome-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+/* Separator line for map overlay controls */
+.controls-separator {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+/* ========== Map Location Picking Banner ========== */
+.map-picking-banner {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 58, 138, 0.95) 100%);
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(59, 130, 246, 0.4);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  backdrop-filter: blur(12px);
+  animation: slideDownBanner 0.25s ease-out;
+  pointer-events: auto;
+}
+
+@keyframes slideDownBanner {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.map-picking-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.map-picking-banner .btn-cancel-pick {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.map-picking-banner .btn-cancel-pick:hover {
+  background: rgba(239, 68, 68, 0.4);
+  border-color: #ef4444;
+}
+
+/* Route Point Card Enhanced */
+.route-point-box {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  transition: all var(--transition-fast);
+}
+
+.route-point-box.active-picking {
+  border-color: #3b82f6;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.route-point-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.route-point-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.route-point-coord {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-point-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.route-swap-row {
+  display: flex;
+  justify-content: center;
+  margin: -4px 0 6px 0;
+}
+
+.route-swap-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: var(--radius-full);
+  padding: 3px 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.route-swap-btn:hover {
+  background: var(--accent-primary);
+  color: #fff;
+  border-color: var(--accent-primary);
+  transform: scale(1.03);
+}
+
+/* ========== Mapillary Floating Info Badge ========== */
+/* Positioned right-center over the Mapillary canvas; never blocks top direction arrows */
+.mapillary-info-badge {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(5, 203, 99, 0.15);
+  border: 1px solid rgba(5, 203, 99, 0.4);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+  color: #86efac;
+  font-size: 0.78rem;
+  pointer-events: auto;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+/* ========== Right-Click Map Context Menu ========== */
+.map-context-menu {
+  min-width: 230px;
+  padding: 5px 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: fadeIn 0.1s ease-out;
+}
+
+.map-context-menu .ctx-coords {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.71rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+.map-context-menu .ctx-coords button {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: rgba(67, 97, 238, 0.2);
+  border: 1px solid rgba(67, 97, 238, 0.35);
+  border-radius: var(--radius-full);
+  color: #93c5fd;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  width: auto;
+  display: inline-flex;
+  text-align: center;
+}
+
+.map-context-menu .ctx-coords button:hover {
+  background: rgba(67, 97, 238, 0.4);
+}
+
+.map-context-menu hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 4px 0;
+}
+
+.map-context-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 16px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.83rem;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  font-family: var(--font-primary);
+}
+
+.map-context-menu > button:hover {
+  background: rgba(67, 97, 238, 0.15);
 }

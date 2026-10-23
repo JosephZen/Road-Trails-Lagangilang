@@ -1,13 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import MapView from './components/MapView';
-import PanoramaViewer from './components/PanoramaViewer';
 import MapillaryViewer from './components/MapillaryViewer';
-import UploadModal from './components/UploadModal';
-import TouristSpotModal from './components/TouristSpotModal';
+import TouristSpotModal, { LAGANGILANG_BARANGAYS } from './components/TouristSpotModal';
 import TouristSpotStreetViewCard from './components/TouristSpotStreetViewCard';
 import PseudoImage from './components/PseudoImage';
-import { touristSpotsService, findNearestPanorama } from './services/touristSpotsService';
-import { usePreloader } from './hooks/usePreloader';
+import { touristSpotsService } from './services/touristSpotsService';
 import { useMapillary } from './hooks/useMapillary';
 import { formatCoords } from './utils/geoUtils';
 import RoutePlanner from './components/RoutePlanner';
@@ -17,24 +14,22 @@ const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 /**
  * Main application shell.
- * Split-screen layout: Map (left) | Panorama Viewer (right).
- * Supports Local mode (Pannellum) and Cloud mode (Mapillary).
- * Fullstack integration with Neon PostgreSQL, offline 2-step staging, and Lagangilang tourist spots.
+ * Split-screen layout: Map (left) | Mapillary 360 Street View Viewer (right).
+ * Powered exclusively by Mapillary API v4 and Meta CDN imagery.
+ * Fullstack integration with Neon PostgreSQL, offline 2-step staging, and Lagangilang tourist spots & POIs.
  */
 export default function App() {
   // App state
-  const [mode, setMode] = useState('local'); // 'local' | 'cloud'
-  const [panoramas, setPanoramas] = useState([]);
-  const [activePano, setActivePano] = useState(null);
   const [viewerHeading, setViewerHeading] = useState(0);
-  const [showUpload, setShowUpload] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState('spots'); // 'spots' | 'panoramas' | 'staging'
+  const [sidebarTab, setSidebarTab] = useState('spots'); // 'spots' | 'staging' | 'routing'
   
   // Tourist Spots & POI State
   const [touristSpots, setTouristSpots] = useState([]);
   const [activeTouristSpot, setActiveTouristSpot] = useState(null);
+  const [spotFilter, setSpotFilter] = useState('all'); // 'all' | 'tourist_spot' | 'poi'
+  const [barangayFilter, setBarangayFilter] = useState('all'); // 'all' | specific barangay
   const [showSpotModal, setShowSpotModal] = useState(false);
   const [editingSpot, setEditingSpot] = useState(null);
   const [steerTarget, setSteerTarget] = useState(null);
@@ -42,6 +37,8 @@ export default function App() {
 
   // Routing State
   const [routingMode, setRoutingMode] = useState(false);
+  const [pickingTarget, setPickingTarget] = useState(null); // null | 'origin' | 'destination'
+  const [isLocating, setIsLocating] = useState(false);
   const [routingProfile, setRoutingProfile] = useState('driving');
   const [routeOrigin, setRouteOrigin] = useState(null);
   const [routeDestination, setRouteDestination] = useState(null);
@@ -49,26 +46,23 @@ export default function App() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [showCustomOSM, setShowCustomOSM] = useState(true);
 
+  // Right-click context menu state: { lat, lng, x, y } | null
+  const [contextMenu, setContextMenu] = useState(null);
+
   // Connectivity & 2-Step Sync State (Research Objective 3: ISO/IEC 25010 Reliability)
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Theme & Auth State
-  const [mapTheme, setMapTheme] = useState('dark'); // 'dark' | 'light' | 'beige' | 'satellite'
-  const [isAdmin, setIsAdmin] = useState(true);
-  const [editingDescId, setEditingDescId] = useState(null);
-  const [descText, setDescText] = useState('');
+  const [mapTheme, setMapTheme] = useState(() => localStorage.getItem('lagangilang_map_theme') || 'light'); // 'dark' | 'light' | 'beige' | 'satellite'
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
 
-  // Mapillary state
+  // Mapillary Street View state
   const [mapillaryImageId, setMapillaryImageId] = useState(null);
+  const [streetViewPos, setStreetViewPos] = useState(null);
   const [mapillaryImages, setMapillaryImages] = useState([]);
   const { searchNearby } = useMapillary();
-
-  // Preloader for local mode
-  const { preloadStatus, getCachedUrl } = usePreloader(
-    activePano?.id,
-    panoramas
-  );
 
   // Map resize
   const [mapWidth, setMapWidth] = useState(45); // percentage
@@ -86,96 +80,139 @@ export default function App() {
     };
   }, []);
 
+  // Geolocation: get user's current position with robust high-accuracy + standard fallbacks
+  const handleUseMyLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsLocating(true);
+
+    const onLocationSuccess = (pos) => {
+      setIsLocating(false);
+      const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setUserLocation(loc);
+      setRouteOrigin([loc.lng, loc.lat]);
+      setRouteData(null);
+      setSidebarTab('routing');
+      setSidebarOpen(true);
+    };
+
+    const onLocationError = (err) => {
+      console.warn('High-accuracy GPS failed or timed out, trying standard accuracy:', err);
+      // Fallback with standard network/wifi accuracy (crucial for laptops)
+      navigator.geolocation.getCurrentPosition(
+        onLocationSuccess,
+        (fallbackErr) => {
+          setIsLocating(false);
+          console.warn('Geolocation completely unavailable:', fallbackErr);
+          const useTownPlaza = window.confirm(
+            'GPS location could not be determined (permissions may be blocked or device has no GPS sensor).\n\nWould you like to set Lagangilang Town Plaza (Poblacion) as Point A (Start)?'
+          );
+          if (useTownPlaza) {
+            setRouteOrigin([120.734, 17.6142]); // Poblacion Town Plaza
+            setRouteData(null);
+            setSidebarTab('routing');
+            setSidebarOpen(true);
+          }
+        },
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+      );
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      onLocationSuccess,
+      onLocationError,
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, []);
+
+  // Route to a specific tourist spot
+  const handleRouteToSpot = useCallback((spot) => {
+    const lat = spot.location?.lat ?? spot.lat;
+    const lng = spot.location?.lng ?? spot.lng;
+    setRouteDestination([lng, lat]);
+    setSidebarTab('routing');
+    setSidebarOpen(true);
+    // If user location is available, auto-set origin
+    if (userLocation) {
+      setRouteOrigin([userLocation.lng, userLocation.lat]);
+    }
+  }, [userLocation]);
+
+  // Right-click context menu handler
+  const handleMapContextMenu = useCallback((lat, lng, screenX, screenY) => {
+    setContextMenu({ lat, lng, x: screenX, y: screenY });
+  }, []);
+
+  // Dismiss context menu on any click or Escape key
+  useEffect(() => {
+    const dismiss = () => setContextMenu(null);
+    const onKey = (e) => { if (e.key === 'Escape') setContextMenu(null); };
+    document.addEventListener('click', dismiss);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('click', dismiss);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
   // Initialize Tourist Spots
   const loadTouristSpots = useCallback(() => {
     const spots = touristSpotsService.getAllSpots();
     setTouristSpots(spots);
   }, []);
 
+  // Filter spots by Tourist Attraction vs Service/POI and Barangay
+  const displayedSpots = useMemo(() => {
+    return touristSpots.filter((s) => {
+      const isPoi = (s.spotType || s.type) === 'poi';
+      if (spotFilter === 'tourist_spot' && isPoi) return false;
+      if (spotFilter === 'poi' && !isPoi) return false;
+      if (barangayFilter !== 'all' && s.barangay !== barangayFilter) return false;
+      return true;
+    });
+  }, [touristSpots, spotFilter, barangayFilter]);
+
   useEffect(() => {
     loadTouristSpots();
   }, [loadTouristSpots]);
 
-  // Fetch panoramas from backend or local storage
-  const fetchPanoramas = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/panoramas`);
-      if (res.ok) {
-        const data = await res.json();
-        setPanoramas(data.panoramas || []);
-      }
-    } catch (err) {
-      console.warn('Backend not running, checking local panoramas fallback');
-      // If backend is not active, look in public metadata or fallback
-      try {
-        const localMeta = await fetch('/panoramas/metadata.json');
-        if (localMeta.ok) {
-          const d = await localMeta.json();
-          setPanoramas(d.panoramas || []);
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchPanoramas();
-  }, [fetchPanoramas]);
-
-  // Handle selecting a panorama from the map
-  const handleSelectPano = useCallback(
-    (pano) => {
-      if (mode === 'local') {
-        setActivePano(pano);
-        setViewerOpen(true);
-      } else {
-        // In cloud mode, search for Mapillary images near this point
-        searchNearby(pano.lat, pano.lng).then((images) => {
-          setMapillaryImages(images);
-          if (images.length > 0) {
-            setMapillaryImageId(images[0].id);
-            setViewerOpen(true);
-          }
-        });
-      }
-    },
-    [mode, searchNearby]
-  );
-
   // Handle selecting a Tourist Spot (POI) from map or sidebar
   const handleSelectTouristSpot = useCallback(
-    (spot) => {
+    async (spot) => {
       setActiveTouristSpot(spot);
       setViewerOpen(true);
 
       const lat = spot.location?.lat ?? spot.lat;
       const lng = spot.location?.lng ?? spot.lng;
 
-      // 1. Check if spot has connected 360 panorama ID
-      if (spot.connected360?.targetId) {
-        const target = panoramas.find((p) => p.id === spot.connected360.targetId);
-        if (target) {
-          setActivePano(target);
-          setMode('local');
-        } else {
-          // If not in local panoramas, find nearest panorama
-          const nearest = findNearestPanorama(lat, lng, panoramas);
-          if (nearest) {
-            setActivePano(nearest);
-            setMode('local');
-          }
-        }
+      // 1. Check if spot has a verified 64-bit Mapillary image ID
+      const targetId = spot.connected360?.targetId;
+      const isValidTargetId = targetId && String(targetId).length >= 10 && /^\d+$/.test(String(targetId));
+
+      if (isValidTargetId) {
+        setMapillaryImageId(String(targetId));
+        setStreetViewPos({ lat, lng, id: String(targetId) });
       } else {
-        // Find nearest panorama by coordinates
-        const nearest = findNearestPanorama(lat, lng, panoramas);
-        if (nearest) {
-          setActivePano(nearest);
-          setMode('local');
+        // 2. Otherwise auto-detect nearest Mapillary imagery
+        try {
+          const images = await searchNearby(lat, lng);
+          if (images && images.length > 0) {
+            setMapillaryImageId(String(images[0].id));
+            setStreetViewPos({ lat: images[0].lat, lng: images[0].lng, id: String(images[0].id) });
+          } else {
+            // Default sequence fallback: UA campus entrance gate
+            setMapillaryImageId('1532761357806896');
+            setStreetViewPos({ lat: 17.6081389, lng: 120.7381389, id: '1532761357806896' });
+          }
+        } catch (e) {
+          console.warn('Could not find nearby Mapillary image:', e);
+          setMapillaryImageId('1532761357806896');
         }
       }
 
-      // 2. Orient the 360 viewer toward the landmark's heading
+      // 3. Orient the 360 viewer toward the landmark's heading
       if (spot.connected360?.heading !== undefined) {
         setSteerTarget({
           heading: spot.connected360.heading,
@@ -184,7 +221,7 @@ export default function App() {
         });
       }
     },
-    [panoramas]
+    [searchNearby]
   );
 
   // Steering camera helper
@@ -195,31 +232,6 @@ export default function App() {
       key: Date.now(),
     });
   }, []);
-
-  // Handle navigating to a neighbor panorama (bullet view)
-  const handleNavigate = useCallback((neighborPano) => {
-    setActivePano(neighborPano);
-  }, []);
-
-  // Save Description Update for Panorama
-  const saveDescription = async (panoId) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/panoramas/${panoId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: descText }),
-      });
-      if (res.ok) {
-        setEditingDescId(null);
-        fetchPanoramas();
-        if (activePano?.id === panoId) {
-          setActivePano((prev) => ({ ...prev, description: descText }));
-        }
-      }
-    } catch (err) {
-      console.error('Failed to update description:', err);
-    }
-  };
 
   // Step 2: Batch Sync all locally staged drafts to Neon Cloud
   const handleBatchSyncToNeon = async () => {
@@ -238,7 +250,7 @@ export default function App() {
   // Delete Tourist Spot
   const handleDeleteSpot = (spotId, e) => {
     e?.stopPropagation();
-    if (window.confirm('Delete this tourist spot?')) {
+    if (window.confirm('Delete this location from the system?')) {
       touristSpotsService.deleteSpot(spotId);
       if (activeTouristSpot?.id === spotId) {
         setActiveTouristSpot(null);
@@ -247,42 +259,99 @@ export default function App() {
     }
   };
 
-  // Handle map click for routing mode
-  const handleMapClickForRouting = useCallback((lat, lng) => {
-    if (!routeOrigin) {
-      setRouteOrigin([lng, lat]);
-    } else if (!routeDestination) {
-      setRouteDestination([lng, lat]);
-    }
+  // Handle dragging a Tourist Spot / POI marker directly on the 2D map
+  const handleSpotLocationChange = useCallback(
+    (spotId, newLat, newLng) => {
+      const lat = parseFloat(Number(newLat).toFixed(6));
+      const lng = parseFloat(Number(newLng).toFixed(6));
+      touristSpotsService.updateSpotLocation(spotId, lat, lng);
+
+      setTouristSpots((prev) =>
+        prev.map((s) => (s.id === spotId ? { ...s, location: { ...(s.location || {}), lat, lng }, lat, lng } : s))
+      );
+
+      if (activeTouristSpot?.id === spotId) {
+        setActiveTouristSpot((prev) =>
+          prev ? { ...prev, location: { ...(prev.location || {}), lat, lng }, lat, lng } : null
+        );
+      }
+    },
+    [activeTouristSpot]
+  );
+
+  // Swap origin and destination
+  const handleSwapPoints = useCallback(() => {
+    setRouteOrigin(routeDestination);
+    setRouteDestination(routeOrigin);
+    setRouteData(null);
   }, [routeOrigin, routeDestination]);
 
-  // Handle clicking on the map — works in both modes
+  // Handle map click for routing mode
+  const handleMapClickForRouting = useCallback((lat, lng) => {
+    if (pickingTarget === 'origin') {
+      setRouteOrigin([lng, lat]);
+      setPickingTarget(null);
+      setRoutingMode(false);
+      setRouteData(null);
+      return;
+    }
+    if (pickingTarget === 'destination') {
+      setRouteDestination([lng, lat]);
+      setPickingTarget(null);
+      setRoutingMode(false);
+      setRouteData(null);
+      return;
+    }
+
+    // Default sequential picking: Point A first, then Point B
+    if (!routeOrigin) {
+      setRouteOrigin([lng, lat]);
+      setRouteData(null);
+    } else if (!routeDestination) {
+      setRouteDestination([lng, lat]);
+      setRoutingMode(false);
+      setRouteData(null);
+    } else {
+      // Both were already set: reset and start fresh with Point A
+      setRouteOrigin([lng, lat]);
+      setRouteDestination(null);
+      setRouteData(null);
+    }
+  }, [pickingTarget, routeOrigin, routeDestination]);
+
+  // Handle clicking on the map — seamlessly handles routing and Mapillary features
   const handleMapClick = useCallback(
-    async (lat, lng, clickedMapillaryId) => {
-      if (routingMode) {
+    async (lat, lng, clickedMapillaryId, isMapillaryClick = false) => {
+      if (routingMode || pickingTarget) {
         handleMapClickForRouting(lat, lng);
         return;
       }
       
-      // If we clicked on a Mapillary feature (green line/dot)
-      if (clickedMapillaryId) {
-        setMode('cloud');
-        setMapillaryImageId(clickedMapillaryId);
+      // If clicked directly on a Mapillary dot or sequence with a verified 64-bit Mapillary image ID
+      const isValidId = clickedMapillaryId && String(clickedMapillaryId).length >= 10 && /^\d+$/.test(String(clickedMapillaryId));
+      if (isValidId) {
+        setActiveTouristSpot(null);
+        setMapillaryImageId(String(clickedMapillaryId));
+        setStreetViewPos({ lat, lng, id: String(clickedMapillaryId) });
         setViewerOpen(true);
         return;
       }
 
-      // If we clicked on a Mapillary sequence (no direct ID), search nearby
-      if (mode === 'cloud') {
-        const images = await searchNearby(lat, lng);
-        setMapillaryImages(images);
-        if (images.length > 0) {
-          setMapillaryImageId(images[0].id);
+      // Check nearby streetview coverage (handles both vector tile sequence clicks and newly uploaded sequences)
+      const images = await searchNearby(lat, lng);
+      setMapillaryImages(images);
+      if (images && images.length > 0) {
+        const closestDist = Math.hypot(images[0].lat - lat, images[0].lng - lng) * 111320;
+        if (isMapillaryClick || closestDist <= 800) {
+          setActiveTouristSpot(null);
+          setMapillaryImageId(String(images[0].id));
+          setStreetViewPos({ lat: images[0].lat, lng: images[0].lng, id: String(images[0].id) });
           setViewerOpen(true);
+          return;
         }
       }
     },
-    [mode, searchNearby]
+    [routingMode, pickingTarget, handleMapClickForRouting, searchNearby]
   );
 
   // Resize handle logic
@@ -309,8 +378,8 @@ export default function App() {
   // Close viewer
   const handleCloseViewer = useCallback(() => {
     setViewerOpen(false);
-    setActivePano(null);
     setMapillaryImageId(null);
+    setStreetViewPos(null);
     setActiveTouristSpot(null);
   }, []);
 
@@ -345,25 +414,19 @@ export default function App() {
     <div className="app-container">
       {/* ===== Map Panel ===== */}
       <div
-        className={`panel-map ${!viewerOpen ? 'expanded' : ''}`}
+        className={`panel-map ${!viewerOpen ? 'expanded' : ''} ${isAdmin ? 'admin-mode' : ''}`}
         style={viewerOpen ? { flex: `0 0 ${mapWidth}%` } : {}}
       >
         {/* Map top controls */}
         <div className="map-overlay-top">
-          {/* Mode Toggle */}
-          <div className="mode-toggle">
-            <button
-              className={`mode-toggle-btn ${mode === 'local' ? 'active' : ''}`}
-              onClick={() => setMode('local')}
-            >
-              📁 Local
-            </button>
-            <button
-              className={`mode-toggle-btn ${mode === 'cloud' ? 'active' : ''}`}
-              onClick={() => setMode('cloud')}
-            >
-              ☁ Cloud
-            </button>
+          {/* Role Indicator Badge */}
+          <div
+            className={`role-indicator ${isAdmin ? 'admin' : 'tourist'}`}
+            onClick={() => setIsAdmin(!isAdmin)}
+            title={isAdmin ? 'Switch to Tourist View' : 'Switch to Admin Panel'}
+          >
+            <span className="role-indicator-dot" />
+            <span>{isAdmin ? '🛡️ Admin Panel' : '🌴 Tourist Explorer'}</span>
           </div>
 
           {/* Theme Selector */}
@@ -382,7 +445,10 @@ export default function App() {
               <button
                 key={t}
                 className={`mode-toggle-btn ${mapTheme === t ? 'active' : ''}`}
-                onClick={() => setMapTheme(t)}
+                onClick={() => {
+                  setMapTheme(t);
+                  localStorage.setItem('lagangilang_map_theme', t);
+                }}
                 style={{ textTransform: 'capitalize', fontSize: '0.8rem', padding: '4px 8px' }}
               >
                 {t}
@@ -390,173 +456,204 @@ export default function App() {
             ))}
           </div>
 
-          {/* Coverage Gaps Toggle (Research Objective 1) */}
+          {/* Route Button (Tourist prominent) */}
           <button
-            className={`btn ${showCoverageGaps ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setShowCoverageGaps(!showCoverageGaps)}
-            title="Toggle Lagangilang Trail Corridors & Coverage Gaps (Objective 1)"
+            className="btn btn-primary"
+            onClick={() => {
+              setSidebarTab('routing');
+              setSidebarOpen(true);
+            }}
             style={{
               fontSize: '0.8rem',
-              padding: '6px 10px',
+              padding: '6px 14px',
               borderRadius: 'var(--radius-full)',
-              background: showCoverageGaps
-                ? 'linear-gradient(135deg, #06d6a0 0%, #059669 100%)'
-                : 'rgba(0,0,0,0.6)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              color: '#ffffff',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              border: 'none',
+              color: '#fff',
             }}
           >
-            🗺️ Gaps {showCoverageGaps ? 'ON' : 'OFF'}
+            🧭 Route
           </button>
 
-          {/* Custom OSM Overlay Toggle */}
-          <button
-            className={`btn btn-sm ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setShowCustomOSM(!showCustomOSM)}
-            title="Toggle Custom OSM Map Overlay"
-            style={{
-              fontSize: '0.8rem',
-              padding: '6px 10px',
-              borderRadius: 'var(--radius-full)',
-              background: showCustomOSM
-                ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-                : 'rgba(0,0,0,0.6)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              color: '#ffffff',
-            }}
-          >
-            🗺️ Custom Map
-          </button>
+          <div className="controls-separator" />
 
-          {/* Offline / Online Network Indicator (Objective 3: Reliability) */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '5px 10px',
-              borderRadius: 'var(--radius-full)',
-              background: 'rgba(0,0,0,0.6)',
-              backdropFilter: 'blur(8px)',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              color: isOnline ? '#10b981' : '#f59e0b',
-              border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.4)'}`,
-            }}
-            title={isOnline ? 'Online • Neon PostgreSQL connected' : 'Offline • Field staging buffer active'}
-          >
-            <span
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: isOnline ? '#10b981' : '#f59e0b',
-                boxShadow: `0 0 6px ${isOnline ? '#10b981' : '#f59e0b'}`,
-              }}
-            />
-            <span>{isOnline ? 'Online' : 'Offline Buffer'}</span>
-          </div>
-
-          {/* Staged Drafts Indicator & Quick Sync */}
-          {stagedCount > 0 && (
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setSidebarTab('staging');
-                setSidebarOpen(true);
-              }}
-              style={{
-                fontSize: '0.75rem',
-                padding: '4px 10px',
-                borderRadius: 'var(--radius-full)',
-                border: '1px solid #f59e0b',
-                color: '#fbbf24',
-                background: 'rgba(245, 158, 11, 0.2)',
-                animation: 'pulse 2s infinite',
-              }}
-              title="Locally staged drafts pending verification/sync"
-            >
-              🟡 {stagedCount} Staged
-            </button>
-          )}
-
-          {/* Admin Mode Toggle */}
-          <button
-            className={`btn ${isAdmin ? 'btn-primary' : 'btn-secondary'} btn-icon`}
-            onClick={() => setIsAdmin(!isAdmin)}
-            title={isAdmin ? 'Admin Mode Active' : 'User Mode'}
-            style={{ fontSize: '0.9rem', width: 'auto', padding: '0 12px' }}
-          >
-            {isAdmin ? '🛡️ Admin' : '👤 User'}
-          </button>
-
-          {/* Add Tourist Spot Button (Admin) */}
+          {/* Admin-only controls */}
           {isAdmin && (
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                setEditingSpot(null);
-                setShowSpotModal(true);
-              }}
-              title="Add Tourist Spot (POI) with Pseudo-Image and 360 link"
-              style={{
-                fontSize: '0.8rem',
-                padding: '6px 12px',
-                borderRadius: 'var(--radius-full)',
-                background: 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
-                color: '#1a1a2e',
-                fontWeight: 700,
-                border: 'none',
-              }}
-            >
-              ⭐ + Add Spot
-            </button>
+            <>
+              {/* Coverage Gaps Toggle (Research Objective 1) */}
+              <button
+                className={`btn ${showCoverageGaps ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setShowCoverageGaps(!showCoverageGaps)}
+                title="Toggle Lagangilang Trail Corridors & Coverage Gaps (Objective 1)"
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '6px 10px',
+                  borderRadius: 'var(--radius-full)',
+                  background: showCoverageGaps
+                    ? 'linear-gradient(135deg, #06d6a0 0%, #059669 100%)'
+                    : 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#ffffff',
+                }}
+              >
+                🗺️ Gaps {showCoverageGaps ? 'ON' : 'OFF'}
+              </button>
+
+              {/* Custom OSM Overlay Toggle */}
+              <button
+                className={`btn btn-sm ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setShowCustomOSM(!showCustomOSM)}
+                title="Toggle Custom OSM Map Overlay"
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '6px 10px',
+                  borderRadius: 'var(--radius-full)',
+                  background: showCustomOSM
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                    : 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#ffffff',
+                }}
+              >
+                🗺️ Custom Map
+              </button>
+
+              {/* Add Tourist Spot Button */}
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setEditingSpot(null);
+                  setShowSpotModal(true);
+                }}
+                title="Add Location (POI or Attraction) to System"
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
+                  color: '#1a1a2e',
+                  fontWeight: 700,
+                  border: 'none',
+                }}
+              >
+                ⭐ + Add Spot
+              </button>
+
+              {/* Online/Offline indicator */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 10px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'rgba(0,0,0,0.6)',
+                  backdropFilter: 'blur(8px)',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: isOnline ? '#10b981' : '#f59e0b',
+                  border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.4)'}`,
+                }}
+                title={isOnline ? 'Online • Neon PostgreSQL connected' : 'Offline • Field staging buffer active'}
+              >
+                <span
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: isOnline ? '#10b981' : '#f59e0b',
+                    boxShadow: `0 0 6px ${isOnline ? '#10b981' : '#f59e0b'}`,
+                  }}
+                />
+                <span>{isOnline ? 'Online' : 'Offline'}</span>
+              </div>
+
+              {/* Staged Drafts */}
+              {stagedCount > 0 && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setSidebarTab('staging');
+                    setSidebarOpen(true);
+                  }}
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-full)',
+                    border: '1px solid #f59e0b',
+                    color: '#fbbf24',
+                    background: 'rgba(245, 158, 11, 0.2)',
+                    animation: 'pulse 2s infinite',
+                  }}
+                  title="Locally staged drafts pending verification/sync"
+                >
+                  🟡 {stagedCount} Staged
+                </button>
+              )}
+            </>
           )}
 
-          {/* Upload Panorama Button (Admin only) */}
-          {isAdmin && (
-            <button
-              className="btn btn-primary btn-icon"
-              onClick={() => setShowUpload(true)}
-              title="Upload 360° panorama"
-              style={{ fontSize: '1.2rem' }}
-            >
-              +
-            </button>
-          )}
-
-          {/* Sidebar toggle */}
+          {/* Sidebar toggle (always visible) */}
           <button
             className="btn btn-secondary btn-icon"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            title="Explore Tourist Spots & Panoramas"
+            title="Explore Tourist Spots & Route Planner"
+            style={{ marginLeft: 'auto' }}
           >
             ☰
           </button>
         </div>
 
+        {/* Map Location Picking Banner */}
+        {(routingMode || pickingTarget) && (
+          <div className="map-picking-banner">
+            <div className="map-picking-banner-content">
+              <span>
+                {pickingTarget === 'origin'
+                  ? '📍 Click anywhere on the map to set Start (Point A)'
+                  : pickingTarget === 'destination'
+                  ? '🏁 Click anywhere on the map to set Destination (Point B)'
+                  : !routeOrigin
+                  ? '📍 Click on the map to set Start (Point A)'
+                  : '🏁 Point A set! Click on the map to set Destination (Point B)'}
+              </span>
+              <button
+                className="btn-cancel-pick"
+                onClick={() => {
+                  setRoutingMode(false);
+                  setPickingTarget(null);
+                }}
+              >
+                ✕ Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 2D MapView */}
         <MapView
           theme={mapTheme}
-          panoramas={panoramas}
-          activePanoId={activePano?.id}
-          onSelectPano={handleSelectPano}
           onMapClick={handleMapClick}
+          onMapContextMenu={handleMapContextMenu}
           viewerHeading={viewerHeading}
+          streetViewPos={streetViewPos}
           touristSpots={touristSpots}
           activeTouristSpotId={activeTouristSpot?.id}
           onSelectTouristSpot={handleSelectTouristSpot}
+          onSpotLocationChange={handleSpotLocationChange}
           showCoverageGaps={showCoverageGaps}
           showCustomOSM={showCustomOSM}
           mapCenter={
-            activePano
-              ? [activePano.lng, activePano.lat]
+            streetViewPos
+              ? [streetViewPos.lng, streetViewPos.lat]
               : [120.738083, 17.60825] // Lagangilang, Abra
           }
           mapZoom={15}
           routeGeoJSON={routeData?.geometry || null}
           routeOrigin={routeOrigin}
           routeDestination={routeDestination}
+          routingMode={routingMode || !!pickingTarget}
+          pickingMode={pickingTarget}
         />
 
         {/* Resize handle */}
@@ -567,7 +664,7 @@ export default function App() {
           />
         )}
 
-        {/* Sidebar - Tabs: Tourist Spots, Panoramas, Staging Queue */}
+        {/* Sidebar - Tabs: Tourist Spots, Staging Queue, Routing */}
         <div className={`sidebar glass-panel ${sidebarOpen ? 'open' : ''}`}>
           <div className="sidebar-header">
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -586,22 +683,7 @@ export default function App() {
               >
                 ⭐ Spots ({touristSpots.length})
               </button>
-              <button
-                onClick={() => setSidebarTab('panoramas')}
-                style={{
-                  background: sidebarTab === 'panoramas' ? 'var(--accent-primary)' : 'transparent',
-                  color: sidebarTab === 'panoramas' ? '#fff' : 'var(--text-secondary)',
-                  border: 'none',
-                  padding: '4px 8px',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                📍 360s ({panoramas.length})
-              </button>
-              {stagedCount > 0 && (
+              {isAdmin && stagedCount > 0 && (
                 <button
                   onClick={() => setSidebarTab('staging')}
                   style={{
@@ -635,241 +717,185 @@ export default function App() {
               </button>
             </div>
 
-            <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
+            <button className="btn btn-ghost" onClick={() => setSidebarOpen(false)}>
               ✕
             </button>
           </div>
 
-          {/* Tab 1: Tourist Spots (POIs) */}
+          {/* Tab 1: Tourist Spots & POIs */}
           {sidebarTab === 'spots' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Lagangilang Tourist Attractions
-                </span>
-                {isAdmin && (
-                  <button
-                    className="btn btn-ghost"
-                    style={{ fontSize: '0.75rem', padding: '2px 6px', color: '#ffd700' }}
-                    onClick={() => {
-                      setEditingSpot(null);
-                      setShowSpotModal(true);
-                    }}
-                  >
-                    + New Spot
-                  </button>
-                )}
-              </div>
+              {/* Tourist Welcome */}
+              {!isAdmin && (
+                <div className="tourist-welcome">
+                  <span className="tourist-welcome-icon">🌴</span>
+                  <span>
+                    Welcome to <strong>Lagangilang, Abra!</strong> Explore tourist spots below.
+                    Tap any spot to view in 360° or tap <strong>🧭 Route Here</strong> to get directions.
+                  </span>
+                </div>
+              )}
 
-              {touristSpots.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '20px 0' }}>
-                  No tourist spots recorded.
-                </p>
-              ) : (
-                <div className="pano-list">
-                  {touristSpots.map((spot) => (
-                    <div
-                      key={spot.id}
-                      className={`pano-list-item ${activeTouristSpot?.id === spot.id ? 'active' : ''}`}
-                      onClick={() => handleSelectTouristSpot(spot)}
+              {/* Filters: Category & Barangay */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'tourist_spot', label: '🌴 Tourist Spots' },
+                    { id: 'poi', label: '🏪 Services / POI' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setSpotFilter(f.id)}
                       style={{
-                        flexDirection: 'column',
-                        alignItems: 'stretch',
-                        borderLeft: `3px solid ${
-                          spot.sync_status === 'staged_local' ? '#f59e0b' : '#ffd700'
-                        }`,
+                        flex: 1,
+                        padding: '4px 6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        background: spotFilter === f.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.06)',
+                        color: spotFilter === f.id ? '#fff' : 'var(--text-secondary)',
+                        cursor: 'pointer',
                       }}
                     >
-                      {/* Image or Pseudo-Image Header */}
-                      <div style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginBottom: '6px' }}>
-                        {spot.image ? (
-                          <img
-                            src={spot.image}
-                            alt={spot.name}
-                            style={{ width: '100%', height: '85px', objectFit: 'cover' }}
-                          />
-                        ) : (
-                          <PseudoImage
-                            title={spot.name}
-                            category={spot.category}
-                            theme={spot.pseudoTheme || 'indigo'}
-                            height="80px"
-                            showWatermark={false}
-                          />
-                        )}
-                      </div>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <h4 style={{ fontSize: '0.85rem', margin: '0 0 2px 0' }}>{spot.name}</h4>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                            Brgy. {spot.barangay}
-                          </span>
-                        </div>
-                        {spot.sync_status === 'staged_local' && (
-                          <span
-                            style={{
-                              fontSize: '0.62rem',
-                              padding: '1px 5px',
-                              borderRadius: '3px',
-                              background: '#f59e0b',
-                              color: '#1a1a2e',
-                              fontWeight: 700,
-                            }}
-                          >
-                            STAGED
-                          </span>
-                        )}
-                      </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Barangay:</span>
+                  <select
+                    value={barangayFilter}
+                    onChange={(e) => setBarangayFilter(e.target.value)}
+                    className="input-field"
+                    style={{ flex: 1, fontSize: '0.75rem', padding: '3px 8px' }}
+                  >
+                    <option value="all">All Barangays (17 Total)</option>
+                    {LAGANGILANG_BARANGAYS.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-                      {/* Interactive Description Snippet */}
-                      <p
-                        style={{
-                          fontSize: '0.74rem',
-                          color: 'var(--text-muted)',
-                          margin: '4px 0 0 0',
-                          lineHeight: 1.35,
-                          cursor: 'pointer',
-                        }}
-                        title="Click to view 360°"
+              {/* Spots List */}
+              <div className="pano-list">
+                {displayedSpots.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '16px 0' }}>
+                    No spots found for this filter.
+                  </p>
+                ) : (
+                  displayedSpots.map((spot) => {
+                    const isPoi = (spot.spotType || spot.type) === 'poi';
+                    return (
+                      <div
+                        key={spot.id}
+                        className={`pano-list-item ${activeTouristSpot?.id === spot.id ? 'active' : ''}`}
+                        onClick={() => handleSelectTouristSpot(spot)}
+                        style={{ flexDirection: 'column', alignItems: 'stretch' }}
                       >
-                        {spot.description.slice(0, 110)}...
-                      </p>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          {spot.isPseudoImage ? (
+                            <PseudoImage
+                              title={spot.name}
+                              category={spot.category}
+                              theme={spot.pseudoTheme || (isPoi ? 'cyan' : 'indigo')}
+                              height="60px"
+                              width="60px"
+                              style={{ borderRadius: 'var(--radius-sm)', flexShrink: 0 }}
+                            />
+                          ) : spot.image ? (
+                            <img
+                              src={spot.image}
+                              alt={spot.name}
+                              className="pano-thumb"
+                              style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-sm)' }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: '60px',
+                                height: '60px',
+                                borderRadius: 'var(--radius-sm)',
+                                background: isPoi ? 'rgba(6, 214, 160, 0.2)' : 'rgba(255, 215, 0, 0.2)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1.5rem',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {spot.categoryIcon || (isPoi ? '🏪' : '⭐')}
+                            </div>
+                          )}
 
-                      {/* Admin Actions */}
-                      {isAdmin && (
+                          <div className="pano-info" style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <h4 style={{ fontSize: '0.85rem', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {spot.name}
+                              </h4>
+                              {spot.sync_status === 'staged_local' && (
+                                <span style={{ fontSize: '0.65rem', color: '#fbbf24', marginLeft: '4px' }}>🟡 Draft</span>
+                              )}
+                            </div>
+                            <p style={{ fontSize: '0.72rem', color: 'var(--accent-glow)', margin: '0 0 2px 0' }}>
+                              {spot.categoryIcon || '⭐'} {spot.category} • Brgy. {spot.barangay}
+                            </p>
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {spot.location?.address}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Actions Row */}
                         <div style={{ display: 'flex', gap: '6px', marginTop: '6px', justifyContent: 'flex-end' }}>
                           <button
                             className="btn btn-ghost"
-                            style={{ fontSize: '0.7rem', padding: '2px 6px' }}
+                            style={{ fontSize: '0.7rem', padding: '2px 8px', color: '#3b82f6' }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setEditingSpot(spot);
-                              setShowSpotModal(true);
+                              handleRouteToSpot(spot);
                             }}
                           >
-                            ✎ Edit
+                            🧭 Route Here
                           </button>
-                          <button
-                            className="btn btn-ghost"
-                            style={{ fontSize: '0.7rem', padding: '2px 6px', color: '#ef4444' }}
-                            onClick={(e) => handleDeleteSpot(spot.id, e)}
-                          >
-                            🗑️ Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Tab 2: 360 Panoramas */}
-          {sidebarTab === 'panoramas' && (
-            <div>
-              {panoramas.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No panoramas yet.</p>
-                  {isAdmin && (
-                    <button
-                      className="btn btn-primary"
-                      style={{ marginTop: '12px' }}
-                      onClick={() => {
-                        setSidebarOpen(false);
-                        setShowUpload(true);
-                      }}
-                    >
-                      + Upload First Image
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="pano-list">
-                  {panoramas.map((pano) => (
-                    <div
-                      key={pano.id}
-                      className={`pano-list-item ${activePano?.id === pano.id ? 'active' : ''}`}
-                      onClick={() => handleSelectPano(pano)}
-                    >
-                      {pano.thumbnail && (
-                        <img
-                          className="pano-thumb"
-                          src={`${API_BASE}/panoramas/${pano.thumbnail}`}
-                          alt={pano.label || pano.id}
-                        />
-                      )}
-                      <div className="pano-info" style={{ flex: 1 }}>
-                        <h4>{pano.label || pano.id}</h4>
-                        <p style={{ fontSize: '0.75rem', marginBottom: '4px' }}>
-                          {formatCoords(pano.lat, pano.lng)}
-                        </p>
-
-                        {/* Description editor */}
-                        {editingDescId === pano.id ? (
-                          <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '8px' }}>
-                            <textarea
-                              className="input-field"
-                              value={descText}
-                              onChange={(e) => setDescText(e.target.value)}
-                              placeholder="Add POI description..."
-                              style={{ width: '100%', minHeight: '60px', padding: '4px', fontSize: '0.8rem' }}
-                            />
-                            <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                              <button
-                                className="btn btn-primary"
-                                style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                                onClick={() => saveDescription(pano.id)}
-                              >
-                                Save
-                              </button>
-                              <button
-                                className="btn btn-secondary"
-                                style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                                onClick={() => setEditingDescId(null)}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={{ marginTop: '4px' }}>
-                            <p
-                              style={{
-                                fontSize: '0.8rem',
-                                color: 'var(--text-color)',
-                                fontStyle: pano.description ? 'normal' : 'italic',
-                                opacity: 0.8,
-                              }}
-                            >
-                              {pano.description || (isAdmin ? 'No description yet' : '')}
-                            </p>
-                            {isAdmin && (
+                          {isAdmin && (
+                            <>
                               <button
                                 className="btn btn-ghost"
-                                style={{ padding: '2px 6px', fontSize: '0.7rem', marginTop: '4px', opacity: 0.7 }}
+                                style={{ fontSize: '0.7rem', padding: '2px 6px' }}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setDescText(pano.description || '');
-                                  setEditingDescId(pano.id);
+                                  setEditingSpot(spot);
+                                  setShowSpotModal(true);
                                 }}
                               >
-                                ✎ Edit Description
+                                ✎ Edit
                               </button>
-                            )}
-                          </div>
-                        )}
+                              <button
+                                className="btn btn-ghost"
+                                style={{ fontSize: '0.7rem', padding: '2px 6px', color: '#ef4444' }}
+                                onClick={(e) => handleDeleteSpot(spot.id, e)}
+                              >
+                                🗑️ Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
 
-          {/* Tab 3: 2-Step Offline Staging Queue */}
-          {sidebarTab === 'staging' && (
+          {/* Tab 2: 2-Step Offline Staging Queue (Admin) */}
+          {isAdmin && sidebarTab === 'staging' && (
             <div>
               <div
                 style={{
@@ -925,7 +951,7 @@ export default function App() {
                           <span style={{ fontSize: '0.65rem', color: '#fbbf24' }}>🟡 Local Draft</span>
                         </div>
                         <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '4px 0' }}>
-                          {spot.location.address}
+                          {spot.location?.address}
                         </p>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '4px' }}>
                           <button
@@ -949,7 +975,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Tab 4: Route Planner */}
+          {/* Tab 3: Route Planner */}
           {sidebarTab === 'routing' && (
             <RoutePlanner
               routeOrigin={routeOrigin}
@@ -957,55 +983,32 @@ export default function App() {
               routeData={routeData}
               routingProfile={routingProfile}
               routingMode={routingMode}
+              pickingTarget={pickingTarget}
               isNavigating={isNavigating}
+              isAdmin={isAdmin}
+              isLocating={isLocating}
+              touristSpots={touristSpots}
+              userLocation={userLocation}
               onSetRoutingMode={setRoutingMode}
+              onSetPickingTarget={setPickingTarget}
               onSetProfile={setRoutingProfile}
               onClearRoute={handleClearRoute}
               onRouteCalculated={handleRouteCalculated}
               onStartNavigation={handleStartNavigation}
+              onSetOrigin={setRouteOrigin}
+              onSetDestination={setRouteDestination}
+              onUseMyLocation={handleUseMyLocation}
+              onSwapPoints={handleSwapPoints}
             />
           )}
         </div>
       </div>
 
-      {/* ===== Viewer Panel ===== */}
+      {/* ===== 360 Viewer Panel (Powered Exclusively by Mapillary) ===== */}
       <div className={`panel-viewer ${!viewerOpen ? 'hidden' : ''}`}>
         {viewerOpen && (
-          <>
-            {/* Top bar with location info */}
-            <div className="viewer-top-bar glass-panel-sm">
-              <div className="viewer-location-info">
-                <div className="location-icon">
-                  {activeTouristSpot ? '⭐' : mode === 'local' ? '📍' : '☁'}
-                </div>
-                <div className="location-text">
-                  <h3>
-                    {activeTouristSpot?.name || activePano?.label || activePano?.id || 'Mapillary View'}
-                  </h3>
-                  <p>
-                    {activeTouristSpot
-                      ? `${activeTouristSpot.location.address} (${activeTouristSpot.location.lat.toFixed(4)}, ${activeTouristSpot.location.lng.toFixed(4)})`
-                      : activePano
-                      ? formatCoords(activePano.lat, activePano.lng)
-                      : 'Cloud imagery'}
-                    {mode === 'local' && activePano?.heading !== undefined && (
-                      <span> • Heading: {Math.round(viewerHeading)}°</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                className="btn btn-ghost"
-                onClick={handleCloseViewer}
-                title="Close viewer"
-                style={{ fontSize: '1.2rem' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Floating Tourist Spot Street View Overlay Card */}
+          <div style={{ position: 'relative', width: '100%', height: '100%', flex: 1, minHeight: 0 }}>
+            {/* Floating Tourist Spot Card */}
             {activeTouristSpot && (
               <TouristSpotStreetViewCard
                 spot={activeTouristSpot}
@@ -1016,82 +1019,101 @@ export default function App() {
               />
             )}
 
-            {/* Panorama Viewer */}
-            {mode === 'local' && activePano ? (
-              <>
-                <PanoramaViewer
-                  panorama={activePano}
-                  panoramas={panoramas}
-                  viewerHeading={viewerHeading}
-                  getCachedUrl={getCachedUrl}
-                  onNavigate={handleNavigate}
-                  onHeadingChange={setViewerHeading}
-                  steerTarget={steerTarget}
-                />
+            {/* Mapillary Street View Viewer */}
+            <MapillaryViewer
+              imageId={mapillaryImageId || '1532761357806896'}
+              onPositionChange={(pos) => {
+                setMapillaryImageId(pos.id);
+                setStreetViewPos(pos);
+              }}
+              onHeadingChange={setViewerHeading}
+              steerTarget={steerTarget}
+            />
 
-                {/* Preload status indicator */}
-                <div className="preload-indicator glass-panel-sm">
-                  <div className={`preload-dot ${preloadStatus.loading ? 'loading' : ''}`} />
-                  <span>
-                    {preloadStatus.loading ? 'Preloading...' : `${preloadStatus.cached} cached`}
-                  </span>
+            {/* Floating info badge on right-center, leaving direction and playback arrows unobstructed */}
+            <div className="mapillary-info-badge">
+              <span style={{ fontSize: '1rem' }}>🟢</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                  Street View
                 </div>
-              </>
-            ) : mode === 'cloud' && mapillaryImageId ? (
-              <MapillaryViewer
-                imageId={mapillaryImageId}
-                onPositionChange={(pos) => {
-                  setActivePano({
-                    id: pos.id,
-                    lat: pos.lat,
-                    lng: pos.lng,
-                    label: `Mapillary ${pos.id}`,
-                  });
-                  setMapillaryImageId(pos.id);
-                }}
-                onHeadingChange={setViewerHeading}
-              />
-            ) : (
-              <div className="empty-state">
-                <div className="empty-icon">🌐</div>
-                <h3>No panorama selected</h3>
-                <p>Click on a marker on the map to view a 360° panorama</p>
+                <div style={{ fontSize: '0.65rem', opacity: 0.75, whiteSpace: 'nowrap' }}>
+                  Lagangilang, Abra
+                </div>
               </div>
-            )}
-
-
-
-            {/* Floating toolbar */}
-            <div className="floating-toolbar glass-panel-sm">
               <button
-                className={`toolbar-btn ${mode === 'local' ? 'active' : ''}`}
-                onClick={() => setMode('local')}
-                title="Local mode"
+                onClick={handleCloseViewer}
+                title="Close street view"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#86efac',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  padding: '0 0 0 4px',
+                  lineHeight: 1,
+                }}
               >
-                📁
+                ✕
               </button>
-              <div className="toolbar-divider" />
-              <button
-                className={`toolbar-btn ${mode === 'cloud' ? 'active' : ''}`}
-                onClick={() => setMode('cloud')}
-                title="Cloud mode (Mapillary)"
-              >
-                ☁
-              </button>
-              <div className="toolbar-divider" />
-              {isAdmin && (
-                <button
-                  className="toolbar-btn"
-                  onClick={() => setShowUpload(true)}
-                  title="Upload panorama"
-                >
-                  📤
-                </button>
-              )}
             </div>
-          </>
+          </div>
         )}
       </div>
+
+      {/* ===== Right-Click Context Menu ===== */}
+      {contextMenu && (
+        <div
+          className="map-context-menu glass-panel"
+          style={{
+            position: 'fixed',
+            left: Math.min(contextMenu.x, window.innerWidth - 240),
+            top: Math.min(contextMenu.y, window.innerHeight - 200),
+            zIndex: 'var(--z-modal)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Coordinates row */}
+          <div className="ctx-coords">
+            <span>📍 {contextMenu.lat.toFixed(6)}, {contextMenu.lng.toFixed(6)}</span>
+            <button
+              title="Copy coordinates"
+              onClick={() => {
+                navigator.clipboard.writeText(`${contextMenu.lat.toFixed(6)}, ${contextMenu.lng.toFixed(6)}`);
+                setContextMenu(null);
+              }}
+            >
+              📋 Copy
+            </button>
+          </div>
+          <hr />
+          <button onClick={() => { setRouteOrigin([contextMenu.lng, contextMenu.lat]); setRouteData(null); setContextMenu(null); }}>
+            📍 Mark as Point A (Start)
+          </button>
+          <button onClick={() => { setRouteDestination([contextMenu.lng, contextMenu.lat]); setRouteData(null); setContextMenu(null); }}>
+            🏁 Mark as Point B (Destination)
+          </button>
+          {isAdmin && (
+            <>
+              <hr />
+              <button onClick={() => {
+                setEditingSpot({ spotType: 'tourist_spot', location: { lat: contextMenu.lat, lng: contextMenu.lng, address: '' } });
+                setShowSpotModal(true);
+                setContextMenu(null);
+              }}>
+                ⭐ Add Tourist Spot here
+              </button>
+              <button onClick={() => {
+                setEditingSpot({ spotType: 'poi', location: { lat: contextMenu.lat, lng: contextMenu.lng, address: '' } });
+                setShowSpotModal(true);
+                setContextMenu(null);
+              }}>
+                📌 Add Point of Interest here
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ===== Tourist Spot Modal (Admin) ===== */}
       <TouristSpotModal
@@ -1104,15 +1126,15 @@ export default function App() {
           loadTouristSpots();
           handleSelectTouristSpot(saved);
         }}
-        availablePanoramas={panoramas}
+        onSpotDeleted={(id) => {
+          if (activeTouristSpot?.id === id) {
+            setActiveTouristSpot(null);
+          }
+          loadTouristSpots();
+          setShowSpotModal(false);
+          setEditingSpot(null);
+        }}
         editingSpot={editingSpot}
-      />
-
-      {/* ===== Upload Modal ===== */}
-      <UploadModal
-        isOpen={showUpload}
-        onClose={() => setShowUpload(false)}
-        onUploadComplete={fetchPanoramas}
       />
     </div>
   );

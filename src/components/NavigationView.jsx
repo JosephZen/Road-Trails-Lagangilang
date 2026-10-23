@@ -5,10 +5,6 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { formatDuration, formatDistance, getManeuverIcon } from '../services/routingService';
 
-// Ferrostar Core SDK for future real-time GPS state machine integration
-import { FerrostarCore } from '@stadiamaps/ferrostar';
-import '@stadiamaps/ferrostar-webcomponents';
-
 setWorkerUrl(maplibreWorkerUrl);
 
 /**

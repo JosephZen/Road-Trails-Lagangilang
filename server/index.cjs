@@ -129,9 +129,11 @@ function writeLocalSpots(spots) {
 }
 
 /**
- * Auto-link neighbors based on a chronological linear sequence.
+ * Auto-link neighbors based on both spatial proximity and chronological sequence.
+ * Connects nearest neighbors within distance threshold (up to 5 closest nodes)
+ * plus consecutive sequence nodes, ensuring a rich, multi-directional 360 street view graph.
  */
-function autoLinkNeighbors(panoramas, maxDistance = 500) {
+function autoLinkNeighbors(panoramas, maxDistance = 300) {
   const toRad = (deg) => (deg * Math.PI) / 180;
 
   function haversine(lat1, lng1, lat2, lng2) {
@@ -148,26 +150,54 @@ function autoLinkNeighbors(panoramas, maxDistance = 500) {
     (a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
   );
 
-  return panoramas.map((pano) => {
-    const index = sorted.findIndex((p) => p.id === pano.id);
-    const neighbors = [];
+  // First pass: collect neighbors for each node
+  const neighborMap = new Map();
+  panoramas.forEach((pano) => {
+    neighborMap.set(pano.id, new Set(pano.neighbors || []));
+  });
 
+  panoramas.forEach((pano) => {
+    const currentSet = neighborMap.get(pano.id);
+
+    // 1. Chronological predecessor & successor (linear path)
+    const index = sorted.findIndex((p) => p.id === pano.id);
     if (index > 0) {
       const prev = sorted[index - 1];
       if (haversine(pano.lat, pano.lng, prev.lat, prev.lng) <= maxDistance) {
-        neighbors.push(prev.id);
+        currentSet.add(prev.id);
+        neighborMap.get(prev.id)?.add(pano.id);
       }
     }
-
     if (index < sorted.length - 1) {
       const next = sorted[index + 1];
       if (haversine(pano.lat, pano.lng, next.lat, next.lng) <= maxDistance) {
-        neighbors.push(next.id);
+        currentSet.add(next.id);
+        neighborMap.get(next.id)?.add(pano.id);
       }
     }
 
-    return { ...pano, neighbors };
+    // 2. Spatial proximity: find all nearby panoramas within 150 meters
+    const nearby = panoramas
+      .filter((other) => other.id !== pano.id)
+      .map((other) => ({
+        id: other.id,
+        dist: haversine(pano.lat, pano.lng, other.lat, other.lng),
+      }))
+      .filter((other) => other.dist <= 150)
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, 5); // Connect to top 5 closest neighbors
+
+    nearby.forEach((other) => {
+      currentSet.add(other.id);
+      neighborMap.get(other.id)?.add(pano.id);
+    });
   });
+
+  // Return panoramas with updated neighbors list
+  return panoramas.map((pano) => ({
+    ...pano,
+    neighbors: Array.from(neighborMap.get(pano.id) || []),
+  }));
 }
 
 /**

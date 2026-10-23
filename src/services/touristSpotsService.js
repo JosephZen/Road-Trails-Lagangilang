@@ -1,6 +1,7 @@
 import seedSpots from '../data/tourist_spots.json';
 
-const STORAGE_KEY = 'lagangilang_tourist_spots_v1';
+const STORAGE_KEY = 'lagangilang_tourist_spots_v2';
+const LEGACY_STORAGE_KEY = 'lagangilang_tourist_spots_v1';
 const NEON_URL_KEY = 'lagangilang_neon_db_url';
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -66,16 +67,84 @@ export const touristSpotsService = {
    */
   getAllSpots() {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
+      let stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) {
+        // Check for legacy v1 storage to migrate custom POIs
+        const legacyStored = localStorage.getItem(LEGACY_STORAGE_KEY);
+        let customSpots = [];
+        if (legacyStored) {
+          try {
+            const legacyParsed = JSON.parse(legacyStored);
+            if (Array.isArray(legacyParsed)) {
+              // Retain user-created custom spots that aren't old dummy spot_00* records
+              customSpots = legacyParsed.filter(
+                (s) => !s.id.startsWith('spot_') && !seedSpots.some((seed) => seed.id === s.id)
+              );
+            }
+          } catch (e) {
+            console.warn('Could not parse legacy tourist spots storage:', e);
+          }
+        }
+        const initial = [...seedSpots, ...customSpots];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+        return initial;
       }
-      // Initialize with seed data
+
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        // Filter out legacy dummy spots if any linger
+        let cleaned = parsed.filter((s) => !s.id.startsWith('spot_'));
+        const existingIds = new Set(cleaned.map((s) => s.id));
+        let changed = cleaned.length !== parsed.length;
+
+        // Ensure all 12 official landmarks from seedSpots are present
+        if (Array.isArray(seedSpots)) {
+          for (const seed of seedSpots) {
+            if (!existingIds.has(seed.id)) {
+              cleaned.push(seed);
+              changed = true;
+            }
+          }
+        }
+
+        // Normalize legacy typos (e.g. Bawa -> Pawa)
+        cleaned.forEach((s) => {
+          if (s.barangay === 'Bawa') {
+            s.barangay = 'Pawa';
+            if (s.location?.address) s.location.address = s.location.address.replace('Bawa', 'Pawa');
+            changed = true;
+          }
+
+          // Migrate legacy local "pano_..." or small integer IDs to verified Mapillary IDs
+          const targetId = s.connected360?.targetId;
+          if (targetId && (String(targetId).startsWith('pano_') || String(targetId).length < 10 || !/^\d+$/.test(String(targetId)))) {
+            const matchedSeed = Array.isArray(seedSpots) ? seedSpots.find((seed) => seed.id === s.id) : null;
+            if (matchedSeed && matchedSeed.connected360?.targetId) {
+              s.connected360 = matchedSeed.connected360;
+            } else {
+              s.connected360 = {
+                type: 'mapillary',
+                targetId: '1532761357806896',
+                heading: s.connected360?.heading || 0,
+                pitch: s.connected360?.pitch || 0,
+              };
+            }
+            changed = true;
+          }
+        });
+
+        if (changed) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        }
+        return cleaned;
+      }
+
+      // Fallback: Initialize with seed data
       localStorage.setItem(STORAGE_KEY, JSON.stringify(seedSpots));
-      return seedSpots;
+      return Array.isArray(seedSpots) ? seedSpots : [];
     } catch (err) {
       console.warn('Error reading tourist spots from localStorage, falling back to seed data:', err);
-      return seedSpots;
+      return Array.isArray(seedSpots) ? seedSpots : [];
     }
   },
 
@@ -125,6 +194,7 @@ export const touristSpotsService = {
     const newSpot = {
       id,
       name: spotData.name.trim(),
+      spotType: spotData.spotType || 'tourist_spot',
       category: spotData.category || 'General Attraction',
       categoryIcon: spotData.categoryIcon || 'map-pin',
       barangay: spotData.barangay || 'Poblacion',
@@ -330,6 +400,39 @@ export const touristSpotsService = {
       };
     });
     this.saveAllSpots(updated);
+    return updated.find((s) => s.id === spotId);
+  },
+
+  /**
+   * Update coordinates of a spot/POI directly (e.g. after dragging marker on map or typing new coordinates)
+   */
+  updateSpotLocation(spotId, lat, lng) {
+    const all = this.getAllSpots();
+    const parsedLat = parseFloat(Number(lat).toFixed(6));
+    const parsedLng = parseFloat(Number(lng).toFixed(6));
+    const updated = all.map((s) => {
+      if (s.id !== spotId) return s;
+      return {
+        ...s,
+        location: {
+          ...(s.location || {}),
+          lat: parsedLat,
+          lng: parsedLng,
+        },
+        lat: parsedLat,
+        lng: parsedLng,
+        updated_at: new Date().toISOString(),
+      };
+    });
+    this.saveAllSpots(updated);
+
+    // Asynchronously mirror update to local server if available
+    fetch(`${API_BASE}/api/tourist-spots/${spotId}/location`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: parsedLat, lng: parsedLng }),
+    }).catch(() => {});
+
     return updated.find((s) => s.id === spotId);
   },
 

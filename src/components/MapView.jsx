@@ -7,23 +7,46 @@ import { calculateBearing } from '../utils/geoUtils';
 
 setWorkerUrl(maplibreWorkerUrl);
 
-// Coverage Gaps & Road/Trail Corridors in Lagangilang, Abra (Research Objective 1)
+// Coverage Gaps & Trail Corridors in Lagangilang, Abra (Research Objective 1: Unsurveyed Corridors)
 const LAGANGILANG_TRAIL_CORRIDORS = {
   type: 'FeatureCollection',
   features: [
     {
       type: 'Feature',
       properties: {
-        name: 'Surveyed Road Corridor (Poblacion - ASIST - Town Plaza)',
+        name: 'Surveyed Road Corridor: UA Campus to Abra-Kalinga Main Road',
         status: 'surveyed',
       },
       geometry: {
         type: 'LineString',
         coordinates: [
-          [120.738083, 17.60825],
-          [120.738111, 17.608167],
-          [120.735, 17.6158],
-          [120.734, 17.6142],
+          [120.738083, 17.608250], // UA Campus Grounds & Gymnasium
+          [120.738111, 17.608167], // Campus Entrance Gate
+          [120.738139, 17.608139], // Access Road (Mapillary Sequence Start)
+          [120.738167, 17.608083],
+          [120.738222, 17.608000],
+          [120.738250, 17.607917],
+          [120.738306, 17.607750],
+          [120.738361, 17.607583],
+          [120.738389, 17.607556],
+          [120.738417, 17.607472], // Junction with Abra-Kalinga National Road (Main Road)
+        ],
+      },
+    },
+    {
+      type: 'Feature',
+      properties: {
+        name: 'Surveyed Road Corridor: Abra-Kalinga Main Road to Poblacion Center',
+        status: 'surveyed',
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [120.738417, 17.607472], // Road Junction
+          [120.738089, 17.611573], // Along Main Road North
+          [120.737382, 17.613777],
+          [120.734200, 17.614200], // Poblacion Town Hall & Freedom Park
+          [120.735000, 17.615800], // Holy Cross Parish Church
         ],
       },
     },
@@ -45,7 +68,7 @@ const LAGANGILANG_TRAIL_CORRIDORS = {
     {
       type: 'Feature',
       properties: {
-        name: 'Unsurveyed River Corridor Gap: Bawa Rapids to Abra Riverbank',
+        name: 'Unsurveyed River Corridor Gap: Pawa Rapids to Abra Riverbank',
         status: 'gap',
       },
       geometry: {
@@ -66,27 +89,53 @@ const LAGANGILANG_TRAIL_CORRIDORS = {
  */
 export default function MapView({
   theme = 'dark',
-  panoramas,
-  activePanoId,
+  panoramas = [],
+  activePanoId = null,
   onSelectPano,
   onMapClick,
+  onMapContextMenu,
   viewerHeading,
+  streetViewPos = null,
   mapCenter,
   mapZoom,
   touristSpots = [],
   activeTouristSpotId = null,
   onSelectTouristSpot,
+  onSpotLocationChange,
   showCoverageGaps = true,
   routeGeoJSON,
   routeOrigin,
   routeDestination,
   showCustomOSM = true,
+  routingMode = false,
+  pickingMode = null,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
   const poiMarkersRef = useRef([]);
   const coneLayerAdded = useRef(false);
+
+  // Keep latest onMapClick ref to avoid stale closures in MapLibre event listeners
+  const onMapClickRef = useRef(onMapClick);
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
+
+  // Keep latest onMapContextMenu ref
+  const onMapContextMenuRef = useRef(onMapContextMenu);
+  useEffect(() => {
+    onMapContextMenuRef.current = onMapContextMenu;
+  }, [onMapContextMenu]);
+
+  // Update cursor when picking points on the map
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const canvas = mapRef.current.getCanvas();
+    if (canvas) {
+      canvas.style.cursor = routingMode || pickingMode ? 'crosshair' : '';
+    }
+  }, [routingMode, pickingMode]);
 
   // Get style URL based on theme
   const getStyleObj = useCallback((t) => {
@@ -135,6 +184,16 @@ export default function MapView({
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
+    // Handle missing sprite images (e.g. OpenFreeMap 'multi' shield icon)
+    map.on('styleimagemissing', (e) => {
+      if (!map.hasImage(e.id)) {
+        const width = 1;
+        const height = 1;
+        const data = new Uint8Array(width * height * 4);
+        map.addImage(e.id, { width, height, data });
+      }
+    });
+
     map.on('load', () => {
       // Mapillary Vector Tiles Source
       map.addSource('mapillary', {
@@ -146,7 +205,24 @@ export default function MapView({
         maxzoom: 14
       });
 
-      // Mapillary Sequence Lines (Green)
+      // Mapillary Sequence Lines Casing (Dark outline for high contrast on all themes)
+      map.addLayer({
+        id: 'mapillary-sequences-casing',
+        type: 'line',
+        source: 'mapillary',
+        'source-layer': 'sequence',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+        },
+        paint: {
+          'line-color': '#064e3b',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 5, 17, 8],
+          'line-opacity': 0.7,
+        },
+      });
+
+      // Mapillary Sequence Lines (Continuous Vibrant Green)
       map.addLayer({
         id: 'mapillary-sequences',
         type: 'line',
@@ -154,44 +230,29 @@ export default function MapView({
         'source-layer': 'sequence',
         layout: {
           'line-cap': 'round',
-          'line-join': 'round'
+          'line-join': 'round',
         },
         paint: {
-          'line-opacity': 0.6,
-          'line-color': '#05CB63',
-          'line-width': 2
-        }
+          'line-color': '#05cb63',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3.5, 17, 5],
+          'line-opacity': 0.95,
+        },
       });
 
-      // Mapillary Image Points (Green Dots)
+      // Mapillary Image Points (Green Dots with White Halo)
       map.addLayer({
         id: 'mapillary-images',
         type: 'circle',
         source: 'mapillary',
         'source-layer': 'image',
         paint: {
-          'circle-radius': 6,
-          'circle-color': '#05CB63',
-          'circle-opacity': 0.8
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 3.5, 16, 6, 18, 8],
+          'circle-color': '#05cb63',
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': '#ffffff',
+          'circle-opacity': 0.95,
         },
-        minzoom: 14
-      });
-
-      // Add source for coverage lines
-      map.addSource('coverage-lines', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      });
-
-      map.addLayer({
-        id: 'coverage-lines-layer',
-        type: 'line',
-        source: 'coverage-lines',
-        paint: {
-          'line-color': '#4361ee',
-          'line-width': 3,
-          'line-opacity': 0.5,
-        },
+        minzoom: 13,
       });
 
       // Add source for direction cone (viewing direction indicator)
@@ -363,36 +424,73 @@ export default function MapView({
           });
         })
         .catch(err => console.warn('Custom OSM overlay load failed:', err));
+
+      // Signal map layers are loaded and ready for GeoJSON data
+      window.dispatchEvent(new Event('map-style-loaded'));
     });
+
+    // Helper to safely extract a valid 64-bit Mapillary image ID (never an internal vector tile index like 1352)
+    const extractMapillaryImageId = (feature) => {
+      if (!feature) return null;
+      // 1. Properties.id on image point features
+      const propId = feature.properties?.id;
+      if (propId && String(propId).length >= 10 && /^\d+$/.test(String(propId))) {
+        return String(propId);
+      }
+      // 2. Properties.image_id on sequence features
+      const seqImageId = feature.properties?.image_id;
+      if (seqImageId && String(seqImageId).length >= 10 && /^\d+$/.test(String(seqImageId))) {
+        return String(seqImageId);
+      }
+      return null;
+    };
 
     // Handle clicks on Mapillary features or the map in general
     map.on('click', (e) => {
       try {
-        // Check if we clicked on a Mapillary image point first
+        // 1. Check if we clicked directly on a Mapillary image point
         if (map.getLayer('mapillary-images')) {
           const imageFeatures = map.queryRenderedFeatures(e.point, {
             layers: ['mapillary-images']
           });
 
           if (imageFeatures.length > 0) {
-            const feature = imageFeatures[0];
-            const imageId = feature.properties?.id || feature.properties?.image_id;
-            if (imageId) {
-              onMapClick?.(e.lngLat.lat, e.lngLat.lng, String(imageId));
-              return;
-            }
+            const validId = extractMapillaryImageId(imageFeatures[0]);
+            onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, validId, true);
+            return;
           }
         }
 
-        // Check sequence lines (they have sequence_id but not individual image_id)
+        // 2. Check sequence lines (continuous green line)
         if (map.getLayer('mapillary-sequences')) {
           const seqFeatures = map.queryRenderedFeatures(e.point, {
             layers: ['mapillary-sequences']
           });
 
           if (seqFeatures.length > 0) {
-            // For sequences, we do a lat/lng search to find the nearest image
-            onMapClick?.(e.lngLat.lat, e.lngLat.lng, null);
+            // Check if there is an image point near the click point (within 35px)
+            const nearbyImageFeatures = map.queryRenderedFeatures([
+              [e.point.x - 35, e.point.y - 35],
+              [e.point.x + 35, e.point.y + 35],
+            ], { layers: ['mapillary-images'] });
+
+            const validId = nearbyImageFeatures.length > 0
+              ? extractMapillaryImageId(nearbyImageFeatures[0])
+              : extractMapillaryImageId(seqFeatures[0]);
+
+            onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, validId, true);
+            return;
+          }
+        }
+
+        // 3. Check surveyed road corridor lines (connecting UA Campus to Main Road)
+        if (map.getLayer('trail-surveyed-layer')) {
+          const surveyedFeatures = map.queryRenderedFeatures(e.point, {
+            layers: ['trail-surveyed-layer']
+          });
+
+          if (surveyedFeatures.length > 0) {
+            onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, null, true);
             return;
           }
         }
@@ -401,10 +499,18 @@ export default function MapView({
       }
 
       // Normal map click (no Mapillary feature)
-      onMapClick?.(e.lngLat.lat, e.lngLat.lng, null);
+      onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, null, false);
     });
 
-    // Change cursor when hovering over Mapillary layers
+    // Right-click context menu (suppress browser default; fire coordinates to App)
+    map.on('contextmenu', (e) => {
+      e.originalEvent?.preventDefault();
+      const screenX = e.originalEvent?.clientX ?? 0;
+      const screenY = e.originalEvent?.clientY ?? 0;
+      onMapContextMenuRef.current?.(e.lngLat.lat, e.lngLat.lng, screenX, screenY);
+    });
+
+    // Change cursor when hovering over Mapillary layers & surveyed corridors
     map.on('mouseenter', 'mapillary-images', () => {
       map.getCanvas().style.cursor = 'pointer';
     });
@@ -415,6 +521,12 @@ export default function MapView({
       map.getCanvas().style.cursor = 'pointer';
     });
     map.on('mouseleave', 'mapillary-sequences', () => {
+      map.getCanvas().style.cursor = '';
+    });
+    map.on('mouseenter', 'trail-surveyed-layer', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', 'trail-surveyed-layer', () => {
       map.getCanvas().style.cursor = '';
     });
 
@@ -463,6 +575,21 @@ export default function MapView({
         });
       }
 
+      if (!mapRef.current.getLayer('mapillary-sequences-casing')) {
+        mapRef.current.addLayer({
+          id: 'mapillary-sequences-casing',
+          type: 'line',
+          source: 'mapillary',
+          'source-layer': 'sequence',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#064e3b',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 5, 17, 8],
+            'line-opacity': 0.7,
+          },
+        });
+      }
+
       if (!mapRef.current.getLayer('mapillary-sequences')) {
         mapRef.current.addLayer({
           id: 'mapillary-sequences',
@@ -470,7 +597,11 @@ export default function MapView({
           source: 'mapillary',
           'source-layer': 'sequence',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-opacity': 0.6, 'line-color': '#05CB63', 'line-width': 2 }
+          paint: {
+            'line-color': '#05cb63',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3.5, 17, 5],
+            'line-opacity': 0.95,
+          },
         });
       }
 
@@ -480,21 +611,14 @@ export default function MapView({
           type: 'circle',
           source: 'mapillary',
           'source-layer': 'image',
-          paint: { 'circle-radius': 6, 'circle-color': '#05CB63', 'circle-opacity': 0.8 },
-          minzoom: 14
-        });
-      }
-
-      if (!mapRef.current.getSource('coverage-lines')) {
-        mapRef.current.addSource('coverage-lines', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] },
-        });
-        mapRef.current.addLayer({
-          id: 'coverage-lines-layer',
-          type: 'line',
-          source: 'coverage-lines',
-          paint: { 'line-color': '#4361ee', 'line-width': 3, 'line-opacity': 0.5 },
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 3.5, 16, 6, 18, 8],
+            'circle-color': '#05cb63',
+            'circle-stroke-width': 1.5,
+            'circle-stroke-color': '#ffffff',
+            'circle-opacity': 0.95,
+          },
+          minzoom: 13,
         });
       }
 
@@ -602,117 +726,67 @@ export default function MapView({
     });
   }, [theme, getStyleObj]);
 
-  // Update markers when panoramas change
+  // Active Street View Marker on 2D Map
+  const streetViewMarkerRef = useRef(null);
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    // Clear old markers
-    markersRef.current.forEach((m) => m.remove());
-    markersRef.current = [];
-
-    if (!panoramas || panoramas.length === 0) return;
-
-    // Add markers for each panorama
-    panoramas.forEach((pano) => {
-      const el = document.createElement('div');
-      el.className = 'map-marker';
-      el.style.transform = 'scale(1.5)';
-      if (pano.id === activePanoId) {
-        el.classList.add('active');
+    if (streetViewPos && streetViewPos.lat !== undefined && streetViewPos.lng !== undefined) {
+      // Pan map smoothly to the street view location if not currently in view
+      const bounds = map.getBounds();
+      const inView = bounds && bounds.contains([streetViewPos.lng, streetViewPos.lat]);
+      if (!inView) {
+        map.flyTo({ center: [streetViewPos.lng, streetViewPos.lat], zoom: Math.max(map.getZoom(), 15), duration: 1000 });
       }
-      el.dataset.panoId = pano.id;
 
-      el.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent map click (which might trigger Mapillary search)
-        onSelectPano?.(pano);
-      });
+      if (!streetViewMarkerRef.current) {
+        const el = document.createElement('div');
+        el.className = 'streetview-active-marker';
+        el.style.width = '18px';
+        el.style.height = '18px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = '#05cb63';
+        el.style.border = '2px solid #ffffff';
+        el.style.boxShadow = '0 0 12px #05cb63, 0 0 4px rgba(0,0,0,0.5)';
+        el.style.cursor = 'pointer';
+        el.title = 'Current Street View Position';
 
-      const marker = new maplibregl.Marker({ element: el })
-        .setLngLat([pano.lng, pano.lat])
-        .addTo(map);
+        streetViewMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([streetViewPos.lng, streetViewPos.lat])
+          .addTo(map);
+      } else {
+        streetViewMarkerRef.current.setLngLat([streetViewPos.lng, streetViewPos.lat]);
+      }
+    } else if (streetViewMarkerRef.current) {
+      streetViewMarkerRef.current.remove();
+      streetViewMarkerRef.current = null;
+    }
 
-      markersRef.current.push(marker);
-    });
-
-    // Build coverage lines between neighbors
-    const features = [];
-    const drawnPairs = new Set();
-
-    panoramas.forEach((pano) => {
-      if (!pano.neighbors) return;
-      pano.neighbors.forEach((neighborId) => {
-        const pairKey = [pano.id, neighborId].sort().join('-');
-        if (drawnPairs.has(pairKey)) return;
-        drawnPairs.add(pairKey);
-
-        const neighbor = panoramas.find((p) => p.id === neighborId);
-        if (!neighbor) return;
-
-        features.push({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: [
-              [pano.lng, pano.lat],
-              [neighbor.lng, neighbor.lat],
-            ],
-          },
-        });
-      });
-    });
-
-    const updateLines = () => {
-      const source = mapRef.current?.getSource('coverage-lines');
-      if (source) {
-        source.setData({ type: 'FeatureCollection', features });
+    return () => {
+      if (streetViewMarkerRef.current) {
+        streetViewMarkerRef.current.remove();
+        streetViewMarkerRef.current = null;
       }
     };
-    
-    updateLines();
-    window.addEventListener('map-style-loaded', updateLines);
-    return () => window.removeEventListener('map-style-loaded', updateLines);
-  }, [panoramas, activePanoId, onSelectPano]);
+  }, [streetViewPos]);
 
-  // Update active marker and fly to it
+  // Update viewing direction cone for Street View
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !activePanoId) return;
-
-    // Update marker styles
-    markersRef.current.forEach((marker) => {
-      const el = marker.getElement();
-      if (el.dataset.panoId === activePanoId) {
-        el.classList.add('active');
-      } else {
-        el.classList.remove('active');
+    if (!map || !streetViewPos || viewerHeading === undefined || !coneLayerAdded.current) {
+      const source = map?.getSource('view-cone');
+      if (source) {
+        source.setData({ type: 'FeatureCollection', features: [] });
       }
-    });
-
-    // Fly to active panorama
-    const activePano = panoramas?.find((p) => p.id === activePanoId);
-    if (activePano) {
-      map.flyTo({
-        center: [activePano.lng, activePano.lat],
-        zoom: Math.max(map.getZoom(), 17),
-        duration: 800,
-      });
+      return;
     }
-  }, [activePanoId, panoramas]);
-
-  // Update viewing direction cone
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !activePanoId || viewerHeading === undefined || !coneLayerAdded.current) return;
-
-    const activePano = panoramas?.find((p) => p.id === activePanoId);
-    if (!activePano) return;
 
     const updateCone = () => {
       const map = mapRef.current;
-      if (!map) return;
+      if (!map || !streetViewPos || streetViewPos.lat === undefined) return;
       // Generate a cone polygon representing the viewing direction
-      const cone = generateViewCone(activePano.lat, activePano.lng, viewerHeading, 30, 0.0003);
+      const cone = generateViewCone(streetViewPos.lat, streetViewPos.lng, viewerHeading, 35, 0.00035);
       const source = map.getSource('view-cone');
       if (source) {
         source.setData({
@@ -729,11 +803,11 @@ export default function MapView({
         });
       }
     };
-    
+
     updateCone();
     window.addEventListener('map-style-loaded', updateCone);
     return () => window.removeEventListener('map-style-loaded', updateCone);
-  }, [viewerHeading, activePanoId, panoramas]);
+  }, [viewerHeading, streetViewPos]);
 
   // Update Tourist Spot (POI) markers
   useEffect(() => {
@@ -751,28 +825,52 @@ export default function MapView({
       const lng = spot.location?.lng ?? spot.lng;
       if (lat === undefined || lng === undefined) return;
 
+      const isPoi = spot.spotType === 'poi' || spot.type === 'poi';
+      const icon = spot.categoryIcon || (isPoi ? '📍' : '⭐');
+
       const el = document.createElement('div');
-      el.className = `poi-marker ${spot.id === activeTouristSpotId ? 'active' : ''} ${
+      el.className = `poi-marker ${isPoi ? 'poi-service' : 'poi-attraction'} ${spot.id === activeTouristSpotId ? 'active' : ''} ${
         spot.sync_status === 'staged_local' ? 'staged' : ''
       }`;
       el.dataset.poiId = spot.id;
+      el.title = `${spot.name} • Drag to reposition`;
 
       el.innerHTML = `
-        <div class="poi-marker-pin">
-          <span class="poi-marker-icon">⭐</span>
+        <div class="poi-marker-inner">
+          <div class="poi-marker-pin ${isPoi ? 'pin-poi' : 'pin-tourist'}">
+            <span class="poi-marker-icon">${icon}</span>
+          </div>
+          <div class="poi-marker-label">${spot.name}</div>
+          <div class="poi-marker-tooltip">${spot.category || ''}</div>
         </div>
-        <div class="poi-marker-label">${spot.name}</div>
-        <div class="poi-marker-tooltip">${spot.category || ''}</div>
       `;
 
+      let wasDragged = false;
+
       el.addEventListener('click', (e) => {
+        if (wasDragged) return;
         e.stopPropagation();
         onSelectTouristSpot?.(spot);
       });
 
-      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', draggable: true })
         .setLngLat([lng, lat])
         .addTo(map);
+
+      marker.on('dragstart', () => {
+        wasDragged = true;
+        el.classList.add('is-dragging');
+      });
+
+      marker.on('dragend', () => {
+        el.classList.remove('is-dragging');
+        const pos = marker.getLngLat();
+        onSpotLocationChange?.(spot.id, pos.lat, pos.lng);
+        // Suppress click right after drop
+        setTimeout(() => {
+          wasDragged = false;
+        }, 150);
+      });
 
       poiMarkersRef.current.push(marker);
     });
@@ -781,7 +879,7 @@ export default function MapView({
       poiMarkersRef.current.forEach((m) => m.remove());
       poiMarkersRef.current = [];
     };
-  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot]);
+  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot, onSpotLocationChange]);
 
   // Fly to active tourist spot when selected
   useEffect(() => {

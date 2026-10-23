@@ -19,6 +19,7 @@ export default function PanoramaViewer({
   onHeadingChange,
   onPitchChange,
   steerTarget,
+  onSwitchToMapillary,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
@@ -105,6 +106,7 @@ export default function PanoramaViewer({
       minHfov: 50,
       maxHfov: 120,
       friction: 0.15,
+      sceneFadeDuration: 600,
       mouseZoom: true,
       keyboardZoom: true,
       hotSpots: hotSpots,
@@ -137,46 +139,86 @@ export default function PanoramaViewer({
   }, [onHeadingChange]);
 
   /**
-   * Build hotspot configs for neighboring panoramas.
+   * Build hotspot configs for neighboring panoramas with spatial discovery and smooth glide transitions.
    */
   function buildHotspots(currentPano, allPanoramas) {
-    if (!currentPano.neighbors || !allPanoramas) return [];
+    if (!allPanoramas || allPanoramas.length === 0) return [];
 
-    return currentPano.neighbors
-      .map((neighborId) => {
+    // Gather neighbor IDs from pano.neighbors and spatial proximity
+    const neighborIdSet = new Set(currentPano.neighbors || []);
+
+    // Also look for spatially close panos (within 150m)
+    allPanoramas.forEach((other) => {
+      if (other.id !== currentPano.id) {
+        const dLat = (other.lat - currentPano.lat) * 111320;
+        const dLng = (other.lng - currentPano.lng) * 111320 * Math.cos((currentPano.lat * Math.PI) / 180);
+        const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+        if (dist <= 150) {
+          neighborIdSet.add(other.id);
+        }
+      }
+    });
+
+    return Array.from(neighborIdSet)
+      .map((neighborId, idx) => {
         const neighbor = allPanoramas.find((p) => p.id === neighborId);
         if (!neighbor) return null;
 
-        const bearing = calculateBearing(
-          currentPano.lat, currentPano.lng,
-          neighbor.lat, neighbor.lng
-        );
+        // Calculate distance
+        const dLat = (neighbor.lat - currentPano.lat) * 111320;
+        const dLng = (neighbor.lng - currentPano.lng) * 111320 * Math.cos((currentPano.lat * Math.PI) / 180);
+        const distMeters = Math.round(Math.sqrt(dLat * dLat + dLng * dLng));
+
+        let bearing;
+        if (distMeters < 2) {
+          // If at nearly identical coordinate, space them out evenly
+          bearing = (idx * 90) % 360;
+        } else {
+          bearing = calculateBearing(
+            currentPano.lat, currentPano.lng,
+            neighbor.lat, neighbor.lng
+          );
+        }
 
         // Convert bearing to yaw relative to panorama heading
-        const yaw = bearing - (currentPano.heading || 0);
+        const rawYaw = bearing - (currentPano.heading || 0);
+        const normalizedYaw = ((rawYaw % 360) + 540) % 360 - 180; // range [-180, 180]
 
         return {
-          pitch: -15, // Below horizon (like street-level arrows)
-          yaw: yaw,
+          pitch: -20, // Ground level street view placement
+          yaw: normalizedYaw,
           type: 'custom',
           cssClass: 'pano-hotspot-arrow',
           createTooltipFunc: (hotSpotDiv) => {
             hotSpotDiv.classList.add('pano-hotspot-arrow');
-            // Create chevron element
             const arrow = document.createElement('div');
             arrow.className = 'pano-hotspot-inner';
+            const labelText = neighbor.label || (neighbor.description ? neighbor.description.slice(0, 20) : 'Step forward');
             arrow.innerHTML = `
-              <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-                 <path d="M10 40 L30 15 L50 40" stroke="rgba(255,255,255,0.9)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-              </svg>
+              <div class="pano-chevron-disc">
+                <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                  <circle cx="22" cy="22" r="19" fill="rgba(15, 23, 42, 0.75)" stroke="rgba(255, 255, 255, 0.9)" stroke-width="2.5"/>
+                  <path d="M14 26 L22 15 L30 26" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="pano-hotspot-label-pill">
+                <span>${labelText}</span>
+                <span style="opacity: 0.7; font-size: 0.65rem;">~${distMeters}m</span>
+              </div>
             `;
             hotSpotDiv.appendChild(arrow);
           },
-          createTooltipArgs: neighborId,
           clickHandlerFunc: () => {
-            onNavigate?.(neighbor);
+            // Smoothly glide camera toward the target arrow before navigating
+            if (viewerRef.current && typeof viewerRef.current.lookAt === 'function') {
+              try {
+                viewerRef.current.lookAt(-12, normalizedYaw, 95, 300);
+              } catch (e) {}
+            }
+            setTimeout(() => {
+              onNavigate?.(neighbor);
+            }, 180);
           },
-          clickHandlerArgs: neighborId,
         };
       })
       .filter(Boolean);
@@ -214,27 +256,89 @@ export default function PanoramaViewer({
         <button className="zoom-btn" onClick={zoomOut} title="Zoom out">−</button>
       </div>
 
+      {/* Seamless Transition Pill to Mapillary Street View when near campus entrance */}
+      {(panorama?.id === 'pano_1785434840169_sqgpeq' || panorama?.id === 'pano_1785458227165_1j20c9' || (panorama?.lat && Math.abs(panorama.lat - 17.60825) < 0.0002)) && onSwitchToMapillary && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+            animation: 'fadeIn 0.3s ease-out',
+          }}
+        >
+          <button
+            onClick={onSwitchToMapillary}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 18px',
+              borderRadius: 'var(--radius-full)',
+              background: 'linear-gradient(135deg, #05cb63 0%, #047857 100%)',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              border: '2px solid rgba(255, 255, 255, 0.4)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5), 0 0 15px rgba(5, 203, 99, 0.5)',
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)',
+            }}
+          >
+            <span>🚗</span>
+            <span>Enter Street View on Main Road</span>
+            <span style={{ fontSize: '0.72rem', opacity: 0.85 }}>(Mapillary)</span>
+            <span>→</span>
+          </button>
+        </div>
+      )}
+
       {/* Hotspot styles injected */}
       <style>{`
         .pano-hotspot-arrow {
           cursor: pointer;
-          transition: transform 0.2s ease, opacity 0.2s ease;
-          opacity: 0.7;
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+          opacity: 0.85;
         }
         .pano-hotspot-arrow:hover {
-          transform: scale(1.1);
+          transform: scale(1.18);
           opacity: 1;
         }
         .pano-hotspot-inner {
-          transform: perspective(400px) rotateX(65deg);
-          filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8));
           display: flex;
-          justify-content: center;
+          flex-direction: column;
           align-items: center;
+          filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7));
+          pointer-events: auto;
+        }
+        .pano-chevron-disc {
+          transform: perspective(300px) rotateX(55deg);
+          animation: pulseArrow 2s infinite ease-in-out;
+        }
+        @keyframes pulseArrow {
+          0%, 100% { transform: perspective(300px) rotateX(55deg) translateY(0); }
+          50% { transform: perspective(300px) rotateX(55deg) translateY(-4px); }
+        }
+        .pano-hotspot-label-pill {
+          background: rgba(15, 23, 42, 0.85);
+          color: #ffffff;
+          padding: 2px 8px;
+          border-radius: 999px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          backdrop-filter: blur(6px);
+          white-space: nowrap;
+          margin-top: -4px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
         .pnlm-hotspot {
-          width: 60px !important;
-          height: 60px !important;
+          width: 80px !important;
+          height: 80px !important;
         }
       `}</style>
     </div>

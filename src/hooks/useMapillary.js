@@ -20,16 +20,16 @@ export function useMapillary() {
 
     try {
       const fields = 'id,geometry,compass_angle,captured_at,is_pano,thumb_1024_url,sequence';
-      const url = `${MAPILLARY_GRAPH_API}/images?access_token=${ACCESS_TOKEN}&fields=${fields}&is_pano=true&bbox=${lng - 0.005},${lat - 0.005},${lng + 0.005},${lat + 0.005}&limit=50`;
+      const delta = 0.009;
+      const url = `${MAPILLARY_GRAPH_API}/images?access_token=${ACCESS_TOKEN}&fields=${fields}&bbox=${lng - delta},${lat - delta},${lng + delta},${lat + delta}&limit=100`;
 
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Mapillary API error: ${response.status}`);
 
       const data = await response.json();
-      setLoading(false);
 
-      return (data.data || []).map((img) => ({
-        id: img.id,
+      let items = (data.data || []).map((img) => ({
+        id: String(img.id),
         lat: img.geometry?.coordinates?.[1],
         lng: img.geometry?.coordinates?.[0],
         heading: img.compass_angle,
@@ -38,6 +38,39 @@ export function useMapillary() {
         thumbUrl: img.thumb_1024_url,
         sequenceId: img.sequence,
       }));
+
+      // If nothing within tight bbox, expand to ~2.5km to ensure sequence clicks always find images
+      if (items.length === 0) {
+        const widerDelta = 0.025;
+        const widerUrl = `${MAPILLARY_GRAPH_API}/images?access_token=${ACCESS_TOKEN}&fields=${fields}&bbox=${lng - widerDelta},${lat - widerDelta},${lng + widerDelta},${lat + widerDelta}&limit=100`;
+        const widerRes = await fetch(widerUrl);
+        if (widerRes.ok) {
+          const widerData = await widerRes.json();
+          items = (widerData.data || []).map((img) => ({
+            id: String(img.id),
+            lat: img.geometry?.coordinates?.[1],
+            lng: img.geometry?.coordinates?.[0],
+            heading: img.compass_angle,
+            capturedAt: img.captured_at,
+            isPano: img.is_pano,
+            thumbUrl: img.thumb_1024_url,
+            sequenceId: img.sequence,
+          }));
+        }
+      }
+
+      setLoading(false);
+
+      // Sort: 360 spherical panoramas prioritized first, then closest by distance
+      items.sort((a, b) => {
+        if (a.isPano && !b.isPano) return -1;
+        if (!a.isPano && b.isPano) return 1;
+        const distA = Math.hypot(a.lat - lat, a.lng - lng);
+        const distB = Math.hypot(b.lat - lat, b.lng - lng);
+        return distA - distB;
+      });
+
+      return items;
     } catch (err) {
       setError(err.message);
       setLoading(false);
