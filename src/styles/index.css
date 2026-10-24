@@ -1131,6 +1131,7 @@ body {
   user-select: none;
   z-index: 15;
   pointer-events: auto;
+  touch-action: none !important;
   /* CRITICAL: Never apply CSS transform or transition: transform to .poi-marker.
      MapLibre GL JS positions this root element via inline transform: translate(...). */
 }
@@ -2276,3 +2277,41 @@ body {
   border-color: #ffd700;
   box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
 }
+
+/* App Toast Notification */
+.app-toast-notification {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.94);
+  color: #f8fafc;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 14px rgba(255, 215, 0, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  animation: appToastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  max-width: 90vw;
+  text-align: center;
+}
+
+@keyframes appToastSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+

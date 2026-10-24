@@ -321,20 +321,6 @@ export default function MapView({
         },
       });
 
-      // Unsurveyed mountain & river trail gaps (Dashed Amber)
-      map.addLayer({
-        id: 'trail-gaps-layer',
-        type: 'line',
-        source: 'trail-corridors',
-        filter: ['==', ['get', 'status'], 'gap'],
-        paint: {
-          'line-color': '#f59e0b',
-          'line-width': 3,
-          'line-dasharray': [2, 2],
-          'line-opacity': 0.9,
-        },
-      });
-
       coneLayerAdded.current = true;
 
       // Custom OSM Overlay (user's edited map.osm data)
@@ -430,18 +416,21 @@ export default function MapView({
       window.dispatchEvent(new Event('map-style-loaded'));
     });
 
-    // Helper to safely extract a valid 64-bit Mapillary image ID (never an internal vector tile index like 1352)
+    // Helper to safely extract a valid 64-bit Mapillary image ID (never an internal sequence ID or vector tile index)
     const extractMapillaryImageId = (feature) => {
       if (!feature) return null;
-      // 1. Properties.id on image point features
+      // Never use properties.id from a sequence feature (it is a sequence ID, not an image ID)
+      if (feature.layer?.id === 'mapillary-sequences') {
+        const seqImageId = feature.properties?.image_id;
+        if (seqImageId && String(seqImageId).length >= 10 && /^\d+$/.test(String(seqImageId))) {
+          return String(seqImageId);
+        }
+        return null;
+      }
+      // Properties.id on image point features
       const propId = feature.properties?.id;
       if (propId && String(propId).length >= 10 && /^\d+$/.test(String(propId))) {
         return String(propId);
-      }
-      // 2. Properties.image_id on sequence features
-      const seqImageId = feature.properties?.image_id;
-      if (seqImageId && String(seqImageId).length >= 10 && /^\d+$/.test(String(seqImageId))) {
-        return String(seqImageId);
       }
       return null;
     };
@@ -463,8 +452,10 @@ export default function MapView({
 
           if (imageFeatures.length > 0) {
             const validId = extractMapillaryImageId(imageFeatures[0]);
-            onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, validId, true);
-            return;
+            if (validId) {
+              onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, validId, true);
+              return;
+            }
           }
         }
 
@@ -475,15 +466,15 @@ export default function MapView({
           });
 
           if (seqFeatures.length > 0) {
-            // Check if there is an image point near the click point (within 35px)
+            // Check if there is an image point near the click point (within 40px)
             const nearbyImageFeatures = map.queryRenderedFeatures([
-              [e.point.x - 35, e.point.y - 35],
-              [e.point.x + 35, e.point.y + 35],
+              [e.point.x - 40, e.point.y - 40],
+              [e.point.x + 40, e.point.y + 40],
             ], { layers: ['mapillary-images'] });
 
             const validId = nearbyImageFeatures.length > 0
               ? extractMapillaryImageId(nearbyImageFeatures[0])
-              : extractMapillaryImageId(seqFeatures[0]);
+              : null; // null triggers searchNearby to resolve the actual image ID
 
             onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, validId, true);
             return;
@@ -778,13 +769,6 @@ export default function MapView({
           filter: ['==', ['get', 'status'], 'surveyed'],
           paint: { 'line-color': '#06d6a0', 'line-width': 3.5, 'line-opacity': 0.8 },
         });
-        mapRef.current.addLayer({
-          id: 'trail-gaps-layer',
-          type: 'line',
-          source: 'trail-corridors',
-          filter: ['==', ['get', 'status'], 'gap'],
-          paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-dasharray': [2, 2], 'line-opacity': 0.9 },
-        });
       }
 
       // Custom OSM Overlay
@@ -1010,7 +994,7 @@ export default function MapView({
     }
   }, [activeTouristSpotId, touristSpots]);
 
-  // Toggle Coverage Gaps & Trail Corridors visibility (Research Objective 1)
+  // Toggle Coverage & Surveyed Trail Corridors visibility
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -1018,9 +1002,6 @@ export default function MapView({
 
     if (map.getLayer('trail-surveyed-layer')) {
       map.setLayoutProperty('trail-surveyed-layer', 'visibility', visibility);
-    }
-    if (map.getLayer('trail-gaps-layer')) {
-      map.setLayoutProperty('trail-gaps-layer', 'visibility', visibility);
     }
   }, [showCoverageGaps]);
 

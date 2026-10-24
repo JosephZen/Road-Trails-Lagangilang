@@ -188,7 +188,25 @@ export default function MapillaryViewer({
           return;
         }
         console.warn('Mapillary navigation warning:', err);
-        setError(err?.message || 'Failed to load street view image');
+
+        // Auto-recover to working default entrance gate if the requested image fails to cache or load
+        if (targetId !== DEFAULT_IMAGE_ID && viewerRef.current) {
+          console.warn(`Image ${targetId} failed to load. Auto-recovering to campus gate (${DEFAULT_IMAGE_ID})...`);
+          try {
+            currentImageIdRef.current = DEFAULT_IMAGE_ID;
+            await viewerRef.current.moveTo(DEFAULT_IMAGE_ID);
+            if (!isCancelled) {
+              setIsLoading(false);
+              setError(null);
+              isNavigatingRef.current = false;
+              return;
+            }
+          } catch (fallbackErr) {
+            console.warn('Fallback also failed:', fallbackErr);
+          }
+        }
+
+        setError(err?.message || 'Street view image unavailable or still processing');
         setIsLoading(false);
         isNavigatingRef.current = false;
       }

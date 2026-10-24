@@ -33,7 +33,7 @@ export default function App() {
   const [showSpotModal, setShowSpotModal] = useState(false);
   const [editingSpot, setEditingSpot] = useState(null);
   const [steerTarget, setSteerTarget] = useState(null);
-  const [showCoverageGaps, setShowCoverageGaps] = useState(true);
+  const [showCoverageGaps, setShowCoverageGaps] = useState(false);
 
   // Routing State
   const [routingMode, setRoutingMode] = useState(false);
@@ -48,6 +48,18 @@ export default function App() {
 
   // Right-click context menu state: { lat, lng, x, y } | null
   const [contextMenu, setContextMenu] = useState(null);
+
+  // Toast notification state
+  const [toastMessage, setToastMessage] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = useCallback((msg, duration = 3500) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToastMessage(msg);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, duration);
+  }, []);
 
   // Connectivity & 2-Step Sync State (Research Objective 3: ISO/IEC 25010 Reliability)
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -291,8 +303,19 @@ export default function App() {
           prev ? { ...prev, location: { ...(prev.location || {}), lat, lng }, lat, lng } : null
         );
       }
+
+      // Haptic feedback for touch devices
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try {
+          navigator.vibrate([30, 20, 30]);
+        } catch (_) {}
+      }
+
+      const spot = touristSpots.find((s) => s.id === spotId);
+      const spotName = spot?.name || 'Landmark';
+      showToast(`📍 ${spotName} moved to [${lat.toFixed(5)}, ${lng.toFixed(5)}] — Saved`);
     },
-    [activeTouristSpot]
+    [activeTouristSpot, touristSpots, showToast]
   );
 
   // Swap origin and destination
@@ -496,25 +519,6 @@ export default function App() {
           {/* Admin-only controls */}
           {isAdmin && (
             <>
-              {/* Coverage Gaps Toggle (Research Objective 1) */}
-              <button
-                className={`btn ${showCoverageGaps ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setShowCoverageGaps(!showCoverageGaps)}
-                title="Toggle Lagangilang Trail Corridors & Coverage Gaps (Objective 1)"
-                style={{
-                  fontSize: '0.8rem',
-                  padding: '6px 10px',
-                  borderRadius: 'var(--radius-full)',
-                  background: showCoverageGaps
-                    ? 'linear-gradient(135deg, #06d6a0 0%, #059669 100%)'
-                    : 'rgba(0,0,0,0.6)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  color: '#ffffff',
-                }}
-              >
-                🗺️ Gaps {showCoverageGaps ? 'ON' : 'OFF'}
-              </button>
-
               {/* Custom OSM Overlay Toggle */}
               <button
                 className={`btn btn-sm ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
@@ -1164,6 +1168,13 @@ export default function App() {
         }}
         editingSpot={editingSpot}
       />
+
+      {/* ===== Floating Toast Notification ===== */}
+      {toastMessage && (
+        <div className="app-toast-notification">
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }

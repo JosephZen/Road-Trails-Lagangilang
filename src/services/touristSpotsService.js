@@ -495,6 +495,7 @@ export const touristSpotsService = {
     const all = this.getAllSpots();
     const parsedLat = parseFloat(Number(lat).toFixed(6));
     const parsedLng = parseFloat(Number(lng).toFixed(6));
+    const nowIso = new Date().toISOString();
     const updated = all.map((s) => {
       if (s.id !== spotId) return s;
       return {
@@ -506,7 +507,7 @@ export const touristSpotsService = {
         },
         lat: parsedLat,
         lng: parsedLng,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
       };
     });
     this.saveAllSpots(updated);
@@ -577,17 +578,39 @@ export const touristSpotsService = {
             sync_status: 'synced_cloud',
             staged_at: r.staged_at,
             synced_at: r.synced_at,
+            updated_at: r.updated_at,
           }));
 
         const local = this.getAllSpots();
-        const stagedDrafts = local.filter((s) => s.sync_status === 'staged_local');
-        const finalSpots = [...stagedDrafts];
-        const addedIds = new Set(finalSpots.map((s) => s.id));
+        const localMap = new Map(local.map((s) => [s.id, s]));
+        const finalSpots = [];
+        const seenIds = new Set();
 
         for (const cs of cloudSpots) {
-          if (!addedIds.has(cs.id)) {
+          seenIds.add(cs.id);
+          const localSpot = localMap.get(cs.id);
+          if (localSpot) {
+            // Compare updated_at: If local has a newer timestamp (e.g. recently dragged), keep local!
+            const localTime = new Date(localSpot.updated_at || 0).getTime();
+            const cloudTime = new Date(cs.updated_at || cs.synced_at || 0).getTime();
+            if (localTime > cloudTime) {
+              finalSpots.push(localSpot);
+              // Background update cloud with the newer local coordinates
+              const lat = localSpot.location?.lat ?? localSpot.lat;
+              const lng = localSpot.location?.lng ?? localSpot.lng;
+              sql`UPDATE public.tourist_spots SET latitude = ${lat}, longitude = ${lng}, updated_at = NOW() WHERE id = ${cs.id}`.catch(() => {});
+            } else {
+              finalSpots.push(cs);
+            }
+          } else {
             finalSpots.push(cs);
-            addedIds.add(cs.id);
+          }
+        }
+
+        // Retain any local spots not yet in cloud (e.g. locally created POIs)
+        for (const ls of local) {
+          if (!seenIds.has(ls.id) && !deletedIds.has(ls.id)) {
+            finalSpots.push(ls);
           }
         }
 
