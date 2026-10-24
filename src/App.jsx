@@ -140,14 +140,19 @@ export default function App() {
     }
   }, [userLocation]);
 
-  // Right-click context menu handler
+  // Right-click / Touchscreen Long-Press context menu handler
+  const lastContextMenuTime = useRef(0);
   const handleMapContextMenu = useCallback((lat, lng, screenX, screenY) => {
+    lastContextMenuTime.current = Date.now();
     setContextMenu({ lat, lng, x: screenX, y: screenY });
   }, []);
 
-  // Dismiss context menu on any click or Escape key
+  // Dismiss context menu on click or Escape key (ignoring synthetic clicks right after long-press)
   useEffect(() => {
-    const dismiss = () => setContextMenu(null);
+    const dismiss = () => {
+      if (Date.now() - lastContextMenuTime.current < 350) return;
+      setContextMenu(null);
+    };
     const onKey = (e) => { if (e.key === 'Escape') setContextMenu(null); };
     document.addEventListener('click', dismiss);
     document.addEventListener('keydown', onKey);
@@ -1072,21 +1077,33 @@ export default function App() {
         )}
       </div>
 
-      {/* ===== Right-Click Context Menu ===== */}
+      {/* ===== Right-Click & Touch Long-Press Context Menu ===== */}
       {contextMenu && (
         <div
           className="map-context-menu glass-panel"
           style={{
             position: 'fixed',
-            left: Math.min(contextMenu.x, window.innerWidth - 240),
-            top: Math.min(contextMenu.y, window.innerHeight - 200),
+            left: Math.max(12, Math.min(contextMenu.x, window.innerWidth - 260)),
+            top: Math.max(12, Math.min(contextMenu.y, window.innerHeight - 260)),
             zIndex: 'var(--z-modal)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Header with Title and Close button for touchscreens */}
+          <div className="ctx-header">
+            <span className="ctx-title">📍 Location Menu</span>
+            <button
+              className="ctx-close-btn"
+              onClick={() => setContextMenu(null)}
+              title="Close menu"
+            >
+              ✕
+            </button>
+          </div>
+
           {/* Coordinates row */}
           <div className="ctx-coords">
-            <span>📍 {contextMenu.lat.toFixed(6)}, {contextMenu.lng.toFixed(6)}</span>
+            <span>{contextMenu.lat.toFixed(6)}, {contextMenu.lng.toFixed(6)}</span>
             <button
               title="Copy coordinates"
               onClick={() => {
@@ -1099,7 +1116,7 @@ export default function App() {
           </div>
           <hr />
           <button onClick={() => { setRouteOrigin([contextMenu.lng, contextMenu.lat]); setRouteData(null); setContextMenu(null); }}>
-            📍 Mark as Point A (Start)
+            🟢 Mark as Point A (Start)
           </button>
           <button onClick={() => { setRouteDestination([contextMenu.lng, contextMenu.lat]); setRouteData(null); setContextMenu(null); }}>
             🏁 Mark as Point B (Destination)

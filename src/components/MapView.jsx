@@ -115,6 +115,7 @@ export default function MapView({
   const markersRef = useRef([]);
   const poiMarkersRef = useRef([]);
   const coneLayerAdded = useRef(false);
+  const suppressClickRef = useRef(false);
 
   // Keep latest onMapClick ref to avoid stale closures in MapLibre event listeners
   const onMapClickRef = useRef(onMapClick);
@@ -447,6 +448,12 @@ export default function MapView({
 
     // Handle clicks on Mapillary features or the map in general
     map.on('click', (e) => {
+      // Suppress synthetic clicks following a touch long-press gesture
+      if (suppressClickRef.current) {
+        suppressClickRef.current = false;
+        return;
+      }
+
       try {
         // 1. Check if we clicked directly on a Mapillary image point
         if (map.getLayer('mapillary-images')) {
@@ -510,6 +517,105 @@ export default function MapView({
       onMapContextMenuRef.current?.(e.lngLat.lat, e.lngLat.lng, screenX, screenY);
     });
 
+    // ========== Touchscreen Long-Press Gesture (Right-Click on Touch) ==========
+    let touchTimer = null;
+    let touchStartPoint = null;
+    let touchStartLngLat = null;
+    let touchScreenX = 0;
+    let touchScreenY = 0;
+    let longPressTriggered = false;
+    let suppressTimeout = null;
+
+    // Visual ripple indicator ring for touch-and-hold
+    const touchIndicator = document.createElement('div');
+    touchIndicator.className = 'touch-hold-indicator';
+    touchIndicator.style.display = 'none';
+    mapContainerRef.current?.appendChild(touchIndicator);
+
+    const cancelTouchHold = () => {
+      if (touchTimer) {
+        clearTimeout(touchTimer);
+        touchTimer = null;
+      }
+      touchIndicator.style.display = 'none';
+      touchIndicator.classList.remove('active');
+    };
+
+    map.on('touchstart', (e) => {
+      // Disregard multi-touch gestures (e.g. pinch-to-zoom or rotate)
+      if (e.points && e.points.length > 1) {
+        cancelTouchHold();
+        return;
+      }
+
+      const touch = e.originalEvent?.touches?.[0];
+      if (!touch) return;
+
+      longPressTriggered = false;
+      touchStartPoint = { x: e.point.x, y: e.point.y };
+      touchStartLngLat = e.lngLat;
+      touchScreenX = touch.clientX;
+      touchScreenY = touch.clientY;
+
+      // Position the visual expanding ripple ring right under the user's finger
+      const containerRect = mapContainerRef.current?.getBoundingClientRect();
+      if (containerRect) {
+        touchIndicator.style.left = `${touch.clientX - containerRect.left}px`;
+        touchIndicator.style.top = `${touch.clientY - containerRect.top}px`;
+        touchIndicator.style.display = 'block';
+        void touchIndicator.offsetWidth; // Trigger reflow for CSS animation
+        touchIndicator.classList.add('active');
+      }
+
+      touchTimer = setTimeout(() => {
+        longPressTriggered = true;
+        cancelTouchHold();
+
+        // Haptic vibration feedback for mobile devices (if supported by browser/device)
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try {
+            navigator.vibrate(45);
+          } catch (_) {}
+        }
+
+        // Trigger context menu with touch coordinates
+        onMapContextMenuRef.current?.(
+          touchStartLngLat.lat,
+          touchStartLngLat.lng,
+          touchScreenX,
+          touchScreenY
+        );
+      }, 500);
+    });
+
+    map.on('touchmove', (e) => {
+      if (!touchTimer || !touchStartPoint) return;
+      // If the user's finger moves more than 10px, it is a map pan/drag, cancel hold
+      const dx = e.point.x - touchStartPoint.x;
+      const dy = e.point.y - touchStartPoint.y;
+      if (Math.hypot(dx, dy) > 10) {
+        cancelTouchHold();
+      }
+    });
+
+    map.on('touchend', (e) => {
+      cancelTouchHold();
+      if (longPressTriggered) {
+        e.originalEvent?.preventDefault();
+        suppressClickRef.current = true;
+        if (suppressTimeout) clearTimeout(suppressTimeout);
+        suppressTimeout = setTimeout(() => {
+          suppressClickRef.current = false;
+        }, 400);
+        longPressTriggered = false;
+      }
+    });
+
+    map.on('touchcancel', () => {
+      cancelTouchHold();
+      longPressTriggered = false;
+    });
+
     // Change cursor when hovering over Mapillary layers & surveyed corridors
     map.on('mouseenter', 'mapillary-images', () => {
       map.getCanvas().style.cursor = 'pointer';
@@ -542,6 +648,10 @@ export default function MapView({
     }
 
     return () => {
+      cancelTouchHold();
+      if (touchIndicator.parentNode) {
+        touchIndicator.remove();
+      }
       resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
