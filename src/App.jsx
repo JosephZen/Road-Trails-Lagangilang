@@ -76,8 +76,9 @@ export default function App() {
   const [mapillaryImages, setMapillaryImages] = useState([]);
   const { searchNearby } = useMapillary();
 
-  // Map resize
-  const [mapWidth, setMapWidth] = useState(45); // percentage
+  // Map resize & layout mode ('split' = 50/50 half screen, 'fullscreen' = 100% viewer)
+  const [mapWidth, setMapWidth] = useState(50); // percentage (default half screen)
+  const [viewerLayout, setViewerLayout] = useState('split'); // 'split' | 'fullscreen'
   const resizing = useRef(false);
 
   // Network connectivity listeners
@@ -215,17 +216,17 @@ export default function App() {
       const lat = spot.location?.lat ?? spot.lat;
       const lng = spot.location?.lng ?? spot.lng;
 
-      // 1. Check if spot has a verified 64-bit Mapillary image ID
-      const targetId = spot.connected360?.targetId;
-      const isValidTargetId = targetId && String(targetId).length >= 10 && /^\d+$/.test(String(targetId));
+      // 1. If landmark has its own 360 image (connected360 or primary_pano_id), use that as default
+      const customPanoId = spot.connected360?.targetId || spot.primary_pano_id;
+      const isValidPanoId = customPanoId && String(customPanoId).length >= 10 && /^\d+$/.test(String(customPanoId));
 
-      if (isValidTargetId) {
-        setMapillaryImageId(String(targetId));
-        setStreetViewPos({ lat, lng, id: String(targetId) });
+      if (isValidPanoId) {
+        setMapillaryImageId(String(customPanoId));
+        setStreetViewPos({ lat, lng, id: String(customPanoId) });
       } else {
-        // 2. Otherwise auto-detect nearest Mapillary imagery
+        // 2. Otherwise auto-detect and load nearest street view
         try {
-          const images = await searchNearby(lat, lng);
+          const images = await searchNearby(lat, lng, 350);
           if (images && images.length > 0) {
             setMapillaryImageId(String(images[0].id));
             setStreetViewPos({ lat: images[0].lat, lng: images[0].lng, id: String(images[0].id) });
@@ -235,7 +236,7 @@ export default function App() {
             setStreetViewPos({ lat: 17.6081389, lng: 120.7381389, id: '1532761357806896' });
           }
         } catch (e) {
-          console.warn('Could not find nearby Mapillary image:', e);
+          console.warn('Could not find nearby street view:', e);
           setMapillaryImageId('1532761357806896');
         }
       }
@@ -376,17 +377,15 @@ export default function App() {
         return;
       }
 
-      // Check nearby streetview coverage (handles both vector tile sequence clicks and newly uploaded sequences)
-      const images = await searchNearby(lat, lng);
-      setMapillaryImages(images);
-      if (images && images.length > 0) {
-        const closestDist = Math.hypot(images[0].lat - lat, images[0].lng - lng) * 111320;
-        if (isMapillaryClick || closestDist <= 800) {
+      // ONLY check nearby streetview coverage if the click was explicitly on a Mapillary feature
+      if (isMapillaryClick) {
+        const images = await searchNearby(lat, lng);
+        setMapillaryImages(images);
+        if (images && images.length > 0) {
           setActiveTouristSpot(null);
           setMapillaryImageId(String(images[0].id));
           setStreetViewPos({ lat: images[0].lat, lng: images[0].lng, id: String(images[0].id) });
           setViewerOpen(true);
-          return;
         }
       }
     },
@@ -453,8 +452,8 @@ export default function App() {
     <div className="app-container">
       {/* ===== Map Panel ===== */}
       <div
-        className={`panel-map ${!viewerOpen ? 'expanded' : ''} ${isAdmin ? 'admin-mode' : ''}`}
-        style={viewerOpen ? { flex: `0 0 ${mapWidth}%` } : {}}
+        className={`panel-map ${!viewerOpen ? 'expanded' : ''} ${viewerLayout === 'fullscreen' ? 'fullscreen-collapsed' : ''} ${isAdmin ? 'admin-mode' : ''}`}
+        style={viewerOpen && viewerLayout === 'split' ? { flex: `0 0 ${mapWidth}%` } : {}}
       >
         {/* Map top controls */}
         <div className="map-overlay-top">
@@ -521,6 +520,26 @@ export default function App() {
           >
             🧭 Route
           </button>
+
+          {/* Street View Layout Toggle (Half Screen vs Full Screen) */}
+          {viewerOpen && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => setViewerLayout(viewerLayout === 'fullscreen' ? 'split' : 'fullscreen')}
+              title={viewerLayout === 'fullscreen' ? 'Switch to 50/50 Half Screen' : 'Switch to Full Browser Screen'}
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-full)',
+                background: viewerLayout === 'fullscreen' ? 'rgba(67, 97, 238, 0.4)' : 'rgba(0,0,0,0.6)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#ffffff',
+                fontWeight: 600,
+              }}
+            >
+              {viewerLayout === 'fullscreen' ? '◫ 50/50 Half Screen' : '⛶ Full Screen'}
+            </button>
+          )}
 
           <div className="controls-separator" />
 
@@ -1034,7 +1053,10 @@ export default function App() {
       </div>
 
       {/* ===== 360 Viewer Panel (Powered Exclusively by Mapillary) ===== */}
-      <div className={`panel-viewer ${!viewerOpen ? 'hidden' : ''}`}>
+      <div
+        className={`panel-viewer ${!viewerOpen ? 'hidden' : ''} ${viewerLayout === 'fullscreen' ? 'fullscreen-viewer' : ''}`}
+        style={viewerOpen && viewerLayout === 'split' ? { flex: `0 0 ${100 - mapWidth}%` } : {}}
+      >
         {viewerOpen && (
           <div style={{ position: 'relative', width: '100%', height: '100%', flex: 1, minHeight: 0 }}>
             {/* Floating Tourist Spot Card */}
@@ -1059,7 +1081,7 @@ export default function App() {
               steerTarget={steerTarget}
             />
 
-            {/* Floating info badge on right-center, leaving direction and playback arrows unobstructed */}
+            {/* Floating info badge on right-center with layout switcher */}
             <div className="mapillary-info-badge">
               <span style={{ fontSize: '1rem' }}>🟢</span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -1070,6 +1092,26 @@ export default function App() {
                   Lagangilang, Abra
                 </div>
               </div>
+
+              {/* Layout mode switcher: 50/50 Split or Full Browser Screen */}
+              <button
+                onClick={() => setViewerLayout(viewerLayout === 'fullscreen' ? 'split' : 'fullscreen')}
+                title={viewerLayout === 'fullscreen' ? 'Restore to 50/50 Half Screen' : 'Expand to Full Browser Screen'}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '0.72rem',
+                  padding: '3px 8px',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {viewerLayout === 'fullscreen' ? '◫ 50/50 Split' : '⛶ Full Screen'}
+              </button>
+
               <button
                 onClick={handleCloseViewer}
                 title="Close street view"

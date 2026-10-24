@@ -130,15 +130,23 @@ body {
 /* Split screen panels */
 .panel-map {
   position: relative;
-  flex: 0 0 45%;
-  min-width: 320px;
+  flex: 0 0 50%;
+  min-width: 0;
   height: 100%;
   transition: flex var(--transition-slow);
   overflow: hidden;
 }
 
 .panel-map.expanded {
-  flex: 1;
+  flex: 1 !important;
+  width: 100% !important;
+}
+
+.panel-map.fullscreen-collapsed {
+  display: none !important;
+  flex: 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
 }
 
 .panel-viewer {
@@ -153,9 +161,17 @@ body {
 }
 
 .panel-viewer.hidden {
-  flex: 0;
-  min-width: 0;
-  overflow: hidden;
+  display: none !important;
+  flex: 0 !important;
+  min-width: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+.panel-viewer.fullscreen-viewer {
+  flex: 1 0 100% !important;
+  width: 100% !important;
 }
 
 /* Resize handle */
@@ -1098,12 +1114,30 @@ body {
   }
 
   .panel-map {
-    flex: 0 0 40%;
+    flex: 0 0 50%;
     min-width: unset;
   }
 
+  .panel-map.expanded {
+    flex: 1 !important;
+    height: 100% !important;
+  }
+
+  .panel-map.fullscreen-collapsed {
+    display: none !important;
+  }
+
   .panel-viewer {
-    flex: 1;
+    flex: 0 0 50%;
+  }
+
+  .panel-viewer.hidden {
+    display: none !important;
+  }
+
+  .panel-viewer.fullscreen-viewer {
+    flex: 1 !important;
+    height: 100% !important;
   }
 
   .resize-handle {
@@ -2319,4 +2353,47 @@ body {
     transform: translate(-50%, 0) scale(1);
   }
 }
+
+/* Center-right Zoom In/Out & Compass Navigation Controls (Prevents overlap with top hamburger icon) */
+.maplibregl-ctrl-top-right {
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  right: 14px !important;
+  margin: 0 !important;
+  z-index: 20 !important;
+}
+
+.maplibregl-ctrl-top-right .maplibregl-ctrl {
+  margin: 0 !important;
+}
+
+.maplibregl-ctrl-group {
+  background: rgba(15, 23, 42, 0.88) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+  overflow: hidden !important;
+}
+
+.maplibregl-ctrl-group button {
+  width: 38px !important;
+  height: 38px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  transition: background var(--transition-fast) !important;
+}
+
+.maplibregl-ctrl-group button:last-child {
+  border-bottom: none !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background: rgba(67, 97, 238, 0.3) !important;
+}
+
+.maplibregl-ctrl-icon {
+  filter: invert(1) hue-rotate(180deg) brightness(1.2);
+}
+
 

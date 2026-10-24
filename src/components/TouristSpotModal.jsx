@@ -399,53 +399,113 @@ export default function TouristSpotModal({
             </div>
           </div>
 
-          {/* Coordinates Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '6px' }}>
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Latitude *</label>
-              <input
-                type="text"
-                name="lat"
-                required
-                value={formData.lat}
-                onChange={handleChange}
-                className="input-field"
-                style={{ width: '100%', marginTop: '4px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Longitude *</label>
-              <input
-                type="text"
-                name="lng"
-                required
-                value={formData.lng}
-                onChange={handleChange}
-                className="input-field"
-                style={{ width: '100%', marginTop: '4px' }}
-              />
-            </div>
-          </div>
-
-          {/* Coordinates Helper Tip */}
+          {/* ========== Designed Placement & Coordinates Box ========== */}
           <div
+            className="placement-box"
             style={{
-              fontSize: '0.74rem',
-              color: 'var(--text-muted)',
-              marginBottom: '12px',
-              padding: '6px 10px',
-              borderRadius: 'var(--radius-sm)',
-              background: 'rgba(59, 130, 246, 0.08)',
-              border: '1px solid rgba(59, 130, 246, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
+              padding: '12px 14px',
+              borderRadius: 'var(--radius-md)',
+              background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%)',
+              border: '1.5px solid rgba(67, 97, 238, 0.4)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+              marginBottom: '14px',
             }}
           >
-            <span>💡</span>
-            <span>
-              <strong>Tip:</strong> You can edit coordinates directly above, or drag this location's marker on the map to relocate it.
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.15rem' }}>📍</span>
+                <div>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc', display: 'block' }}>
+                    Map Placement & GPS Coordinates
+                  </span>
+                  <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                    Precise WGS84 coordinates on Lagangilang Map
+                  </span>
+                </div>
+              </div>
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  padding: '3px 8px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'rgba(67, 97, 238, 0.25)',
+                  color: '#93c5fd',
+                  border: '1px solid rgba(147, 197, 253, 0.35)',
+                }}
+              >
+                Brgy. {formData.barangay || 'Poblacion'}
+              </span>
+            </div>
+
+            {/* Coordinates Inputs */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
+              <div>
+                <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                  <span>🌐</span> Latitude (N) *
+                </label>
+                <input
+                  type="text"
+                  name="lat"
+                  required
+                  placeholder="e.g. 17.608250"
+                  value={formData.lat}
+                  onChange={handleChange}
+                  className="input-field"
+                  style={{
+                    width: '100%',
+                    fontFamily: 'monospace',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    background: 'rgba(15, 23, 42, 0.9)',
+                    borderColor: 'rgba(67, 97, 238, 0.45)',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                  <span>🌐</span> Longitude (E) *
+                </label>
+                <input
+                  type="text"
+                  name="lng"
+                  required
+                  placeholder="e.g. 120.738083"
+                  value={formData.lng}
+                  onChange={handleChange}
+                  className="input-field"
+                  style={{
+                    width: '100%',
+                    fontFamily: 'monospace',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    background: 'rgba(15, 23, 42, 0.9)',
+                    borderColor: 'rgba(67, 97, 238, 0.45)',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Helper Hint */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 10px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(0, 0, 0, 0.4)',
+                border: '1px dashed rgba(255, 255, 255, 0.15)',
+                fontSize: '0.72rem',
+                color: '#cbd5e1',
+              }}
+            >
+              <span>🎯</span>
+              <span>
+                <strong>Placement:</strong> Coordinates are automatically set from your map click. You can also <strong>drag this marker on the map</strong> in Admin mode anytime to relocate it.
+              </span>
+            </div>
           </div>
 
           {/* Address */}
@@ -561,16 +621,16 @@ export default function TouristSpotModal({
             }}
           >
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-glow)', display: 'block', marginBottom: '6px' }}>
-              🌐 Connected 360° Street View (Mapillary)
+              🌐 Connected 360° Street View & Panorama Image (Database Upload)
             </span>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr auto 1fr 1fr', gap: '8px', alignItems: 'end' }}>
               <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Mapillary Image ID</label>
+                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>360 Image / Mapillary ID</label>
                 <input
                   type="text"
                   name="connectedPanoId"
-                  placeholder="e.g. 1532761357806896 (optional)"
+                  placeholder="e.g. 1532761357806896 or custom pano ID"
                   value={formData.connectedPanoId}
                   onChange={handleChange}
                   className="input-field"

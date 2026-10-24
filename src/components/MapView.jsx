@@ -507,16 +507,15 @@ export default function MapView({
       onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, null, false);
     });
 
-    // Right-click context menu (Desktop) - Admin only for dropping markings & POIs
+    // Right-click context menu (Desktop) - Allows tourists to mark Point A/B & admins to add POIs
     map.on('contextmenu', (e) => {
-      if (!isAdminRef.current) return;
       e.originalEvent?.preventDefault();
       const screenX = e.originalEvent?.clientX ?? 0;
       const screenY = e.originalEvent?.clientY ?? 0;
       onMapContextMenuRef.current?.(e.lngLat.lat, e.lngLat.lng, screenX, screenY);
     });
 
-    // ========== Touchscreen Long-Press Gesture (Right-Click on Touch) - Admin only ==========
+    // ========== Touchscreen Long-Press Gesture (Right-Click on Touch) ==========
     let touchTimer = null;
     let touchStartPoint = null;
     let touchStartLngLat = null;
@@ -541,9 +540,6 @@ export default function MapView({
     };
 
     map.on('touchstart', (e) => {
-      // Tourist explorer mode just explores the map smoothly; long-press gestures reserved for Admin
-      if (!isAdminRef.current) return;
-
       // Disregard multi-touch gestures (e.g. pinch-to-zoom or rotate)
       if (e.points && e.points.length > 1) {
         cancelTouchHold();
