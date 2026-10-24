@@ -461,8 +461,16 @@ export default function App() {
           {/* Role Indicator Badge */}
           <div
             className={`role-indicator ${isAdmin ? 'admin' : 'tourist'}`}
-            onClick={() => setIsAdmin(!isAdmin)}
-            title={isAdmin ? 'Switch to Tourist View' : 'Switch to Admin Panel'}
+            onClick={() => {
+              const next = !isAdmin;
+              setIsAdmin(next);
+              showToast(
+                next
+                  ? '🛡️ Admin Panel active — Marker dragging & location marking enabled'
+                  : '🌴 Tourist Explorer active — Explore map & navigate 360 street views'
+              );
+            }}
+            title={isAdmin ? 'Switch to Tourist Explorer' : 'Switch to Admin Panel'}
           >
             <span className="role-indicator-dot" />
             <span>{isAdmin ? '🛡️ Admin Panel' : '🌴 Tourist Explorer'}</span>
@@ -674,6 +682,7 @@ export default function App() {
           routeDestination={routeDestination}
           routingMode={routingMode || !!pickingTarget}
           pickingMode={pickingTarget}
+          isAdmin={isAdmin}
         />
 
         {/* Resize handle */}

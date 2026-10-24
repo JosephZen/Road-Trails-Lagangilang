@@ -109,6 +109,7 @@ export default function MapView({
   showCustomOSM = true,
   routingMode = false,
   pickingMode = null,
+  isAdmin = false,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -116,6 +117,12 @@ export default function MapView({
   const poiMarkersRef = useRef([]);
   const coneLayerAdded = useRef(false);
   const suppressClickRef = useRef(false);
+
+  // Keep latest isAdmin ref
+  const isAdminRef = useRef(isAdmin);
+  useEffect(() => {
+    isAdminRef.current = isAdmin;
+  }, [isAdmin]);
 
   // Keep latest onMapClick ref to avoid stale closures in MapLibre event listeners
   const onMapClickRef = useRef(onMapClick);
@@ -500,15 +507,16 @@ export default function MapView({
       onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, null, false);
     });
 
-    // Right-click context menu (suppress browser default; fire coordinates to App)
+    // Right-click context menu (Desktop) - Admin only for dropping markings & POIs
     map.on('contextmenu', (e) => {
+      if (!isAdminRef.current) return;
       e.originalEvent?.preventDefault();
       const screenX = e.originalEvent?.clientX ?? 0;
       const screenY = e.originalEvent?.clientY ?? 0;
       onMapContextMenuRef.current?.(e.lngLat.lat, e.lngLat.lng, screenX, screenY);
     });
 
-    // ========== Touchscreen Long-Press Gesture (Right-Click on Touch) ==========
+    // ========== Touchscreen Long-Press Gesture (Right-Click on Touch) - Admin only ==========
     let touchTimer = null;
     let touchStartPoint = null;
     let touchStartLngLat = null;
@@ -533,6 +541,9 @@ export default function MapView({
     };
 
     map.on('touchstart', (e) => {
+      // Tourist explorer mode just explores the map smoothly; long-press gestures reserved for Admin
+      if (!isAdminRef.current) return;
+
       // Disregard multi-touch gestures (e.g. pinch-to-zoom or rotate)
       if (e.points && e.points.length > 1) {
         cancelTouchHold();
@@ -923,11 +934,11 @@ export default function MapView({
       const icon = spot.categoryIcon || (isPoi ? '📍' : '⭐');
 
       const el = document.createElement('div');
-      el.className = `poi-marker ${isPoi ? 'poi-service' : 'poi-attraction'} ${spot.id === activeTouristSpotId ? 'active' : ''} ${
-        spot.sync_status === 'staged_local' ? 'staged' : ''
-      }`;
+      el.className = `poi-marker ${isPoi ? 'poi-service' : 'poi-attraction'} ${
+        spot.id === activeTouristSpotId ? 'active' : ''
+      } ${spot.sync_status === 'staged_local' ? 'staged' : ''} ${isAdmin ? 'is-admin-draggable' : ''}`;
       el.dataset.poiId = spot.id;
-      el.title = `${spot.name} • Drag to reposition`;
+      el.title = isAdmin ? `${spot.name} • Drag to reposition` : spot.name;
 
       el.innerHTML = `
         <div class="poi-marker-inner">
@@ -947,24 +958,30 @@ export default function MapView({
         onSelectTouristSpot?.(spot);
       });
 
-      const marker = new maplibregl.Marker({ element: el, anchor: 'bottom', draggable: true })
+      const marker = new maplibregl.Marker({
+        element: el,
+        anchor: 'bottom',
+        draggable: !!isAdmin,
+      })
         .setLngLat([lng, lat])
         .addTo(map);
 
-      marker.on('dragstart', () => {
-        wasDragged = true;
-        el.classList.add('is-dragging');
-      });
+      if (isAdmin) {
+        marker.on('dragstart', () => {
+          wasDragged = true;
+          el.classList.add('is-dragging');
+        });
 
-      marker.on('dragend', () => {
-        el.classList.remove('is-dragging');
-        const pos = marker.getLngLat();
-        onSpotLocationChange?.(spot.id, pos.lat, pos.lng);
-        // Suppress click right after drop
-        setTimeout(() => {
-          wasDragged = false;
-        }, 150);
-      });
+        marker.on('dragend', () => {
+          el.classList.remove('is-dragging');
+          const pos = marker.getLngLat();
+          onSpotLocationChange?.(spot.id, pos.lat, pos.lng);
+          // Suppress click right after drop
+          setTimeout(() => {
+            wasDragged = false;
+          }, 150);
+        });
+      }
 
       poiMarkersRef.current.push(marker);
     });
@@ -973,7 +990,7 @@ export default function MapView({
       poiMarkersRef.current.forEach((m) => m.remove());
       poiMarkersRef.current = [];
     };
-  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot, onSpotLocationChange]);
+  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot, onSpotLocationChange, isAdmin]);
 
   // Fly to active tourist spot when selected
   useEffect(() => {

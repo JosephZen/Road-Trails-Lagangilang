@@ -1,153 +1,123 @@
 -- ============================================================================
 -- Seed Data for Lagangilang Tourist Spots Database (Neon PostgreSQL)
+-- 12 Official Municipal Landmarks & Heritage Sites
 -- ============================================================================
 
--- Ensure the public schema exists and set search path explicitly
 CREATE SCHEMA IF NOT EXISTS public;
 SET search_path TO public;
 
--- Insert Categories
-INSERT INTO public.categories (id, name, icon, badge_color, description) VALUES
-('cat_heritage', 'Education & Heritage', 'graduation-cap', '#4361ee', 'Academic institutions, historic archives, and cultural preservation centers.'),
-('cat_religion', 'Religious & Cultural Heritage', 'church', '#f72585', 'Historic churches, shrines, and sacred community landmarks.'),
-('cat_civic', 'Civic & Public Park', 'landmark', '#06d6a0', 'Municipal government compounds, town squares, and public gathering spaces.'),
-('cat_nature', 'Nature & Eco-Tourism', 'waves', '#4cc9f0', 'Riverbanks, scenic lookouts, and environmental conservation spots.'),
-('cat_adventure', 'Adventure & Trekking Trail', 'mountain', '#ff6d00', 'Hiking trails, mountain peaks, and rough terrain corridors.'),
-('cat_handicraft', 'Agri-Tourism & Cultural Handicrafts', 'sparkles', '#7209b7', 'Bamboo processing centers, traditional weaving houses, and agro-farms.')
-ON CONFLICT (id) DO NOTHING;
+-- Categories
+INSERT INTO public.categories (id, name, icon) VALUES
+('cat_nature', 'Nature & Eco-Tourism', '🏞️'),
+('cat_heritage', 'Historical & Cultural Heritage', '🏛️'),
+('cat_adventure', 'Adventure & Trekking Trail', '🌉'),
+('cat_agri', 'Agri-Tourism & Cultural Handicrafts', '🌾'),
+('cat_religious', 'Religious & Spiritual Site', '⛪'),
+('cat_civic', 'Civic & Public Park', '🌳'),
+('cat_viewpoint', 'Scenic Viewpoint & Overlook', '🌄')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon = EXCLUDED.icon;
 
--- Insert Tourist Spots
+-- Clean up any obsolete prototype entries
+DELETE FROM public.tourist_spots WHERE id IN (
+  'poi_asist_main', 'poi_lagangilang_town_hall', 'poi_abra_river_viewpoint',
+  'poi_mount_mag_atong', 'poi_bawa_hanging_bridge', 'poi_tagodtod_bamboo_craft',
+  'poi_don_mariano_bridge_view', 'poi_sinapangan_weaving', 'poi_paganao_bamboo',
+  'poi_la_paz_lookout', 'poi_abra_river_poblacion'
+);
+
+-- 12 Official Municipal Landmarks
 INSERT INTO public.tourist_spots (
-  id, name, category_id, barangay, latitude, longitude, address, 
-  description, is_pseudo_image, pseudo_theme, primary_pano_id, 
-  target_heading, target_pitch, sync_status
+  id, name, category_id, barangay, latitude, longitude, address,
+  description, image_url, is_pseudo_image, pseudo_theme,
+  primary_pano_id, target_heading, target_pitch, sync_status,
+  staged_at, synced_at, updated_at
 ) VALUES
 (
-  'poi_asist_main',
-  'ASIST Main Campus (University of Abra)',
-  'cat_heritage',
-  'Poblacion',
-  17.608250,
-  120.738083,
-  'Poblacion, Lagangilang, Abra, Philippines',
-  'The premier state higher education institution in Abra, featuring historic academic quadrangles, lush provincial green spaces, and cultural research archives showcasing Tingguian and Abra heritage. Click to immerse yourself in the campus grounds.',
-  true,
-  'indigo',
-  'pano_1785458227165_1j20c9',
-  45.0,
-  -5.0,
-  'synced_cloud'
+  'poi_ugiao_river', 'Ugiao River', 'cat_nature', 'Pawa', 17.587492, 120.73661, 'Barangay Pawa, Lagangilang, Abra',
+  'Scenic river landscape in Barangay Pawa with freshwater flows and recreational spots.', NULL, true, 'teal',
+  '1608965217005049', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
 ),
 (
-  'poi_holy_cross_parish',
-  'Holy Cross Parish Church',
-  'cat_religion',
-  'Poblacion',
-  17.615800,
-  120.735000,
-  'Church Road, Poblacion, Lagangilang, Abra',
-  'The spiritual heart of Lagangilang, this historic Roman Catholic parish features Spanish-colonial-inspired brick architecture and serves as the center of Holy Cross fiesta celebrations and community gatherings.',
-  true,
-  'amber',
-  'pano_1785458811653_j5vnmy',
-  90.0,
-  0.0,
-  'synced_cloud'
+  'poi_quirsodan_dam', 'Quirsodan River Dam', 'cat_nature', 'San Isidro', 17.59235, 120.785336, 'Barangay San Isidro, Lagangilang, Abra',
+  'Major irrigation and scenic dam structure spanning the Quirsodan River.', NULL, true, 'cyan',
+  '1532761357806896', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
 ),
 (
-  'poi_lagangilang_town_hall',
-  'Lagangilang Municipal Town Hall & Freedom Park',
-  'cat_civic',
-  'Poblacion',
-  17.614200,
-  120.734000,
-  'Municipal Compound, Poblacion, Lagangilang, Abra',
-  'The administrative seat of Lagangilang, surrounded by the town plaza and Freedom Park. It hosts municipal cultural festivities, open-air community sports, and showcases local Tingguian craftsmanship monuments.',
-  true,
-  'emerald',
-  'pano_1785458901520_jb1b5w',
-  180.0,
-  0.0,
-  'synced_cloud'
+  'poi_holy_cross_parish', 'Holy Cross Parish', 'cat_religious', 'Poblacion', 17.60858, 120.735127, 'Church Road, Poblacion, Lagangilang, Abra',
+  'Historic religious parish church in Poblacion, serving as the spiritual heart of the community.', NULL, true, 'amber',
+  '1724722945416495', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
 ),
 (
-  'poi_abra_river_viewpoint',
-  'Abra River Viewpoint & Bawa Riverbanks',
-  'cat_nature',
-  'Bawa',
-  17.621000,
-  120.728000,
-  'Riverside Trail, Barangay Bawa, Lagangilang, Abra',
-  'A breathtaking scenic vantage point overlooking the mighty Abra River and its pebble riverbanks. Popular among trail trekkers, local fishermen, and nature photographers capturing the river gorge during sunset.',
-  true,
-  'cyan',
-  'pano_1785458903585_a9jv8p',
-  270.0,
-  -10.0,
-  'synced_cloud'
+  'poi_talinawen_spring', 'Talinawen Spring', 'cat_nature', 'Paganao', 17.606224, 120.732113, 'Barangay Paganao, Lagangilang, Abra',
+  'Natural cold water spring and ecological recreation site surrounded by lush greenery.', NULL, true, 'emerald',
+  '1458052846269748', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
 ),
 (
-  'poi_mount_mag_atong',
-  'Mount Mag-atong Eco-Trail & Summit',
-  'cat_adventure',
-  'Nagtipulan',
-  17.632000,
-  120.751000,
-  'Mag-atong Trailhead, Barangay Nagtipulan, Lagangilang, Abra',
-  'Lagangilang''s iconic panoramic mountain trail, offering exhilarating hiking paths through indigenous pine and hardwood groves, culminating in a 360° summit vista of the Abra River Valley and Cordillera mountains.',
-  true,
-  'rose',
-  'pano_1785458907688_3ycntg',
-  315.0,
-  15.0,
-  'synced_cloud'
+  'poi_galangugong_rocks', 'Galangugong Rock Formation', 'cat_nature', 'Bacooc', 17.666497, 120.799143, 'Barangay Bacooc, Lagangilang, Abra',
+  'Distinctive limestone rock formations and geological landmark with scenic mountain views.', NULL, true, 'rose',
+  '1778693856687129', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
 ),
 (
-  'poi_bawa_hanging_bridge',
-  'Bawa Hanging Footbridge & Rapids',
-  'cat_adventure',
-  'Bawa',
-  17.625000,
-  120.742000,
-  'Bawa Crossing, Lagangilang, Abra',
-  'A classic suspension footbridge spanning across the Bawa tributary waters, connecting rural agricultural farming communities with panoramic river gorge views and clear freshwater swimming spots.',
-  true,
-  'teal',
-  'pano_1785458911472_jf2n58',
-  120.0,
-  -8.0,
-  'synced_cloud'
+  'poi_banat_caves', 'BANAT Caves 1 & 2', 'cat_adventure', 'Bacooc', 17.657574, 120.788181, 'Barangay Bacooc, Lagangilang, Abra',
+  'Twin natural cavern network popular with adventure trekkers and speleology enthusiasts.', NULL, true, 'purple',
+  '1556968976199743', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
 ),
 (
-  'poi_tagodtod_bamboo_craft',
-  'Tagodtod Bamboo Craft & Cultural Center',
-  'cat_handicraft',
-  'Tagodtod',
-  17.611500,
-  120.731000,
-  'Barangay Tagodtod, Lagangilang, Abra',
-  'Center for Lagangilang''s renowned engineered bamboo and traditional Tingguian basketry. Visitors can experience native loom-weaving demonstrations and purchase handcrafted bamboo eco-souvenirs.',
-  true,
-  'violet',
-  'pano_1785458933279_gohnbu',
-  60.0,
-  0.0,
-  'synced_cloud'
+  'poi_ua_main_campus', 'University of Abra Main Campus', 'cat_heritage', 'Poblacion', 17.60825, 120.738083, 'Poblacion, Lagangilang, Abra',
+  'The premier higher education institution in Abra, featuring historic academic quadrangles and lush provincial green spaces.', NULL, true, 'indigo',
+  '1724722945416495', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
 ),
 (
-  'poi_don_mariano_bridge_view',
-  'Don Mariano Marcos Bridge Scenic Overlook',
-  'cat_nature',
-  'Laguiben',
-  17.601500,
-  120.725000,
-  'Abra-Kalinga National Road, Lagangilang, Abra',
-  'The historic steel bridge entryway to eastern Abra, offering panoramic views of the Abra River canyon, river transport bancas, and the surrounding Cordillera mountain ridges.',
-  true,
-  'orange',
-  'pano_1785458951667_shihgp',
-  210.0,
-  -5.0,
-  'synced_cloud'
+  'poi_ua_fish_pond', 'University of Abra - Fish Pond', 'cat_agri', 'Poblacion', 17.6068, 120.7392, 'UA Agricultural Research Station, Poblacion, Lagangilang',
+  'Aquaculture research and educational fisheries training facility managed by the university.', NULL, true, 'blue',
+  '1735531687819496', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
+),
+(
+  'poi_ua_tamarind_farm', 'University of Abra - Tamarind Farm', 'cat_agri', 'Poblacion', 17.6095, 120.741, 'UA Agro-Forestry Grounds, Poblacion, Lagangilang',
+  'Commercial tamarind cultivation and agricultural demonstration orchard.', NULL, true, 'emerald',
+  '2194203998167208', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
+),
+(
+  'poi_ua_cacao_garden', 'University of Abra - Cacao Clonal Garden', 'cat_agri', 'Poblacion', 17.6075, 120.7418, 'UA Clonal Extension, Poblacion, Lagangilang',
+  'Regional clonal cacao nursery and quality bean research demonstration center.', NULL, true, 'amber',
+  '1735531687819496', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
+),
+(
+  'poi_dj_farm', 'DJ Farm', 'cat_agri', 'Nagtupacan', 17.5901, 120.7402, 'Barangay Nagtupacan, Lagangilang, Abra',
+  'Agri-tourism farm offering orchard tours and rural provincial countryside recreation.', NULL, true, 'orange',
+  '1858716472228937', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
+),
+(
+  'poi_rizalista_cave', 'Rizalista Cave', 'cat_heritage', 'Laguiben', 17.6125, 120.7462, 'Barangay Laguiben, Lagangilang, Abra',
+  'Cultural and historical heritage cave site revered by local spiritual and folkloric traditions.', NULL, true, 'indigo',
+  '1761125488711823', 0, 0, 'synced_cloud',
+  NOW(), NOW(), NOW()
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  category_id = EXCLUDED.category_id,
+  barangay = EXCLUDED.barangay,
+  latitude = EXCLUDED.latitude,
+  longitude = EXCLUDED.longitude,
+  address = EXCLUDED.address,
+  description = EXCLUDED.description,
+  image_url = EXCLUDED.image_url,
+  is_pseudo_image = EXCLUDED.is_pseudo_image,
+  pseudo_theme = EXCLUDED.pseudo_theme,
+  primary_pano_id = EXCLUDED.primary_pano_id,
+  target_heading = EXCLUDED.target_heading,
+  target_pitch = EXCLUDED.target_pitch,
+  sync_status = 'synced_cloud',
+  synced_at = NOW(),
+  updated_at = NOW();

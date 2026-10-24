@@ -1127,17 +1127,22 @@ body {
 
 /* ========== Tourist Spot (POI) Markers & Animations ========== */
 .poi-marker {
-  cursor: grab;
+  cursor: pointer;
   user-select: none;
   z-index: 15;
   pointer-events: auto;
-  touch-action: none !important;
   /* CRITICAL: Never apply CSS transform or transition: transform to .poi-marker.
      MapLibre GL JS positions this root element via inline transform: translate(...). */
 }
 
-.poi-marker:active,
-.poi-marker.is-dragging {
+/* Marker dragging styles active ONLY for Admin */
+.poi-marker.is-admin-draggable {
+  cursor: grab;
+  touch-action: none !important;
+}
+
+.poi-marker.is-admin-draggable:active,
+.poi-marker.is-admin-draggable.is-dragging {
   cursor: grabbing !important;
   z-index: 999 !important;
 }

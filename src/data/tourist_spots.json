@@ -7,8 +7,8 @@
     "categoryIcon": "🏞️",
     "barangay": "Pawa",
     "location": {
-      "lat": 17.6025,
-      "lng": 120.7295,
+      "lat": 17.587492,
+      "lng": 120.73661,
       "address": "Ugiao River, Barangay Pawa, Lagangilang, Abra"
     },
     "description": "Scenic freshwater river corridor featuring clear waters, pebble banks, and tranquil natural swimming spots popular for picnics and summer outings.",
@@ -21,7 +21,9 @@
       "heading": 0,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "lat": 17.587492,
+    "lng": 120.73661
   },
   {
     "id": "poi_quirsodan_dam",
@@ -31,8 +33,8 @@
     "categoryIcon": "🌊",
     "barangay": "San Isidro",
     "location": {
-      "lat": 17.5903,
-      "lng": 120.7819,
+      "lat": 17.59235,
+      "lng": 120.785336,
       "address": "Sitio Quirsodan, Barangay San Isidro, Lagangilang, Abra"
     },
     "description": "Scenic irrigation dam and freshwater river spillway surrounded by verdant mountain ridges, scenic river boulders, and tranquil countryside waters.",
@@ -45,7 +47,9 @@
       "heading": 90,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "lat": 17.59235,
+    "lng": 120.785336
   },
   {
     "id": "poi_holy_cross_parish",
@@ -55,8 +59,8 @@
     "categoryIcon": "⛪",
     "barangay": "Poblacion",
     "location": {
-      "lat": 17.6158,
-      "lng": 120.735,
+      "lat": 17.60858,
+      "lng": 120.735127,
       "address": "Church Road, Barangay Poblacion, Lagangilang, Abra"
     },
     "description": "Historic Roman Catholic parish and spiritual sanctuary of Lagangilang, known for Spanish-colonial-inspired brick architecture and Holy Cross fiesta celebrations.",
@@ -69,7 +73,9 @@
       "heading": 180,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "lat": 17.60858,
+    "lng": 120.735127
   },
   {
     "id": "poi_talinawen_spring",
@@ -79,8 +85,8 @@
     "categoryIcon": "💧",
     "barangay": "Paganao",
     "location": {
-      "lat": 17.6255,
-      "lng": 120.758,
+      "lat": 17.606224,
+      "lng": 120.732113,
       "address": "Talinawen Natural Spring, Lagangilang, Abra"
     },
     "description": "Famous natural freshwater spring pool bubbling from limestone aquifers, celebrated for its refreshing cool waters, swimming basins, and lush tropical canopy.",
@@ -93,7 +99,9 @@
       "heading": 150,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "lat": 17.606224,
+    "lng": 120.732113
   },
   {
     "id": "poi_galangugong_rocks",
@@ -103,8 +111,8 @@
     "categoryIcon": "🪨",
     "barangay": "Bacooc",
     "location": {
-      "lat": 17.6628,
-      "lng": 120.7925,
+      "lat": 17.666497,
+      "lng": 120.799143,
       "address": "Barangay Bacooc, Lagangilang, Abra"
     },
     "description": "Monumental limestone karst cliffs and sculptured rock formations along the Bacooc river gorge, offering stunning geological scenery and trekking paths.",
@@ -117,7 +125,9 @@
       "heading": 0,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "lat": 17.666497,
+    "lng": 120.799143
   },
   {
     "id": "poi_banat_caves",
@@ -127,8 +137,8 @@
     "categoryIcon": "🦇",
     "barangay": "Bacooc",
     "location": {
-      "lat": 17.6645,
-      "lng": 120.7938,
+      "lat": 17.657574,
+      "lng": 120.788181,
       "address": "Barangay Bacooc, Lagangilang, Abra"
     },
     "description": "DENR-assessed subterranean cave network in Bacooc featuring twin caverns with intricate stalactites, limestone chambers, and thrilling spelunking trails.",
@@ -141,7 +151,9 @@
       "heading": 90,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "lat": 17.657574,
+    "lng": 120.788181
   },
   {
     "id": "poi_ua_main_campus",
