@@ -5,6 +5,7 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { calculateBearing } from '../utils/geoUtils';
 import { normalizeCategoryName, getDefaultCategoryIcon } from '../services/touristSpotsService';
+import { streetviewAlignmentService } from '../services/streetviewAlignmentService';
 
 setWorkerUrl(maplibreWorkerUrl);
 
@@ -113,12 +114,27 @@ export default function MapView({
   isAdmin = false,
   isDraggable = false,
   viewerOpen = false,
+  aligningSequence = null,
+  onUpdateAligningSequence,
+  alignedGeoJSON = null,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
   const poiMarkersRef = useRef([]);
   const coneLayerAdded = useRef(false);
+
+  // Keep latest alignment sequence & update callback refs
+  const draggingHandleIndex = useRef(null);
+  const aligningSequenceRef = useRef(aligningSequence);
+  useEffect(() => {
+    aligningSequenceRef.current = aligningSequence;
+  }, [aligningSequence]);
+
+  const onUpdateAligningSequenceRef = useRef(onUpdateAligningSequence);
+  useEffect(() => {
+    onUpdateAligningSequenceRef.current = onUpdateAligningSequence;
+  }, [onUpdateAligningSequence]);
 
   // Trigger map resize when viewer opens or closes to prevent blanking
   useEffect(() => {
@@ -342,6 +358,85 @@ export default function MapView({
         },
       });
 
+      // Aligned Streetview Lines Source & Layers (user-aligned, smooth realistic lines on roads)
+      map.addSource('aligned-streetview-source', {
+        type: 'geojson',
+        data: alignedGeoJSON || streetviewAlignmentService.toGeoJSON(),
+      });
+
+      map.addLayer({
+        id: 'aligned-streetview-casing',
+        type: 'line',
+        source: 'aligned-streetview-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#064e3b',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6, 17, 9],
+          'line-opacity': 0.85,
+        },
+      });
+
+      map.addLayer({
+        id: 'aligned-streetview-layer',
+        type: 'line',
+        source: 'aligned-streetview-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#00f0ff',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 14, 4, 17, 6],
+          'line-opacity': 0.98,
+        },
+      });
+
+      // Active Line Alignment Editor Layers (when bending lines)
+      map.addSource('active-align-line-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'active-align-line-casing',
+        type: 'line',
+        source: 'active-align-line-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#0284c7',
+          'line-width': 10,
+          'line-opacity': 0.6,
+        },
+      });
+
+      map.addLayer({
+        id: 'active-align-line-inner',
+        type: 'line',
+        source: 'active-align-line-source',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#38bdf8',
+          'line-width': 5,
+          'line-opacity': 0.95,
+          'line-dasharray': [2, 1],
+        },
+      });
+
+      map.addSource('active-align-handles-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'active-align-handles-layer',
+        type: 'circle',
+        source: 'active-align-handles-source',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 6, 15, 9, 18, 12],
+          'circle-color': '#00f0ff',
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#ffffff',
+          'circle-opacity': 1,
+        },
+      });
+
       coneLayerAdded.current = true;
 
       // Custom OSM Overlay (user's edited map.osm data)
@@ -465,6 +560,56 @@ export default function MapView({
       }
 
       try {
+        // 0a. If in alignment mode, clicking on the active bent line inserts a new curve handle
+        if (aligningSequenceRef.current && map.getLayer('active-align-line-inner')) {
+          const lineFeatures = map.queryRenderedFeatures(e.point, {
+            layers: ['active-align-line-inner', 'active-align-line-casing'],
+          });
+          if (lineFeatures.length > 0) {
+            const clickCoord = [e.lngLat.lng, e.lngLat.lat];
+            const seq = aligningSequenceRef.current;
+            const cps = seq.controlPoints;
+            let bestIdx = 1;
+            let minD = Infinity;
+            for (let i = 0; i < cps.length - 1; i++) {
+              const midLng = (cps[i][0] + cps[i + 1][0]) / 2;
+              const midLat = (cps[i][1] + cps[i + 1][1]) / 2;
+              const d = Math.hypot(clickCoord[0] - midLng, clickCoord[1] - midLat);
+              if (d < minD) {
+                minD = d;
+                bestIdx = i + 1;
+              }
+            }
+            const newControlPoints = [...cps];
+            newControlPoints.splice(bestIdx, 0, clickCoord);
+            const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+              newControlPoints,
+              seq.images
+            );
+            onUpdateAligningSequenceRef.current?.({
+              ...seq,
+              controlPoints: newControlPoints,
+              coordinates,
+              images: mappedImages,
+            });
+            return;
+          }
+        }
+
+        // 0b. Check if clicked on a user-aligned streetview line (Streetview is 100% active!)
+        if (map.getLayer('aligned-streetview-layer')) {
+          const alignedFeatures = map.queryRenderedFeatures(e.point, {
+            layers: ['aligned-streetview-layer'],
+          });
+          if (alignedFeatures.length > 0) {
+            const seqId = alignedFeatures[0].properties?.sequenceId;
+            const img = streetviewAlignmentService.findClosestImage(seqId, e.lngLat.lat, e.lngLat.lng);
+            if (img && img.id) {
+              onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, String(img.id), true);
+              return;
+            }
+          }
+        }
         // 1. Check if we clicked directly on a Mapillary image point
         if (map.getLayer('mapillary-images')) {
           const imageFeatures = map.queryRenderedFeatures(e.point, {
@@ -524,6 +669,31 @@ export default function MapView({
     // Right-click context menu (Desktop) - Allows tourists to mark Point A/B & admins to add POIs
     map.on('contextmenu', (e) => {
       e.originalEvent?.preventDefault();
+
+      // If in alignment mode, right-clicking on a handle removes that handle!
+      if (aligningSequenceRef.current && map.getLayer('active-align-handles-layer')) {
+        const handleFeatures = map.queryRenderedFeatures(e.point, {
+          layers: ['active-align-handles-layer'],
+        });
+        if (handleFeatures.length > 0) {
+          const idx = handleFeatures[0].properties?.index;
+          const seq = aligningSequenceRef.current;
+          if (idx !== undefined && seq.controlPoints.length > 2) {
+            const newControlPoints = seq.controlPoints.filter((_, i) => i !== idx);
+            const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+              newControlPoints,
+              seq.images
+            );
+            onUpdateAligningSequenceRef.current?.({
+              ...seq,
+              controlPoints: newControlPoints,
+              coordinates,
+              images: mappedImages,
+            });
+            return;
+          }
+        }
+      }
       const screenX = e.originalEvent?.clientX ?? 0;
       const screenY = e.originalEvent?.clientY ?? 0;
       onMapContextMenuRef.current?.(e.lngLat.lat, e.lngLat.lng, screenX, screenY);
@@ -647,6 +817,89 @@ export default function MapView({
     map.on('mouseleave', 'trail-surveyed-layer', () => {
       map.getCanvas().style.cursor = '';
     });
+
+    // Hover cursor for user-aligned streetview lines
+    map.on('mouseenter', 'aligned-streetview-layer', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', 'aligned-streetview-layer', () => {
+      if (draggingHandleIndex.current === null) {
+        map.getCanvas().style.cursor = '';
+      }
+    });
+
+    // Alignment Handle Dragging (60 FPS interactive line bending)
+    map.on('mouseenter', 'active-align-handles-layer', () => {
+      map.getCanvas().style.cursor = 'grab';
+    });
+    map.on('mouseleave', 'active-align-handles-layer', () => {
+      if (draggingHandleIndex.current === null) {
+        map.getCanvas().style.cursor = '';
+      }
+    });
+
+    map.on('mousedown', 'active-align-handles-layer', (e) => {
+      if (!aligningSequenceRef.current) return;
+      e.originalEvent?.preventDefault();
+      const feature = e.features?.[0];
+      if (feature && feature.properties?.index !== undefined) {
+        draggingHandleIndex.current = feature.properties.index;
+        map.dragPan.disable();
+        map.getCanvas().style.cursor = 'grabbing';
+      }
+    });
+
+    map.on('mousemove', (e) => {
+      if (draggingHandleIndex.current !== null && aligningSequenceRef.current) {
+        const idx = draggingHandleIndex.current;
+        const seq = aligningSequenceRef.current;
+        const newControlPoints = [...seq.controlPoints];
+        newControlPoints[idx] = [e.lngLat.lng, e.lngLat.lat];
+
+        const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+          newControlPoints,
+          seq.images
+        );
+
+        const lineSrc = map.getSource('active-align-line-source');
+        const handlesSrc = map.getSource('active-align-handles-source');
+
+        if (lineSrc) {
+          lineSrc.setData({
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates } }],
+          });
+        }
+
+        if (handlesSrc) {
+          handlesSrc.setData({
+            type: 'FeatureCollection',
+            features: newControlPoints.map((cp, i) => ({
+              type: 'Feature',
+              properties: { index: i },
+              geometry: { type: 'Point', coordinates: cp },
+            })),
+          });
+        }
+
+        onUpdateAligningSequenceRef.current?.({
+          ...seq,
+          controlPoints: newControlPoints,
+          coordinates,
+          images: mappedImages,
+        });
+      }
+    });
+
+    const onGlobalMouseUp = () => {
+      if (draggingHandleIndex.current !== null) {
+        draggingHandleIndex.current = null;
+        map.dragPan.enable();
+        map.getCanvas().style.cursor = '';
+      }
+    };
+
+    map.on('mouseup', onGlobalMouseUp);
 
     mapRef.current = map;
 
@@ -789,6 +1042,81 @@ export default function MapView({
           source: 'trail-corridors',
           filter: ['==', ['get', 'status'], 'surveyed'],
           paint: { 'line-color': '#06d6a0', 'line-width': 3.5, 'line-opacity': 0.8 },
+        });
+      }
+
+      if (!mapRef.current.getSource('aligned-streetview-source')) {
+        mapRef.current.addSource('aligned-streetview-source', {
+          type: 'geojson',
+          data: alignedGeoJSON || streetviewAlignmentService.toGeoJSON(),
+        });
+        mapRef.current.addLayer({
+          id: 'aligned-streetview-casing',
+          type: 'line',
+          source: 'aligned-streetview-source',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#064e3b',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6, 17, 9],
+            'line-opacity': 0.85,
+          },
+        });
+        mapRef.current.addLayer({
+          id: 'aligned-streetview-layer',
+          type: 'line',
+          source: 'aligned-streetview-source',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#00f0ff',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 14, 4, 17, 6],
+            'line-opacity': 0.98,
+          },
+        });
+      }
+
+      if (!mapRef.current.getSource('active-align-line-source')) {
+        mapRef.current.addSource('active-align-line-source', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        mapRef.current.addLayer({
+          id: 'active-align-line-casing',
+          type: 'line',
+          source: 'active-align-line-source',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#0284c7',
+            'line-width': 10,
+            'line-opacity': 0.6,
+          },
+        });
+        mapRef.current.addLayer({
+          id: 'active-align-line-inner',
+          type: 'line',
+          source: 'active-align-line-source',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': 5,
+            'line-opacity': 0.95,
+            'line-dasharray': [2, 1],
+          },
+        });
+        mapRef.current.addSource('active-align-handles-source', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        mapRef.current.addLayer({
+          id: 'active-align-handles-layer',
+          type: 'circle',
+          source: 'active-align-handles-source',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 6, 15, 9, 18, 12],
+            'circle-color': '#00f0ff',
+            'circle-stroke-width': 3,
+            'circle-stroke-color': '#ffffff',
+            'circle-opacity': 1,
+          },
         });
       }
 
@@ -1108,6 +1436,59 @@ export default function MapView({
       routeMarkersRef.current = [];
     };
   }, [routeOrigin, routeDestination]);
+
+  // Update Aligned Streetview Lines GeoJSON source
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const src = mapRef.current.getSource('aligned-streetview-source');
+    if (src) {
+      src.setData(alignedGeoJSON || streetviewAlignmentService.toGeoJSON());
+    }
+  }, [alignedGeoJSON]);
+
+  // Update Active Alignment Editor GeoJSON sources
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const lineSrc = mapRef.current.getSource('active-align-line-source');
+    const handlesSrc = mapRef.current.getSource('active-align-handles-source');
+
+    if (!aligningSequence) {
+      if (lineSrc) lineSrc.setData({ type: 'FeatureCollection', features: [] });
+      if (handlesSrc) handlesSrc.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+
+    const { coordinates = [], controlPoints = [] } = aligningSequence;
+
+    if (lineSrc && coordinates.length > 1) {
+      lineSrc.setData({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates,
+            },
+          },
+        ],
+      });
+    }
+
+    if (handlesSrc) {
+      handlesSrc.setData({
+        type: 'FeatureCollection',
+        features: controlPoints.map((cp, idx) => ({
+          type: 'Feature',
+          properties: { index: idx },
+          geometry: {
+            type: 'Point',
+            coordinates: cp,
+          },
+        })),
+      });
+    }
+  }, [aligningSequence]);
 
   return (
     <div className="map-container" ref={mapContainerRef} />

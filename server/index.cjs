@@ -752,6 +752,68 @@ app.put('/api/panoramas/:id', async (req, res) => {
   res.json(data.panoramas[index]);
 });
 
+// ============ Aligned Streetview Sequences API ============
+const ALIGNED_SEQS_FILE = path.join(__dirname, 'data', 'aligned_sequences.json');
+
+function readAlignedSequences() {
+  try {
+    if (!fs.existsSync(ALIGNED_SEQS_FILE)) {
+      const dataDir = path.dirname(ALIGNED_SEQS_FILE);
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(ALIGNED_SEQS_FILE, JSON.stringify({}), 'utf8');
+      return {};
+    }
+    return JSON.parse(fs.readFileSync(ALIGNED_SEQS_FILE, 'utf8'));
+  } catch (err) {
+    console.warn('Error reading aligned sequences:', err.message);
+    return {};
+  }
+}
+
+function writeAlignedSequences(data) {
+  try {
+    const dataDir = path.dirname(ALIGNED_SEQS_FILE);
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(ALIGNED_SEQS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error writing aligned sequences:', err.message);
+  }
+}
+
+/**
+ * GET /api/aligned-sequences - Get all aligned streetview sequences
+ */
+app.get('/api/aligned-sequences', (req, res) => {
+  res.json(readAlignedSequences());
+});
+
+/**
+ * POST /api/aligned-sequences - Save or update an aligned streetview sequence
+ */
+app.post('/api/aligned-sequences', (req, res) => {
+  const record = req.body;
+  if (!record || !record.sequenceId) {
+    return res.status(400).json({ error: 'Missing sequenceId in payload' });
+  }
+
+  const all = readAlignedSequences();
+  all[record.sequenceId] = record;
+  writeAlignedSequences(all);
+
+  res.json({ success: true, record });
+});
+
+/**
+ * DELETE /api/aligned-sequences/:id - Remove an aligned sequence (revert to raw GPS)
+ */
+app.delete('/api/aligned-sequences/:id', (req, res) => {
+  const all = readAlignedSequences();
+  delete all[req.params.id];
+  writeAlignedSequences(all);
+
+  res.json({ success: true });
+});
+
 // ============ Start Server ============
 async function startServer() {
   if (pgPool) {

@@ -2270,11 +2270,29 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
   padding: 6px 14px;
   font-size: 0.72rem;
   color: var(--text-muted);
   font-family: var(--font-mono, monospace);
+}
+
+.map-context-menu .ctx-coords .ctx-coords-text {
+  user-select: all;
+  -webkit-user-select: all;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background var(--transition-fast), color var(--transition-fast);
+  color: var(--text-secondary);
+}
+
+.map-context-menu .ctx-coords .ctx-coords-text:hover {
+  background: rgba(67, 97, 238, 0.2);
+  color: #93c5fd;
+  border-color: rgba(67, 97, 238, 0.4);
 }
 
 .map-context-menu .ctx-coords button {
@@ -2287,14 +2305,24 @@ body {
   border-radius: var(--radius-full);
   color: #93c5fd;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: all var(--transition-fast);
   width: auto;
   display: inline-flex;
+  align-items: center;
+  gap: 4px;
   text-align: center;
 }
 
 .map-context-menu .ctx-coords button:hover {
   background: rgba(67, 97, 238, 0.4);
+  color: #ffffff;
+}
+
+.map-context-menu .ctx-coords button.copied {
+  background: rgba(16, 185, 129, 0.25) !important;
+  border-color: rgba(16, 185, 129, 0.6) !important;
+  color: #6ee7b7 !important;
+  font-weight: 700;
 }
 
 .map-context-menu hr {
@@ -2429,5 +2457,188 @@ body {
 .maplibregl-ctrl-icon {
   filter: invert(1) hue-rotate(180deg) brightness(1.2);
 }
+
+/* ========== Streetview Line Aligner Floating Toolbar ========== */
+.streetview-aligner-panel {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-modal);
+  min-width: 320px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 18px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(0, 240, 255, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -16px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.streetview-aligner-panel .aligner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.streetview-aligner-panel .aligner-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.streetview-aligner-panel .aligner-badge {
+  background: rgba(0, 240, 255, 0.15);
+  color: #00f0ff;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.streetview-aligner-panel .aligner-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.streetview-aligner-panel .aligner-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.streetview-aligner-panel .aligner-close-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.streetview-aligner-panel .aligner-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  border-left: 3px solid #00f0ff;
+}
+
+.streetview-aligner-panel .aligner-tips strong {
+  color: #e2e8f0;
+}
+
+.streetview-aligner-panel .aligner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.streetview-aligner-panel .aligner-actions button {
+  font-size: 0.75rem;
+  padding: 6px 14px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.streetview-aligner-panel .aligner-btn-save {
+  background: linear-gradient(135deg, #05cb63, #047857);
+  color: #ffffff;
+  border: 1px solid rgba(5, 203, 99, 0.5);
+  box-shadow: 0 4px 14px rgba(5, 203, 99, 0.35);
+}
+
+.streetview-aligner-panel .aligner-btn-save:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+.streetview-aligner-panel .aligner-btn-reset {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.streetview-aligner-panel .aligner-btn-reset:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.streetview-aligner-panel .aligner-btn-done {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  margin-left: auto;
+}
+
+.streetview-aligner-panel .aligner-btn-done:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ========== Floating App Toast Notifications ========== */
+.app-toast-notification {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-modal);
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  background: rgba(15, 23, 42, 0.94);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: toastFadeIn 0.25s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+@keyframes toastFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+
 
 

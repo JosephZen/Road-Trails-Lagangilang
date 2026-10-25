@@ -17,6 +17,9 @@ import {
 } from './utils/streetViewJunctions';
 import RoutePlanner from './components/RoutePlanner';
 import NavigationView from './components/NavigationView';
+import { getRoute } from './services/routingService';
+import { streetviewAlignmentService } from './services/streetviewAlignmentService';
+import StreetviewLineAligner from './components/StreetviewLineAligner';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -173,6 +176,141 @@ export default function App() {
       setRouteOrigin([userLocation.lng, userLocation.lat]);
     }
   }, [userLocation]);
+
+  // Copy coordinates handler with fallback & instant visual feedback
+  const [copiedCoords, setCopiedCoords] = useState(false);
+  const handleCopyCoordinates = useCallback(async (lat, lng) => {
+    const text = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    let ok = false;
+    if (navigator?.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } catch (err) {
+        console.warn('Clipboard writeText failed:', err);
+      }
+    }
+    if (!ok) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (err) {
+        console.error('execCommand copy failed:', err);
+      }
+    }
+    setCopiedCoords(true);
+    showToast(`📍 Copied coordinates: ${text}`);
+    setTimeout(() => {
+      setCopiedCoords(false);
+    }, 2000);
+  }, [showToast]);
+
+  // Streetview Line Alignment & Bending State
+  const [aligningSequence, setAligningSequence] = useState(null);
+  const [alignedGeoJSON, setAlignedGeoJSON] = useState(() => streetviewAlignmentService.toGeoJSON());
+  const [isSavingAlignment, setIsSavingAlignment] = useState(false);
+
+  const handleStartAligningAtCoord = useCallback(async (lat, lng) => {
+    try {
+      showToast('⏳ Loading Mapillary sequence for alignment...');
+      const seqData = await streetviewAlignmentService.fetchNearbySequence(lat, lng);
+      const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+        seqData.controlPoints,
+        seqData.images
+      );
+      setAligningSequence({
+        ...seqData,
+        coordinates,
+        images: mappedImages,
+      });
+      showToast('📐 Alignment Mode: Drag handles to bend line onto road curve!');
+    } catch (err) {
+      showToast(`⚠️ ${err.message || 'No Mapillary sequence found at this point'}`);
+    }
+  }, [showToast]);
+
+  const handleSaveAlignment = useCallback(async () => {
+    if (!aligningSequence) return;
+    setIsSavingAlignment(true);
+    try {
+      await streetviewAlignmentService.saveAlignedSequence(aligningSequence.sequenceId, {
+        coordinates: aligningSequence.coordinates,
+        controlPoints: aligningSequence.controlPoints,
+        images: aligningSequence.images,
+      });
+      setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+      setAligningSequence(null);
+      showToast('💾 Streetview alignment saved! Streetview is 100% active along the line.');
+    } catch (err) {
+      console.error('Save alignment error:', err);
+      showToast('⚠️ Failed to save alignment');
+    } finally {
+      setIsSavingAlignment(false);
+    }
+  }, [aligningSequence, showToast]);
+
+  const handleResetAlignmentOriginal = useCallback(() => {
+    if (!aligningSequence) return;
+    const rawCoords = aligningSequence.images.map((img) => [img.originalLng || img.lng, img.originalLat || img.lat]);
+    const handleCount = Math.max(6, Math.min(14, Math.ceil(rawCoords.length / 8)));
+    const controlPoints = [];
+    const step = (rawCoords.length - 1) / (handleCount - 1);
+
+    for (let i = 0; i < handleCount; i++) {
+      const idx = Math.min(rawCoords.length - 1, Math.round(i * step));
+      controlPoints.push([...rawCoords[idx]]);
+    }
+
+    const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+      controlPoints,
+      aligningSequence.images
+    );
+
+    setAligningSequence({
+      ...aligningSequence,
+      controlPoints,
+      coordinates,
+      images: mappedImages,
+    });
+    showToast('↺ Restored line to raw Mapillary GPS capture points');
+  }, [aligningSequence, showToast]);
+
+  // Automatically calculate route when both Point A and Point B are chosen
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+  useEffect(() => {
+    if (!routeOrigin || !routeDestination) return;
+
+    let isMounted = true;
+    const autoCalc = async () => {
+      setIsCalculatingRoute(true);
+      try {
+        const route = await getRoute(routeOrigin, routeDestination, routingProfile);
+        if (isMounted) {
+          setRouteData(route);
+          setSidebarTab('routing');
+          showToast('🚀 Route calculated! Turn-by-turn directions ready.');
+        }
+      } catch (err) {
+        console.warn('Auto route calculation error:', err);
+      } finally {
+        if (isMounted) {
+          setIsCalculatingRoute(false);
+        }
+      }
+    };
+
+    autoCalc();
+    return () => {
+      isMounted = false;
+    };
+  }, [routeOrigin, routeDestination, routingProfile, showToast]);
 
   // Right-click / Touchscreen Long-Press context menu handler
   const lastContextMenuTime = useRef(0);
@@ -566,6 +704,30 @@ export default function App() {
             🧭 Route
           </button>
 
+          {/* Bend / Align Streetview Line Button */}
+          <button
+            className={`btn ${aligningSequence ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => {
+              if (aligningSequence) {
+                setAligningSequence(null);
+              } else {
+                const targetPos = streetViewPos || { lat: 17.609, lng: 120.738 };
+                handleStartAligningAtCoord(targetPos.lat, targetPos.lng);
+              }
+            }}
+            style={{
+              fontSize: '0.8rem',
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
+            title="Bend and re-align Mapillary streetview lines onto road curves"
+          >
+            📐 {aligningSequence ? 'Exit Align' : 'Align Line'}
+          </button>
+
 
           <div className="controls-separator" />
 
@@ -738,6 +900,17 @@ export default function App() {
           </div>
         )}
 
+        {/* Floating Streetview Line Aligner Toolbar */}
+        {aligningSequence && (
+          <StreetviewLineAligner
+            aligningSequence={aligningSequence}
+            onSave={handleSaveAlignment}
+            onResetOriginal={handleResetAlignmentOriginal}
+            onCancel={() => setAligningSequence(null)}
+            isSaving={isSavingAlignment}
+          />
+        )}
+
         {/* 2D MapView */}
         <MapView
           theme={mapTheme}
@@ -765,6 +938,9 @@ export default function App() {
           pickingMode={pickingTarget}
           isAdmin={isAdmin}
           isDraggable={isAdmin && pinsDraggable}
+          aligningSequence={aligningSequence}
+          onUpdateAligningSequence={setAligningSequence}
+          alignedGeoJSON={alignedGeoJSON}
         />
 
         {/* Resize handle */}
@@ -1409,15 +1585,19 @@ export default function App() {
 
           {/* Coordinates row */}
           <div className="ctx-coords">
-            <span>{contextMenu.lat.toFixed(6)}, {contextMenu.lng.toFixed(6)}</span>
-            <button
-              title="Copy coordinates"
-              onClick={() => {
-                navigator.clipboard.writeText(`${contextMenu.lat.toFixed(6)}, ${contextMenu.lng.toFixed(6)}`);
-                setContextMenu(null);
-              }}
+            <span
+              className="ctx-coords-text"
+              title="Click to copy coordinates"
+              onClick={() => handleCopyCoordinates(contextMenu.lat, contextMenu.lng)}
             >
-              📋 Copy
+              {contextMenu.lat.toFixed(6)}, {contextMenu.lng.toFixed(6)}
+            </span>
+            <button
+              className={`ctx-copy-btn ${copiedCoords ? 'copied' : ''}`}
+              title="Copy coordinates"
+              onClick={() => handleCopyCoordinates(contextMenu.lat, contextMenu.lng)}
+            >
+              {copiedCoords ? '✓ Copied!' : '📋 Copy'}
             </button>
           </div>
           <hr />
@@ -1437,6 +1617,14 @@ export default function App() {
             }}
           >
             🌐 View in Google Street View
+          </button>
+          <button
+            onClick={() => {
+              handleStartAligningAtCoord(contextMenu.lat, contextMenu.lng);
+              setContextMenu(null);
+            }}
+          >
+            📐 Bend / Re-align Streetview Line
           </button>
           {isAdmin && (
             <>
