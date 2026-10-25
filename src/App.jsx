@@ -7,6 +7,14 @@ import TouristSpotModal, { LAGANGILANG_BARANGAYS } from './components/TouristSpo
 import TouristSpotStreetViewCard from './components/TouristSpotStreetViewCard';
 import TrailAlignmentHUD from './components/TrailAlignmentHUD';
 import PseudoImage from './components/PseudoImage';
+import {
+  DEFAULT_CAMPUS_SEQUENCE_ID,
+  DEFAULT_CAMPUS_OFFSET,
+  getSavedSequenceOffsets,
+  saveSequenceOffsets,
+  normalizeSequenceId,
+  getSequenceMeta,
+} from './utils/trailCalibration';
 import { touristSpotsService } from './services/touristSpotsService';
 import { useMapillary } from './hooks/useMapillary';
 import { formatCoords } from './utils/geoUtils';
@@ -89,21 +97,53 @@ export default function App() {
   const [mapCenterPos, setMapCenterPos] = useState(null);
   const { searchNearby } = useMapillary();
 
-  // Trail alignment state (calibrates GPS drift so Mapillary lines connect to road legends)
-  const [trailOffset, setTrailOffset] = useState(() => {
-    try {
-      const savedX = localStorage.getItem('lagangilang_mapillary_offset_x');
-      const savedY = localStorage.getItem('lagangilang_mapillary_offset_y');
-      return {
-        x: savedX !== null ? parseFloat(savedX) : -24,
-        y: savedY !== null ? parseFloat(savedY) : 6,
-      };
-    } catch {
-      return { x: -24, y: 6 };
-    }
-  });
+  // Trail alignment & selective calibration state (allows re-aligning specific upload lines)
+  const [sequenceOffsets, setSequenceOffsets] = useState(() => getSavedSequenceOffsets());
+  const [activeSequenceId, setActiveSequenceId] = useState(DEFAULT_CAMPUS_SEQUENCE_ID);
+  const [alignScope, setAlignScope] = useState('single'); // 'single' | 'all'
+  const [isPickOnMap, setIsPickOnMap] = useState(false);
   const [showAlignmentModal, setShowAlignmentModal] = useState(false);
   const [isDragAlignMode, setIsDragAlignMode] = useState(false);
+
+  // Derived current active offset
+  const activeNormalizedId = normalizeSequenceId(activeSequenceId);
+  const currentTrailOffset = alignScope === 'all'
+    ? (sequenceOffsets.global || { x: 0, y: 0 })
+    : (sequenceOffsets[activeNormalizedId] || DEFAULT_CAMPUS_OFFSET);
+
+  const handleSelectSequence = useCallback((seqId) => {
+    const normalized = normalizeSequenceId(seqId);
+    setActiveSequenceId(normalized);
+    setIsPickOnMap(false);
+    const meta = getSequenceMeta(normalized);
+    showToast(`🎯 Selected: ${meta.name}`);
+  }, [showToast]);
+
+  const handleSequenceOffsetChange = useCallback((newOffset, seqId) => {
+    const targetId = alignScope === 'all' ? 'global' : normalizeSequenceId(seqId || activeSequenceId);
+    setSequenceOffsets((prev) => ({
+      ...prev,
+      [targetId]: newOffset,
+    }));
+  }, [alignScope, activeSequenceId]);
+
+  const handleSaveSequenceOffset = useCallback((savedOffset, seqId) => {
+    const targetId = alignScope === 'all' ? 'global' : normalizeSequenceId(seqId || activeSequenceId);
+    setSequenceOffsets((prev) => {
+      const updated = {
+        ...prev,
+        [targetId]: savedOffset,
+      };
+      saveSequenceOffsets(updated);
+      return updated;
+    });
+    setIsDragAlignMode(false);
+    setIsPickOnMap(false);
+    setShowAlignmentModal(false);
+    const meta = getSequenceMeta(targetId);
+    const label = alignScope === 'all' ? 'All Lines (Global)' : meta.name;
+    showToast(`🎯 Saved alignment for ${label}: [${savedOffset.x}px, ${savedOffset.y}px]`);
+  }, [alignScope, activeSequenceId, showToast]);
 
   // Map resize & layout mode ('split' = 50/50 half screen, 'fullscreen' = 100% viewer)
   const [mapWidth, setMapWidth] = useState(50); // percentage (default half screen)
@@ -795,9 +835,16 @@ export default function App() {
           pickingMode={pickingTarget}
           isAdmin={isAdmin}
           isDraggable={isAdmin && pinsDraggable}
-          trailOffset={trailOffset}
+          trailOffset={currentTrailOffset}
+          activeSequenceId={activeSequenceId}
+          onSelectSequence={handleSelectSequence}
+          sequenceOffsets={sequenceOffsets}
+          alignScope={alignScope}
+          isAlignmentOpen={showAlignmentModal}
+          isPickOnMap={isPickOnMap}
+          onTogglePickOnMap={() => setIsPickOnMap(!isPickOnMap)}
           isDragAlignMode={isDragAlignMode}
-          onTrailOffsetChange={setTrailOffset}
+          onTrailOffsetChange={handleSequenceOffsetChange}
         />
 
         {/* Resize handle */}
@@ -1540,17 +1587,19 @@ export default function App() {
         onClose={() => {
           setShowAlignmentModal(false);
           setIsDragAlignMode(false);
+          setIsPickOnMap(false);
         }}
-        currentOffset={trailOffset}
-        onOffsetChange={(newOffset) => setTrailOffset(newOffset)}
+        activeSequenceId={activeSequenceId}
+        onSelectSequence={handleSelectSequence}
+        sequenceOffsets={sequenceOffsets}
+        alignScope={alignScope}
+        onChangeScope={setAlignScope}
+        onOffsetChange={handleSequenceOffsetChange}
+        onSave={handleSaveSequenceOffset}
         isDragMode={isDragAlignMode}
         onToggleDragMode={() => setIsDragAlignMode(!isDragAlignMode)}
-        onSave={(savedOffset) => {
-          setTrailOffset(savedOffset);
-          setIsDragAlignMode(false);
-          setShowAlignmentModal(false);
-          showToast(`🎯 Trail alignment saved to road legends: [${savedOffset.x}px, ${savedOffset.y}px]`);
-        }}
+        isPickOnMap={isPickOnMap}
+        onTogglePickOnMap={() => setIsPickOnMap(!isPickOnMap)}
       />
 
       {/* ===== Floating Toast Notification ===== */}

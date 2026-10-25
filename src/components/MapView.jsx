@@ -5,6 +5,11 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { calculateBearing } from '../utils/geoUtils';
 import { normalizeCategoryName, getDefaultCategoryIcon } from '../services/touristSpotsService';
+import {
+  DEFAULT_CAMPUS_SEQUENCE_ID,
+  DEFAULT_CAMPUS_OFFSET,
+  normalizeSequenceId,
+} from '../utils/trailCalibration';
 
 setWorkerUrl(maplibreWorkerUrl);
 
@@ -116,6 +121,12 @@ export default function MapView({
   trailOffset = { x: -24, y: 6 },
   isDragAlignMode = false,
   onTrailOffsetChange,
+  activeSequenceId = DEFAULT_CAMPUS_SEQUENCE_ID,
+  onSelectSequence,
+  sequenceOffsets = {},
+  alignScope = 'single',
+  isAlignmentOpen = false,
+  isPickOnMap = false,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -123,34 +134,145 @@ export default function MapView({
   const poiMarkersRef = useRef([]);
   const coneLayerAdded = useRef(false);
 
-  // Keep latest trail offset ref for click hit-testing
+  // Keep latest state refs for click hit-testing & event listeners
   const trailOffsetRef = useRef(trailOffset);
   useEffect(() => {
     trailOffsetRef.current = trailOffset;
   }, [trailOffset]);
 
-  // Dynamically update Mapillary layer translations when trail offset changes
+  const activeSequenceIdRef = useRef(activeSequenceId);
   useEffect(() => {
+    activeSequenceIdRef.current = activeSequenceId;
+  }, [activeSequenceId]);
+
+  const sequenceOffsetsRef = useRef(sequenceOffsets);
+  useEffect(() => {
+    sequenceOffsetsRef.current = sequenceOffsets;
+  }, [sequenceOffsets]);
+
+  const alignScopeRef = useRef(alignScope);
+  useEffect(() => {
+    alignScopeRef.current = alignScope;
+  }, [alignScope]);
+
+  const isAlignmentOpenRef = useRef(isAlignmentOpen);
+  useEffect(() => {
+    isAlignmentOpenRef.current = isAlignmentOpen;
+  }, [isAlignmentOpen]);
+
+  const isPickOnMapRef = useRef(isPickOnMap);
+  useEffect(() => {
+    isPickOnMapRef.current = isPickOnMap;
+    if (mapRef.current) {
+      mapRef.current.getCanvas().style.cursor = isPickOnMap ? 'crosshair' : '';
+    }
+  }, [isPickOnMap]);
+
+  // Dynamically configure MapLibre layer filters and translations
+  const applyTrailTranslations = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    const x = trailOffset?.x ?? -24;
-    const y = trailOffset?.y ?? 6;
+
+    const scope = alignScopeRef.current;
+    const activeId = normalizeSequenceId(activeSequenceIdRef.current || DEFAULT_CAMPUS_SEQUENCE_ID);
+    const offsets = sequenceOffsetsRef.current || {};
+    const activeOffset = scope === 'all'
+      ? (offsets.global || trailOffsetRef.current || { x: 0, y: 0 })
+      : (offsets[activeId] || DEFAULT_CAMPUS_OFFSET);
+
+    const x = activeOffset.x ?? 0;
+    const y = activeOffset.y ?? 0;
+
     try {
-      if (map.getLayer('mapillary-sequences-casing')) {
-        map.setPaintProperty('mapillary-sequences-casing', 'line-translate', [x, y]);
-      }
-      if (map.getLayer('mapillary-sequences')) {
-        map.setPaintProperty('mapillary-sequences', 'line-translate', [x, y]);
-      }
-      if (map.getLayer('mapillary-images')) {
-        map.setPaintProperty('mapillary-images', 'circle-translate', [x, y]);
+      if (scope === 'single' && activeId) {
+        // Active sequence filter: match activeId as string property
+        const activeSeqFilter = ['any',
+          ['==', ['to-string', ['get', 'id']], activeId],
+          ['==', ['to-string', ['id']], activeId]
+        ];
+        // Other sequences filter: not activeId
+        const otherSeqFilter = ['!=', ['to-string', ['get', 'id']], activeId];
+
+        // Active images filter: sequence_id matches activeId
+        const activeImgFilter = ['==', ['to-string', ['get', 'sequence_id']], activeId];
+        // Other images filter
+        const otherImgFilter = ['!=', ['to-string', ['get', 'sequence_id']], activeId];
+
+        // 1. Configure Active Sequence & Image Layers with specific [x, y] translation
+        if (map.getLayer('mapillary-sequence-active-casing')) {
+          map.setFilter('mapillary-sequence-active-casing', activeSeqFilter);
+          map.setPaintProperty('mapillary-sequence-active-casing', 'line-translate', [x, y]);
+        }
+        if (map.getLayer('mapillary-sequence-active')) {
+          map.setFilter('mapillary-sequence-active', activeSeqFilter);
+          map.setPaintProperty('mapillary-sequence-active', 'line-translate', [x, y]);
+        }
+        if (map.getLayer('mapillary-sequence-active-glow')) {
+          map.setFilter('mapillary-sequence-active-glow', activeSeqFilter);
+          map.setPaintProperty('mapillary-sequence-active-glow', 'line-translate', [x, y]);
+        }
+        if (map.getLayer('mapillary-images-active')) {
+          map.setFilter('mapillary-images-active', activeImgFilter);
+          map.setPaintProperty('mapillary-images-active', 'circle-translate', [x, y]);
+        }
+
+        // 2. Configure Default/Other Sequences Layers (anchored at raw 0, 0 position)
+        if (map.getLayer('mapillary-sequences-casing')) {
+          map.setFilter('mapillary-sequences-casing', otherSeqFilter);
+          map.setPaintProperty('mapillary-sequences-casing', 'line-translate', [0, 0]);
+        }
+        if (map.getLayer('mapillary-sequences')) {
+          map.setFilter('mapillary-sequences', otherSeqFilter);
+          map.setPaintProperty('mapillary-sequences', 'line-translate', [0, 0]);
+        }
+        if (map.getLayer('mapillary-images')) {
+          map.setFilter('mapillary-images', otherImgFilter);
+          map.setPaintProperty('mapillary-images', 'circle-translate', [0, 0]);
+        }
+      } else {
+        // Global mode: all sequences shift together by activeOffset
+        const globalX = offsets.global?.x ?? trailOffsetRef.current?.x ?? 0;
+        const globalY = offsets.global?.y ?? trailOffsetRef.current?.y ?? 0;
+
+        // Hide active-only layers
+        if (map.getLayer('mapillary-sequence-active-casing')) {
+          map.setFilter('mapillary-sequence-active-casing', ['==', '1', '2']);
+        }
+        if (map.getLayer('mapillary-sequence-active')) {
+          map.setFilter('mapillary-sequence-active', ['==', '1', '2']);
+        }
+        if (map.getLayer('mapillary-sequence-active-glow')) {
+          map.setFilter('mapillary-sequence-active-glow', ['==', '1', '2']);
+        }
+        if (map.getLayer('mapillary-images-active')) {
+          map.setFilter('mapillary-images-active', ['==', '1', '2']);
+        }
+
+        // Apply global translation across all Mapillary layers
+        if (map.getLayer('mapillary-sequences-casing')) {
+          map.setFilter('mapillary-sequences-casing', null);
+          map.setPaintProperty('mapillary-sequences-casing', 'line-translate', [globalX, globalY]);
+        }
+        if (map.getLayer('mapillary-sequences')) {
+          map.setFilter('mapillary-sequences', null);
+          map.setPaintProperty('mapillary-sequences', 'line-translate', [globalX, globalY]);
+        }
+        if (map.getLayer('mapillary-images')) {
+          map.setFilter('mapillary-images', null);
+          map.setPaintProperty('mapillary-images', 'circle-translate', [globalX, globalY]);
+        }
       }
     } catch {
       // ignore
     }
-  }, [trailOffset]);
+  }, []);
 
-  // Interactive direct map drag alignment mode
+  // Update translations when props or state change
+  useEffect(() => {
+    applyTrailTranslations();
+  }, [trailOffset, activeSequenceId, sequenceOffsets, alignScope, applyTrailTranslations]);
+
+  // Interactive direct map drag alignment mode (selective: moves ONLY active sequence line)
   const isDraggingTrail = useRef(false);
   const dragStartPoint = useRef({ x: 0, y: 0 });
   const startOffset = useRef({ x: -24, y: 6 });
@@ -166,7 +288,15 @@ export default function MapView({
       const handleMouseDown = (e) => {
         isDraggingTrail.current = true;
         dragStartPoint.current = { x: e.point.x, y: e.point.y };
-        startOffset.current = { ...trailOffsetRef.current };
+
+        const scope = alignScopeRef.current;
+        const activeId = normalizeSequenceId(activeSequenceIdRef.current || DEFAULT_CAMPUS_SEQUENCE_ID);
+        const offsets = sequenceOffsetsRef.current || {};
+        const currOffset = scope === 'all'
+          ? (offsets.global || trailOffsetRef.current || { x: 0, y: 0 })
+          : (offsets[activeId] || DEFAULT_CAMPUS_OFFSET);
+
+        startOffset.current = { ...currOffset };
         map.getCanvas().style.cursor = 'grabbing';
       };
 
@@ -178,20 +308,37 @@ export default function MapView({
         const nextY = Math.round((startOffset.current.y + dy) * 10) / 10;
 
         try {
-          if (map.getLayer('mapillary-sequences-casing')) {
-            map.setPaintProperty('mapillary-sequences-casing', 'line-translate', [nextX, nextY]);
-          }
-          if (map.getLayer('mapillary-sequences')) {
-            map.setPaintProperty('mapillary-sequences', 'line-translate', [nextX, nextY]);
-          }
-          if (map.getLayer('mapillary-images')) {
-            map.setPaintProperty('mapillary-images', 'circle-translate', [nextX, nextY]);
+          if (alignScopeRef.current === 'single') {
+            // Translate ONLY the active sequence line layers
+            if (map.getLayer('mapillary-sequence-active-casing')) {
+              map.setPaintProperty('mapillary-sequence-active-casing', 'line-translate', [nextX, nextY]);
+            }
+            if (map.getLayer('mapillary-sequence-active')) {
+              map.setPaintProperty('mapillary-sequence-active', 'line-translate', [nextX, nextY]);
+            }
+            if (map.getLayer('mapillary-sequence-active-glow')) {
+              map.setPaintProperty('mapillary-sequence-active-glow', 'line-translate', [nextX, nextY]);
+            }
+            if (map.getLayer('mapillary-images-active')) {
+              map.setPaintProperty('mapillary-images-active', 'circle-translate', [nextX, nextY]);
+            }
+          } else {
+            // Global mode: translate all
+            if (map.getLayer('mapillary-sequences-casing')) {
+              map.setPaintProperty('mapillary-sequences-casing', 'line-translate', [nextX, nextY]);
+            }
+            if (map.getLayer('mapillary-sequences')) {
+              map.setPaintProperty('mapillary-sequences', 'line-translate', [nextX, nextY]);
+            }
+            if (map.getLayer('mapillary-images')) {
+              map.setPaintProperty('mapillary-images', 'circle-translate', [nextX, nextY]);
+            }
           }
         } catch {
           // ignore
         }
 
-        onTrailOffsetChange?.({ x: nextX, y: nextY });
+        onTrailOffsetChange?.({ x: nextX, y: nextY }, activeSequenceIdRef.current);
       };
 
       const handleMouseUp = () => {
@@ -210,11 +357,11 @@ export default function MapView({
         map.off('mousemove', handleMouseMove);
         map.off('mouseup', handleMouseUp);
         map.dragPan.enable();
-        map.getCanvas().style.cursor = '';
+        map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : '';
       };
     } else {
       map.dragPan.enable();
-      map.getCanvas().style.cursor = '';
+      map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : '';
     }
   }, [isDragAlignMode, onTrailOffsetChange]);
 
@@ -377,6 +524,76 @@ export default function MapView({
         },
         minzoom: 13,
       });
+
+      // Active Mapillary Sequence Line Casing (Outline for selected sequence)
+      map.addLayer({
+        id: 'mapillary-sequence-active-casing',
+        type: 'line',
+        source: 'mapillary',
+        'source-layer': 'sequence',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+        },
+        paint: {
+          'line-color': '#064e3b',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6.5, 17, 9],
+          'line-opacity': 0.85,
+        },
+      });
+
+      // Active Mapillary Sequence Glow (Radiant emerald highlight)
+      map.addLayer({
+        id: 'mapillary-sequence-active-glow',
+        type: 'line',
+        source: 'mapillary',
+        'source-layer': 'sequence',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+        },
+        paint: {
+          'line-color': '#34d399',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 6, 14, 9, 17, 13],
+          'line-opacity': 0.45,
+        },
+      });
+
+      // Active Mapillary Sequence Line (Vibrant Emerald for selected sequence)
+      map.addLayer({
+        id: 'mapillary-sequence-active',
+        type: 'line',
+        source: 'mapillary',
+        'source-layer': 'sequence',
+        layout: {
+          'line-cap': 'round',
+          'line-join': 'round',
+        },
+        paint: {
+          'line-color': '#10b981',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 14, 4, 17, 6],
+          'line-opacity': 1.0,
+        },
+      });
+
+      // Active Mapillary Image Points (Selected sequence dots with distinct white halo)
+      map.addLayer({
+        id: 'mapillary-images-active',
+        type: 'circle',
+        source: 'mapillary',
+        'source-layer': 'image',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 4.5, 16, 7, 18, 9],
+          'circle-color': '#10b981',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff',
+          'circle-opacity': 1.0,
+        },
+        minzoom: 13,
+      });
+
+      // Apply initial per-sequence / global translations
+      applyTrailTranslations();
 
       // Add source for direction cone (viewing direction indicator)
       map.addSource('view-cone', {
@@ -557,7 +774,7 @@ export default function MapView({
     const extractMapillaryImageId = (feature) => {
       if (!feature) return null;
       // Never use properties.id from a sequence feature (it is a sequence ID, not an image ID)
-      if (feature.layer?.id === 'mapillary-sequences') {
+      if (feature.layer?.id === 'mapillary-sequences' || feature.layer?.id === 'mapillary-sequence-active') {
         const seqImageId = feature.properties?.image_id;
         if (seqImageId && String(seqImageId).length >= 10 && /^\d+$/.test(String(seqImageId))) {
           return String(seqImageId);
@@ -580,20 +797,56 @@ export default function MapView({
         return;
       }
 
+      const isPicking = isPickOnMapRef.current;
+      const isAlignOpen = isAlignmentOpenRef.current;
+
+      // In line picking or calibration mode: clicking any line selects it
+      if (isPicking || (isAlignOpen && !isDragAlignMode)) {
+        const checkLayers = [
+          'mapillary-sequence-active',
+          'mapillary-sequences',
+          'mapillary-images-active',
+          'mapillary-images',
+        ].filter(l => map.getLayer(l));
+
+        const clickedFeats = map.queryRenderedFeatures([
+          [e.point.x - 20, e.point.y - 20],
+          [e.point.x + 20, e.point.y + 20],
+        ], { layers: checkLayers });
+
+        if (clickedFeats.length > 0) {
+          const feat = clickedFeats[0];
+          const seqId = feat.properties?.sequence_id || feat.properties?.id;
+          if (seqId && typeof seqId === 'string' && seqId.length > 4) {
+            onSelectSequence?.(String(seqId));
+            return;
+          }
+        }
+
+        if (isPicking) {
+          return;
+        }
+      }
+
       try {
-        // 1. Check if we clicked directly on a Mapillary image point (accounting for trail offset)
-        if (map.getLayer('mapillary-images')) {
-          const ox = trailOffsetRef.current?.x || 0;
-          const oy = trailOffsetRef.current?.y || 0;
-          const imageFeatures = map.queryRenderedFeatures([
+        const scope = alignScopeRef.current;
+        const activeId = normalizeSequenceId(activeSequenceIdRef.current || DEFAULT_CAMPUS_SEQUENCE_ID);
+        const offsets = sequenceOffsetsRef.current || {};
+        const activeOffset = scope === 'all'
+          ? (offsets.global || trailOffsetRef.current || { x: 0, y: 0 })
+          : (offsets[activeId] || DEFAULT_CAMPUS_OFFSET);
+        const ox = activeOffset.x || 0;
+        const oy = activeOffset.y || 0;
+
+        // 1. Check shifted active image points
+        if (map.getLayer('mapillary-images-active')) {
+          const activeImgs = map.queryRenderedFeatures([
             [e.point.x - 16 - ox, e.point.y - 16 - oy],
             [e.point.x + 16 - ox, e.point.y + 16 - oy],
-          ], {
-            layers: ['mapillary-images']
-          });
+          ], { layers: ['mapillary-images-active'] });
 
-          if (imageFeatures.length > 0) {
-            const validId = extractMapillaryImageId(imageFeatures[0]);
+          if (activeImgs.length > 0) {
+            const validId = extractMapillaryImageId(activeImgs[0]);
             if (validId) {
               onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, validId, true);
               return;
@@ -601,34 +854,61 @@ export default function MapView({
           }
         }
 
-        // 2. Check sequence lines (continuous green line)
-        if (map.getLayer('mapillary-sequences')) {
-          const ox = trailOffsetRef.current?.x || 0;
-          const oy = trailOffsetRef.current?.y || 0;
-          const seqFeatures = map.queryRenderedFeatures([
-            [e.point.x - 12 - ox, e.point.y - 12 - oy],
-            [e.point.x + 12 - ox, e.point.y + 12 - oy],
-          ], {
-            layers: ['mapillary-sequences']
-          });
+        // 2. Check unshifted default image points
+        if (map.getLayer('mapillary-images')) {
+          const defaultImgs = map.queryRenderedFeatures([
+            [e.point.x - 16, e.point.y - 16],
+            [e.point.x + 16, e.point.y + 16],
+          ], { layers: ['mapillary-images'] });
 
-          if (seqFeatures.length > 0) {
-            // Check if there is an image point near the click point (within 45px)
-            const nearbyImageFeatures = map.queryRenderedFeatures([
+          if (defaultImgs.length > 0) {
+            const validId = extractMapillaryImageId(defaultImgs[0]);
+            if (validId) {
+              onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, validId, true);
+              return;
+            }
+          }
+        }
+
+        // 3. Check shifted active sequence line
+        if (map.getLayer('mapillary-sequence-active')) {
+          const activeSeqs = map.queryRenderedFeatures([
+            [e.point.x - 14 - ox, e.point.y - 14 - oy],
+            [e.point.x + 14 - ox, e.point.y + 14 - oy],
+          ], { layers: ['mapillary-sequence-active'] });
+
+          if (activeSeqs.length > 0) {
+            const nearbyImgs = map.queryRenderedFeatures([
               [e.point.x - 45 - ox, e.point.y - 45 - oy],
               [e.point.x + 45 - ox, e.point.y + 45 - oy],
-            ], { layers: ['mapillary-images'] });
+            ], { layers: ['mapillary-images-active'] });
 
-            const validId = nearbyImageFeatures.length > 0
-              ? extractMapillaryImageId(nearbyImageFeatures[0])
-              : null; // null triggers searchNearby to resolve the actual image ID
-
+            const validId = nearbyImgs.length > 0 ? extractMapillaryImageId(nearbyImgs[0]) : null;
             onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, validId, true);
             return;
           }
         }
 
-        // 3. Check surveyed road corridor lines (connecting UA Campus to Main Road)
+        // 4. Check unshifted default sequence line
+        if (map.getLayer('mapillary-sequences')) {
+          const defaultSeqs = map.queryRenderedFeatures([
+            [e.point.x - 14, e.point.y - 14],
+            [e.point.x + 14, e.point.y + 14],
+          ], { layers: ['mapillary-sequences'] });
+
+          if (defaultSeqs.length > 0) {
+            const nearbyImgs = map.queryRenderedFeatures([
+              [e.point.x - 45, e.point.y - 45],
+              [e.point.x + 45, e.point.y + 45],
+            ], { layers: ['mapillary-images'] });
+
+            const validId = nearbyImgs.length > 0 ? extractMapillaryImageId(nearbyImgs[0]) : null;
+            onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, validId, true);
+            return;
+          }
+        }
+
+        // 5. Check surveyed road corridor lines (connecting UA Campus to Main Road)
         if (map.getLayer('trail-surveyed-layer')) {
           const surveyedFeatures = map.queryRenderedFeatures(e.point, {
             layers: ['trail-surveyed-layer']
@@ -756,22 +1036,34 @@ export default function MapView({
 
     // Change cursor when hovering over Mapillary layers & surveyed corridors
     map.on('mouseenter', 'mapillary-images', () => {
-      map.getCanvas().style.cursor = 'pointer';
+      map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : 'pointer';
     });
     map.on('mouseleave', 'mapillary-images', () => {
-      map.getCanvas().style.cursor = '';
+      map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : '';
+    });
+    map.on('mouseenter', 'mapillary-images-active', () => {
+      map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : 'pointer';
+    });
+    map.on('mouseleave', 'mapillary-images-active', () => {
+      map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : '';
     });
     map.on('mouseenter', 'mapillary-sequences', () => {
-      map.getCanvas().style.cursor = 'pointer';
+      map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : 'pointer';
     });
     map.on('mouseleave', 'mapillary-sequences', () => {
-      map.getCanvas().style.cursor = '';
+      map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : '';
+    });
+    map.on('mouseenter', 'mapillary-sequence-active', () => {
+      map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : 'pointer';
+    });
+    map.on('mouseleave', 'mapillary-sequence-active', () => {
+      map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : '';
     });
     map.on('mouseenter', 'trail-surveyed-layer', () => {
       map.getCanvas().style.cursor = 'pointer';
     });
     map.on('mouseleave', 'trail-surveyed-layer', () => {
-      map.getCanvas().style.cursor = '';
+      map.getCanvas().style.cursor = isPickOnMapRef.current ? 'crosshair' : '';
     });
 
     mapRef.current = map;
@@ -867,11 +1159,75 @@ export default function MapView({
             'circle-stroke-width': 1.5,
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 0.95,
-            'circle-translate': [trailOffsetRef.current?.x ?? -24, trailOffsetRef.current?.y ?? 6],
           },
           minzoom: 13,
         });
       }
+
+      if (!mapRef.current.getLayer('mapillary-sequence-active-casing')) {
+        mapRef.current.addLayer({
+          id: 'mapillary-sequence-active-casing',
+          type: 'line',
+          source: 'mapillary',
+          'source-layer': 'sequence',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#064e3b',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6.5, 17, 9],
+            'line-opacity': 0.85,
+          },
+        });
+      }
+
+      if (!mapRef.current.getLayer('mapillary-sequence-active-glow')) {
+        mapRef.current.addLayer({
+          id: 'mapillary-sequence-active-glow',
+          type: 'line',
+          source: 'mapillary',
+          'source-layer': 'sequence',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#34d399',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 6, 14, 9, 17, 13],
+            'line-opacity': 0.45,
+          },
+        });
+      }
+
+      if (!mapRef.current.getLayer('mapillary-sequence-active')) {
+        mapRef.current.addLayer({
+          id: 'mapillary-sequence-active',
+          type: 'line',
+          source: 'mapillary',
+          'source-layer': 'sequence',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#10b981',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 14, 4, 17, 6],
+            'line-opacity': 1.0,
+          },
+        });
+      }
+
+      if (!mapRef.current.getLayer('mapillary-images-active')) {
+        mapRef.current.addLayer({
+          id: 'mapillary-images-active',
+          type: 'circle',
+          source: 'mapillary',
+          'source-layer': 'image',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 4.5, 16, 7, 18, 9],
+            'circle-color': '#10b981',
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#ffffff',
+            'circle-opacity': 1.0,
+          },
+          minzoom: 13,
+        });
+      }
+
+      // Re-apply sequence-specific translations on the newly loaded style
+      applyTrailTranslations();
 
       if (!mapRef.current.getSource('view-cone')) {
         mapRef.current.addSource('view-cone', {
