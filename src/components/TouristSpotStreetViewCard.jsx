@@ -298,7 +298,7 @@ export default function TouristSpotStreetViewCard({
           </button>
 
           <button
-            onClick={() => onToggleViewerMode?.('road')}
+            onClick={() => onToggleViewerMode?.('google')}
             style={{
               flex: 1,
               padding: '6px 8px',
@@ -311,17 +311,17 @@ export default function TouristSpotStreetViewCard({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '4px',
-              background: viewerPanoMode === 'road'
+              background: viewerPanoMode === 'google'
                 ? 'linear-gradient(135deg, #05cb63 0%, #047857 100%)'
                 : 'transparent',
-              color: viewerPanoMode === 'road' ? '#ffffff' : '#94a3b8',
-              boxShadow: viewerPanoMode === 'road' ? '0 2px 8px rgba(5, 203, 99, 0.4)' : 'none',
+              color: viewerPanoMode === 'google' ? '#ffffff' : '#94a3b8',
+              boxShadow: viewerPanoMode === 'google' ? '0 2px 8px rgba(5, 203, 99, 0.4)' : 'none',
               transition: 'all var(--transition-fast)',
             }}
-            title="Step out to public road Street View sequence (Mapillary)"
+            title="Switch to Google Street View at this location"
           >
-            <span>🚗</span>
-            <span>Road Street View</span>
+            <span>🌐</span>
+            <span>Google Street View</span>
           </button>
         </div>
       )}

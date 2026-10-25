@@ -20,7 +20,6 @@ export default function PanoramaViewer({
   onHeadingChange,
   onPitchChange,
   steerTarget,
-  onSwitchToMapillary,
   onCloseViewer,
 }) {
   const containerRef = useRef(null);
@@ -28,10 +27,46 @@ export default function PanoramaViewer({
   const [isLoading, setIsLoading] = useState(true);
   const [viewerReady, setViewerReady] = useState(true);
   const currentPanoRef = useRef(null);
+  const activeBlobUrlRef = useRef(null);
+
+  // Helper to convert base64 data URI to standard Blob URL (bypasses browser XHR CORS/status:0 issues in Pannellum)
+  const dataUriToBlobUrl = useCallback((dataUri) => {
+    if (!dataUri || !dataUri.startsWith('data:')) return dataUri;
+    try {
+      const parts = dataUri.split(',');
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const bstr = atob(parts[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const blob = new Blob([u8arr], { type: mime });
+      return URL.createObjectURL(blob);
+    } catch (err) {
+      console.warn('Could not convert data URI to blob URL:', err);
+      return dataUri;
+    }
+  }, []);
+
+  // Cleanup created blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (activeBlobUrlRef.current && activeBlobUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+      }
+    };
+  }, []);
 
   // Initialize or update the viewer when panorama changes
   useEffect(() => {
     if (!viewerReady || !panorama || !containerRef.current) return;
+
+    // Guard: Prevent re-initialization if the exact same panorama is already loaded and active
+    if (currentPanoRef.current === panorama.id && viewerRef.current) {
+      return;
+    }
 
     let isCancelled = false;
 
@@ -68,9 +103,19 @@ export default function PanoramaViewer({
 
       if (isCancelled) return;
 
+      // 4. Convert base64 data URI to Blob URL to ensure Pannellum XHR succeeds with status 200
+      if (finalImageUrl && finalImageUrl.startsWith('data:')) {
+        const blobUrl = dataUriToBlobUrl(finalImageUrl);
+        if (activeBlobUrlRef.current && activeBlobUrlRef.current.startsWith('blob:')) {
+          URL.revokeObjectURL(activeBlobUrlRef.current);
+        }
+        activeBlobUrlRef.current = blobUrl;
+        finalImageUrl = blobUrl;
+      }
+
       const hotSpots = buildHotspots(panorama, panoramas);
 
-      if (viewerRef.current && currentPanoRef.current) {
+      if (viewerRef.current) {
         try {
           viewerRef.current.destroy();
         } catch (e) {}
@@ -85,7 +130,7 @@ export default function PanoramaViewer({
     return () => {
       isCancelled = true;
     };
-  }, [panorama, viewerReady, panoramas, getCachedUrl]); // intentional omit viewerHeading so it doesn't trigger reload when just looking around
+  }, [panorama?.id, viewerReady, panoramas, getCachedUrl]); // Stable dependency on panorama.id instead of object reference
 
   // Handle steering / orienting camera to face a tourist landmark
   useEffect(() => {
@@ -104,7 +149,7 @@ export default function PanoramaViewer({
     } catch (e) {
       console.warn('Could not orient Pannellum camera:', e);
     }
-  }, [steerTarget, panorama, onHeadingChange]);
+  }, [steerTarget, panorama?.heading, onHeadingChange]);
 
   /**
    * Create a new Pannellum viewer instance.
@@ -121,10 +166,13 @@ export default function PanoramaViewer({
       ? (currentAbsoluteHeading - (heading || 0)) 
       : 0;
 
+    const isBlobOrData = String(imageUrl).startsWith('blob:') || String(imageUrl).startsWith('data:');
+
     const viewer = window.pannellum.viewer(containerRef.current, {
       type: 'equirectangular',
       panorama: imageUrl,
-      crossOrigin: 'anonymous',
+      crossOrigin: isBlobOrData ? undefined : 'anonymous',
+      ignoreGPanoXMP: true,
       autoLoad: true,
       showControls: false,
       showZoomCtrl: false,
@@ -351,45 +399,7 @@ export default function PanoramaViewer({
         </button>
       )}
 
-      {/* Universal Step Out to Road Street View (Mapillary) Button */}
-      {onSwitchToMapillary && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '24px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 100,
-            animation: 'fadeIn 0.3s ease-out',
-          }}
-        >
-          <button
-            onClick={onSwitchToMapillary}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 20px',
-              borderRadius: 'var(--radius-full)',
-              background: 'linear-gradient(135deg, #05cb63 0%, #047857 100%)',
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              border: '2px solid rgba(255, 255, 255, 0.45)',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5), 0 0 15px rgba(5, 203, 99, 0.5)',
-              cursor: 'pointer',
-              transition: 'all var(--transition-fast)',
-              whiteSpace: 'nowrap',
-            }}
-            title="Step out of this standalone photo onto the nearest public road Street View sequence"
-          >
-            <span style={{ fontSize: '1rem' }}>🚗</span>
-            <span>Step Out to Road Street View</span>
-            <span style={{ fontSize: '0.72rem', opacity: 0.85 }}>(Mapillary)</span>
-            <span style={{ fontSize: '1rem' }}>→</span>
-          </button>
-        </div>
-      )}
+
 
       {/* Hotspot styles injected */}
       <style>{`

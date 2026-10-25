@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import MapView from './components/MapView';
 import MapillaryViewer from './components/MapillaryViewer';
 import PanoramaViewer from './components/PanoramaViewer';
+import GoogleStreetViewViewer from './components/GoogleStreetViewViewer';
 import TouristSpotModal, { LAGANGILANG_BARANGAYS } from './components/TouristSpotModal';
 import TouristSpotStreetViewCard from './components/TouristSpotStreetViewCard';
 import PseudoImage from './components/PseudoImage';
@@ -248,27 +249,10 @@ export default function App() {
       if (isLocalPano) {
         setViewerPanoMode('dedicated');
         setStreetViewPos({ lat, lng, id: String(customPanoId || spot.id) });
-      } else if (isDedicatedPanoId) {
-        setViewerPanoMode('road');
-        setMapillaryImageId(String(customPanoId));
-        setStreetViewPos({ lat, lng, id: String(customPanoId) });
       } else {
-        setViewerPanoMode('road');
-        // 2. Otherwise auto-detect and load nearest street view
-        try {
-          const images = await searchNearby(lat, lng, 350);
-          if (images && images.length > 0) {
-            setMapillaryImageId(String(images[0].id));
-            setStreetViewPos({ lat: images[0].lat, lng: images[0].lng, id: String(images[0].id) });
-          } else {
-            // Default sequence fallback: UA campus entrance gate
-            setMapillaryImageId('1532761357806896');
-            setStreetViewPos({ lat: 17.6081389, lng: 120.7381389, id: '1532761357806896' });
-          }
-        } catch (e) {
-          console.warn('Could not find nearby street view:', e);
-          setMapillaryImageId('1532761357806896');
-        }
+        // Default to Google Street View at the exact landmark location (no redirecting to distant Mapillary gates)
+        setViewerPanoMode('google');
+        setStreetViewPos({ lat, lng, id: String(customPanoId || spot.id) });
       }
 
       // 3. Orient the 360 viewer toward the landmark's heading
@@ -280,41 +264,12 @@ export default function App() {
         });
       }
     },
-    [searchNearby]
+    []
   );
 
-  // Seamlessly transition out of a dedicated 360 photo onto the nearest Mapillary road street view
-  const handleSwitchToRoadStreetView = useCallback(async () => {
-    if (!activeTouristSpot) return;
-    const lat = activeTouristSpot.location?.lat ?? activeTouristSpot.lat;
-    const lng = activeTouristSpot.location?.lng ?? activeTouristSpot.lng;
-
-    try {
-      const images = await searchNearby(lat, lng, 350);
-      if (images && images.length > 0) {
-        setMapillaryImageId(String(images[0].id));
-        setStreetViewPos({ lat: images[0].lat, lng: images[0].lng, id: String(images[0].id) });
-      } else {
-        setMapillaryImageId('1532761357806896');
-        setStreetViewPos({ lat: 17.6081389, lng: 120.7381389, id: '1532761357806896' });
-      }
-    } catch (e) {
-      console.warn('Could not detect nearest road street view node:', e);
-      setMapillaryImageId('1532761357806896');
-    }
-    setViewerPanoMode('road');
-  }, [activeTouristSpot, searchNearby]);
-
-  const handleToggleViewerMode = useCallback(
-    (mode) => {
-      if (mode === 'road') {
-        handleSwitchToRoadStreetView();
-      } else {
-        setViewerPanoMode('dedicated');
-      }
-    },
-    [handleSwitchToRoadStreetView]
-  );
+  const handleToggleViewerMode = useCallback((mode) => {
+    setViewerPanoMode(mode);
+  }, []);
 
   // Steering camera helper
   const handleSteerHeading = useCallback((heading, pitch) => {
@@ -1198,7 +1153,7 @@ export default function App() {
               />
             )}
 
-            {/* 360 Viewer: Dedicated Uploaded Panorama (Pannellum) or Public Street View (Mapillary) */}
+            {/* 360 Viewer: Dedicated Uploaded Panorama (Pannellum) or Google Street View */}
             {activeTouristSpot &&
             (activeTouristSpot.connected360?.type === 'local' ||
               !!activeTouristSpot.connected360?.imageUrl ||
@@ -1222,8 +1177,16 @@ export default function App() {
                 viewerHeading={viewerHeading}
                 onHeadingChange={setViewerHeading}
                 steerTarget={steerTarget}
-                onSwitchToMapillary={handleSwitchToRoadStreetView}
                 onCloseViewer={handleCloseViewer}
+              />
+            ) : viewerPanoMode === 'google' || !mapillaryImageId ? (
+              <GoogleStreetViewViewer
+                lat={activeTouristSpot?.location?.lat ?? activeTouristSpot?.lat ?? streetViewPos?.lat ?? 17.612749}
+                lng={activeTouristSpot?.location?.lng ?? activeTouristSpot?.lng ?? streetViewPos?.lng ?? 120.733755}
+                heading={activeTouristSpot?.connected360?.heading || viewerHeading || 0}
+                pitch={activeTouristSpot?.connected360?.pitch || 0}
+                title={activeTouristSpot?.name || 'Lagangilang, Abra'}
+                onClose={handleCloseViewer}
               />
             ) : (
               <MapillaryViewer
@@ -1248,7 +1211,9 @@ export default function App() {
                     String(activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || '').startsWith('pano_')) &&
                   viewerPanoMode === 'dedicated'
                     ? 'Dedicated 360 Landmark'
-                    : 'Road Street View'}
+                    : viewerPanoMode === 'google'
+                    ? 'Google Street View'
+                    : 'Mapillary Street View'}
                 </div>
                 <div style={{ fontSize: '0.65rem', opacity: 0.75, whiteSpace: 'nowrap' }}>
                   Lagangilang, Abra
@@ -1337,6 +1302,17 @@ export default function App() {
           </button>
           <button onClick={() => { setRouteDestination([contextMenu.lng, contextMenu.lat]); setRouteData(null); setContextMenu(null); }}>
             🏁 Mark as Point B (Destination)
+          </button>
+          <button
+            onClick={() => {
+              setActiveTouristSpot(null);
+              setStreetViewPos({ lat: contextMenu.lat, lng: contextMenu.lng });
+              setViewerPanoMode('google');
+              setViewerOpen(true);
+              setContextMenu(null);
+            }}
+          >
+            🌐 View in Google Street View
           </button>
           {isAdmin && (
             <>
