@@ -9,8 +9,8 @@ import {
 /**
  * Google Street View Viewer Component
  * Connects directly to Google Maps Street View for true road coverage in Lagangilang & Abra.
- * Includes intelligent junction detection and 1-click fallback to Mapillary when inside
- * campus trails or areas with no vehicle coverage.
+ * All transition buttons, engine switches, and status badges are anchored on the BOTTOM LEFT,
+ * leaving the top of the viewer clean and unobstructed.
  */
 export default function GoogleStreetViewViewer({
   lat,
@@ -56,184 +56,7 @@ export default function GoogleStreetViewViewer({
         overflow: 'hidden',
       }}
     >
-      {/* Top Banner: Junction & Coverage Notice */}
-      {inCampus && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '14px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 15,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            background: 'rgba(15, 23, 42, 0.92)',
-            padding: '8px 16px',
-            borderRadius: 'var(--radius-full, 9999px)',
-            border: '1.5px solid #f59e0b',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(12px)',
-            maxWidth: 'calc(100% - 100px)',
-            animation: 'fadeInDown 0.3s ease-out',
-          }}
-        >
-          <span style={{ fontSize: '1rem' }}>🏫</span>
-          <div style={{ fontSize: '0.78rem', color: '#e2e8f0', lineHeight: 1.25 }}>
-            <span style={{ color: '#fbbf24', fontWeight: 700 }}>Inside UA Campus Grounds: </span>
-            Google Street View has no vehicle coverage here.
-          </div>
-          {onSwitchToMapillary && (
-            <button
-              onClick={handleEnterMapillaryCampus}
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: 'var(--radius-full, 9999px)',
-                padding: '4px 12px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
-              }}
-            >
-              <span>🚗 Switch to Mapillary Trail</span>
-              <span>→</span>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Junction Bridge Pill (when viewing on highway near UA Campus Entrance) */}
-      {!inCampus && nearJunction && onSwitchToMapillary && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '14px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 15,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(15, 23, 42, 0.92)',
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-full, 9999px)',
-            border: '1px solid #10b981',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(12px)',
-            animation: 'fadeInDown 0.3s ease-out',
-          }}
-        >
-          <span style={{ fontSize: '0.95rem' }}>🚗</span>
-          <span style={{ fontSize: '0.78rem', color: '#86efac', fontWeight: 600 }}>
-            Junction Connected:
-          </span>
-          <button
-            onClick={handleEnterMapillaryCampus}
-            style={{
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: 'var(--radius-full, 9999px)',
-              padding: '4px 12px',
-              fontSize: '0.74rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            <span>Enter UA Campus Grounds (Mapillary)</span>
-            <span>→</span>
-          </button>
-        </div>
-      )}
-
-      {/* Bottom-Left Pill: Street View Identifier & External Link */}
-      {/* If tourist card is present, shift it right so they don't collide */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: '20px',
-          left: hasDedicatedCard ? '348px' : '16px',
-          zIndex: 10,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          background: 'rgba(15, 23, 42, 0.88)',
-          padding: '6px 14px',
-          borderRadius: 'var(--radius-full, 9999px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          backdropFilter: 'blur(10px)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-          maxWidth: 'calc(100% - 32px)',
-          flexWrap: 'wrap',
-          transition: 'all 0.2s ease',
-        }}
-      >
-        <span style={{ fontSize: '1rem' }}>🌐</span>
-        <div>
-          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
-            Google Street View
-          </div>
-          <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
-            {title || `${parsedLat.toFixed(5)}, ${parsedLng.toFixed(5)}`}
-          </div>
-        </div>
-
-        <a
-          href={externalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            marginLeft: '6px',
-            fontSize: '0.68rem',
-            color: '#60a5fa',
-            textDecoration: 'none',
-            padding: '2px 8px',
-            borderRadius: '4px',
-            background: 'rgba(59, 130, 246, 0.15)',
-            border: '1px solid rgba(96, 165, 250, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-          title="Open in official Google Maps app or browser tab"
-        >
-          <span>Open in Google Maps</span>
-          <span>↗</span>
-        </a>
-
-        {onSwitchToMapillary && (
-          <button
-            onClick={() => onSwitchToMapillary({ lat: parsedLat, lng: parsedLng })}
-            style={{
-              fontSize: '0.68rem',
-              color: '#34d399',
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid rgba(52, 211, 153, 0.4)',
-              borderRadius: '4px',
-              padding: '2px 8px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-            title="Switch to Mapillary streetview coverage at this location"
-          >
-            <span>🔄 Switch to Mapillary</span>
-          </button>
-        )}
-      </div>
-
-      {/* Close button at Top-Right */}
+      {/* Top of viewer is strictly clean: only Close button at Top-Right */}
       {onClose && (
         <button
           onClick={onClose}
@@ -241,8 +64,8 @@ export default function GoogleStreetViewViewer({
             position: 'absolute',
             top: '14px',
             right: '16px',
-            zIndex: 10,
-            background: 'rgba(15, 23, 42, 0.88)',
+            zIndex: 30,
+            background: 'rgba(15, 23, 42, 0.9)',
             color: '#ffffff',
             border: '1px solid rgba(255, 255, 255, 0.25)',
             borderRadius: 'var(--radius-full, 9999px)',
@@ -254,6 +77,7 @@ export default function GoogleStreetViewViewer({
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
           }}
           title="Back to Map"
         >
@@ -300,6 +124,183 @@ export default function GoogleStreetViewViewer({
         loading="lazy"
         onLoad={() => setIsLoading(false)}
       />
+
+      {/* ===== BOTTOM-LEFT OF STREETVIEW: All transitions and engine controls ===== */}
+      <div
+        className="streetview-bottom-left-controls"
+        style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '16px',
+          zIndex: 40,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          maxWidth: hasDedicatedCard ? 'calc(100% - 360px)' : 'calc(100% - 32px)',
+          marginLeft: hasDedicatedCard ? '335px' : '0px',
+          pointerEvents: 'auto',
+          animation: 'fadeInUp 0.3s ease-out',
+          transition: 'all 0.25s ease',
+        }}
+      >
+        {/* Transition prompt: Inside Campus Ground (No Google vehicle coverage) */}
+        {inCampus && onSwitchToMapillary && (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              background: 'rgba(15, 23, 42, 0.94)',
+              borderRadius: 'var(--radius-full, 9999px)',
+              border: '1.5px solid #f59e0b',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(12px)',
+              width: 'fit-content',
+            }}
+          >
+            <span style={{ fontSize: '0.95rem' }}>🏫</span>
+            <span style={{ fontSize: '0.74rem', color: '#fbbf24', fontWeight: 600 }}>
+              Inside UA Campus (No Google road coverage)
+            </span>
+            <button
+              onClick={handleEnterMapillaryCampus}
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 'var(--radius-full, 9999px)',
+                padding: '4px 12px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
+              }}
+            >
+              <span>🚗 Switch to Mapillary Trail</span>
+              <span>→</span>
+            </button>
+          </div>
+        )}
+
+        {/* Transition prompt: Near UA Campus Entrance Highway Junction */}
+        {!inCampus && nearJunction && onSwitchToMapillary && (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              background: 'rgba(15, 23, 42, 0.94)',
+              borderRadius: 'var(--radius-full, 9999px)',
+              border: '1.5px solid #10b981',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(12px)',
+              width: 'fit-content',
+            }}
+          >
+            <span style={{ fontSize: '0.95rem' }}>🚗</span>
+            <span style={{ fontSize: '0.74rem', color: '#86efac', fontWeight: 600 }}>
+              Junction Connected:
+            </span>
+            <button
+              onClick={handleEnterMapillaryCampus}
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 'var(--radius-full, 9999px)',
+                padding: '4px 12px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
+              }}
+            >
+              <span>Enter UA Campus Grounds (Mapillary)</span>
+              <span>→</span>
+            </button>
+          </div>
+        )}
+
+        {/* Google Street View Status & Transition Hub */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'rgba(15, 23, 42, 0.92)',
+            padding: '6px 14px',
+            borderRadius: 'var(--radius-full, 9999px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            width: 'fit-content',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span style={{ fontSize: '1rem' }}>🌐</span>
+          <div>
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
+              Google Street View
+            </div>
+            <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+              {title || `${parsedLat.toFixed(5)}, ${parsedLng.toFixed(5)}`}
+            </div>
+          </div>
+
+          <a
+            href={externalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              marginLeft: '4px',
+              fontSize: '0.68rem',
+              color: '#60a5fa',
+              textDecoration: 'none',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              background: 'rgba(59, 130, 246, 0.15)',
+              border: '1px solid rgba(96, 165, 250, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+            title="Open in official Google Maps app or browser tab"
+          >
+            <span>Open in Google Maps</span>
+            <span>↗</span>
+          </a>
+
+          {onSwitchToMapillary && (
+            <button
+              onClick={() => onSwitchToMapillary({ lat: parsedLat, lng: parsedLng })}
+              style={{
+                fontSize: '0.68rem',
+                color: '#34d399',
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(52, 211, 153, 0.4)',
+                borderRadius: '4px',
+                padding: '2px 8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontWeight: 600,
+              }}
+              title="Transition to Mapillary streetview at this location"
+            >
+              <span>🚗 Switch to Mapillary</span>
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

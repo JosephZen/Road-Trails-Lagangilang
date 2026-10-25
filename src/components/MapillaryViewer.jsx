@@ -299,29 +299,29 @@ export default function MapillaryViewer({
         </div>
       )}
 
-      {/* Highway Junction Bridge: Transition to Abra-Kalinga Highway on Google Street View */}
+      {/* Bottom-Left Highway Junction Transition: Step Out to Abra-Kalinga Highway on Google Street View */}
       {currentPos && isNearCampusJunction(currentPos.lat, currentPos.lng) && onSwitchToGoogle && (
         <div
           style={{
             position: 'absolute',
-            top: '14px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 30,
+            bottom: '20px',
+            left: '16px',
+            zIndex: 35,
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            background: 'rgba(15, 23, 42, 0.92)',
+            background: 'rgba(15, 23, 42, 0.94)',
             padding: '6px 14px',
             borderRadius: 'var(--radius-full, 9999px)',
-            border: '1px solid #38bdf8',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            border: '1.5px solid #38bdf8',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
             backdropFilter: 'blur(12px)',
-            animation: 'fadeInDown 0.3s ease-out',
+            animation: 'fadeInUp 0.3s ease-out',
+            width: 'fit-content',
           }}
         >
           <span style={{ fontSize: '1rem' }}>🌐</span>
-          <span style={{ fontSize: '0.78rem', color: '#bae6fd', fontWeight: 600 }}>
+          <span style={{ fontSize: '0.74rem', color: '#bae6fd', fontWeight: 600 }}>
             Highway Connection:
           </span>
           <button
@@ -341,7 +341,7 @@ export default function MapillaryViewer({
               boxShadow: '0 2px 8px rgba(2, 132, 199, 0.4)',
             }}
           >
-            <span>Step Out to Highway (Google)</span>
+            <span>Step Out to Highway (Google Street View)</span>
             <span>→</span>
           </button>
         </div>

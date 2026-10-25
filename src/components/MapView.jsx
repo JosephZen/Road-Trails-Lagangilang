@@ -113,7 +113,9 @@ export default function MapView({
   isAdmin = false,
   isDraggable = false,
   viewerOpen = false,
-  trailOffset = { x: -9, y: 3 },
+  trailOffset = { x: -24, y: 6 },
+  isDragAlignMode = false,
+  onTrailOffsetChange,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -131,8 +133,8 @@ export default function MapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const x = trailOffset?.x ?? -9;
-    const y = trailOffset?.y ?? 3;
+    const x = trailOffset?.x ?? -24;
+    const y = trailOffset?.y ?? 6;
     try {
       if (map.getLayer('mapillary-sequences-casing')) {
         map.setPaintProperty('mapillary-sequences-casing', 'line-translate', [x, y]);
@@ -147,6 +149,74 @@ export default function MapView({
       // ignore
     }
   }, [trailOffset]);
+
+  // Interactive direct map drag alignment mode
+  const isDraggingTrail = useRef(false);
+  const dragStartPoint = useRef({ x: 0, y: 0 });
+  const startOffset = useRef({ x: -24, y: 6 });
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (isDragAlignMode) {
+      map.dragPan.disable();
+      map.getCanvas().style.cursor = 'grab';
+
+      const handleMouseDown = (e) => {
+        isDraggingTrail.current = true;
+        dragStartPoint.current = { x: e.point.x, y: e.point.y };
+        startOffset.current = { ...trailOffsetRef.current };
+        map.getCanvas().style.cursor = 'grabbing';
+      };
+
+      const handleMouseMove = (e) => {
+        if (!isDraggingTrail.current) return;
+        const dx = e.point.x - dragStartPoint.current.x;
+        const dy = e.point.y - dragStartPoint.current.y;
+        const nextX = Math.round((startOffset.current.x + dx) * 10) / 10;
+        const nextY = Math.round((startOffset.current.y + dy) * 10) / 10;
+
+        try {
+          if (map.getLayer('mapillary-sequences-casing')) {
+            map.setPaintProperty('mapillary-sequences-casing', 'line-translate', [nextX, nextY]);
+          }
+          if (map.getLayer('mapillary-sequences')) {
+            map.setPaintProperty('mapillary-sequences', 'line-translate', [nextX, nextY]);
+          }
+          if (map.getLayer('mapillary-images')) {
+            map.setPaintProperty('mapillary-images', 'circle-translate', [nextX, nextY]);
+          }
+        } catch {
+          // ignore
+        }
+
+        onTrailOffsetChange?.({ x: nextX, y: nextY });
+      };
+
+      const handleMouseUp = () => {
+        if (isDraggingTrail.current) {
+          isDraggingTrail.current = false;
+          map.getCanvas().style.cursor = 'grab';
+        }
+      };
+
+      map.on('mousedown', handleMouseDown);
+      map.on('mousemove', handleMouseMove);
+      map.on('mouseup', handleMouseUp);
+
+      return () => {
+        map.off('mousedown', handleMouseDown);
+        map.off('mousemove', handleMouseMove);
+        map.off('mouseup', handleMouseUp);
+        map.dragPan.enable();
+        map.getCanvas().style.cursor = '';
+      };
+    } else {
+      map.dragPan.enable();
+      map.getCanvas().style.cursor = '';
+    }
+  }, [isDragAlignMode, onTrailOffsetChange]);
 
   // Trigger map resize when viewer opens or closes to prevent blanking
   useEffect(() => {
@@ -269,7 +339,7 @@ export default function MapView({
           'line-color': '#064e3b',
           'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 5, 17, 8],
           'line-opacity': 0.7,
-          'line-translate': [trailOffset?.x ?? -9, trailOffset?.y ?? 3],
+          'line-translate': [trailOffset?.x ?? -24, trailOffset?.y ?? 6],
         },
       });
 
@@ -287,7 +357,7 @@ export default function MapView({
           'line-color': '#05cb63',
           'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3.5, 17, 5],
           'line-opacity': 0.95,
-          'line-translate': [trailOffset?.x ?? -9, trailOffset?.y ?? 3],
+          'line-translate': [trailOffset?.x ?? -24, trailOffset?.y ?? 6],
         },
       });
 
@@ -303,7 +373,7 @@ export default function MapView({
           'circle-stroke-width': 1.5,
           'circle-stroke-color': '#ffffff',
           'circle-opacity': 0.95,
-          'circle-translate': [trailOffset?.x ?? -9, trailOffset?.y ?? 3],
+          'circle-translate': [trailOffset?.x ?? -24, trailOffset?.y ?? 6],
         },
         minzoom: 13,
       });
@@ -360,16 +430,31 @@ export default function MapView({
         data: LAGANGILANG_TRAIL_CORRIDORS,
       });
 
+      // Surveyed road corridors Casing (Dark contrast outline)
+      map.addLayer({
+        id: 'trail-surveyed-casing',
+        type: 'line',
+        source: 'trail-corridors',
+        filter: ['==', ['get', 'status'], 'surveyed'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#064e3b',
+          'line-width': 6,
+          'line-opacity': 0.85,
+        },
+      });
+
       // Surveyed road corridors (Solid Emerald)
       map.addLayer({
         id: 'trail-surveyed-layer',
         type: 'line',
         source: 'trail-corridors',
         filter: ['==', ['get', 'status'], 'surveyed'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#06d6a0',
+          'line-color': '#05cb63',
           'line-width': 3.5,
-          'line-opacity': 0.8,
+          'line-opacity': 0.95,
         },
       });
 
@@ -749,7 +834,7 @@ export default function MapView({
             'line-color': '#064e3b',
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 5, 17, 8],
             'line-opacity': 0.7,
-            'line-translate': [trailOffsetRef.current?.x ?? -9, trailOffsetRef.current?.y ?? 3],
+            'line-translate': [trailOffsetRef.current?.x ?? -24, trailOffsetRef.current?.y ?? 6],
           },
         });
       }
@@ -765,7 +850,7 @@ export default function MapView({
             'line-color': '#05cb63',
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3.5, 17, 5],
             'line-opacity': 0.95,
-            'line-translate': [trailOffsetRef.current?.x ?? -9, trailOffsetRef.current?.y ?? 3],
+            'line-translate': [trailOffsetRef.current?.x ?? -24, trailOffsetRef.current?.y ?? 6],
           },
         });
       }
@@ -782,7 +867,7 @@ export default function MapView({
             'circle-stroke-width': 1.5,
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 0.95,
-            'circle-translate': [trailOffsetRef.current?.x ?? -9, trailOffsetRef.current?.y ?? 3],
+            'circle-translate': [trailOffsetRef.current?.x ?? -24, trailOffsetRef.current?.y ?? 6],
           },
           minzoom: 13,
         });
