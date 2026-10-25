@@ -112,12 +112,24 @@ export default function MapView({
   pickingMode = null,
   isAdmin = false,
   isDraggable = false,
+  viewerOpen = false,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
   const poiMarkersRef = useRef([]);
   const coneLayerAdded = useRef(false);
+
+  // Trigger map resize when viewer opens or closes to prevent blanking
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const t1 = setTimeout(() => mapRef.current?.resize(), 50);
+    const t2 = setTimeout(() => mapRef.current?.resize(), 200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [viewerOpen]);
   const suppressClickRef = useRef(false);
 
   // Keep latest isAdmin ref

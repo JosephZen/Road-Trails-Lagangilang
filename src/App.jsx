@@ -431,12 +431,16 @@ export default function App() {
     document.addEventListener('mouseup', onMouseUp);
   }, []);
 
-  // Close viewer
+  // Close viewer and return to 2D map view cleanly
   const handleCloseViewer = useCallback(() => {
     setViewerOpen(false);
+    setViewerLayout('split'); // Always restore layout to split
     setMapillaryImageId(null);
     setStreetViewPos(null);
     setActiveTouristSpot(null);
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 60);
   }, []);
 
   const handleRouteCalculated = useCallback((route) => {
@@ -470,7 +474,7 @@ export default function App() {
     <div className="app-container">
       {/* ===== Map Panel ===== */}
       <div
-        className={`panel-map ${!viewerOpen ? 'expanded' : ''} ${viewerLayout === 'fullscreen' ? 'fullscreen-collapsed' : ''} ${isAdmin ? 'admin-mode' : ''}`}
+        className={`panel-map ${!viewerOpen ? 'expanded' : ''} ${viewerOpen && viewerLayout === 'fullscreen' ? 'fullscreen-collapsed' : ''} ${isAdmin ? 'admin-mode' : ''}`}
         style={viewerOpen && viewerLayout === 'split' ? { flex: `0 0 ${mapWidth}%` } : {}}
       >
         {/* Map top controls */}
@@ -713,6 +717,7 @@ export default function App() {
         {/* 2D MapView */}
         <MapView
           theme={mapTheme}
+          viewerOpen={viewerOpen}
           onMapClick={handleMapClick}
           onMapContextMenu={handleMapContextMenu}
           viewerHeading={viewerHeading}
@@ -1117,9 +1122,9 @@ export default function App() {
         </div>
       </div>
 
-      {/* ===== 360 Viewer Panel (Powered Exclusively by Mapillary) ===== */}
+      {/* ===== 360 Viewer Panel ===== */}
       <div
-        className={`panel-viewer ${!viewerOpen ? 'hidden' : ''} ${viewerLayout === 'fullscreen' ? 'fullscreen-viewer' : ''}`}
+        className={`panel-viewer ${!viewerOpen ? 'hidden' : ''} ${viewerOpen && viewerLayout === 'fullscreen' ? 'fullscreen-viewer' : ''}`}
         style={viewerOpen && viewerLayout === 'split' ? { flex: `0 0 ${100 - mapWidth}%` } : {}}
       >
         {viewerOpen && (
@@ -1128,7 +1133,7 @@ export default function App() {
             {activeTouristSpot && (
               <TouristSpotStreetViewCard
                 spot={activeTouristSpot}
-                onClose={() => setActiveTouristSpot(null)}
+                onClose={handleCloseViewer}
                 onNavigateTo360={handleSelectTouristSpot}
                 onSteerHeading={handleSteerHeading}
                 isViewerOpen={viewerOpen}

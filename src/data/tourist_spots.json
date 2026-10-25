@@ -309,8 +309,8 @@
     "categoryIcon": "🏛️",
     "barangay": "Poblacion",
     "location": {
-      "lat": 17.612749,
-      "lng": 120.733755,
+      "lat": 17.612711,
+      "lng": 120.733756,
       "address": "Lagangilang Municipal Town Hall, Poblacion, Lagangilang, Abra"
     },
     "description": "Government Office - Municipal Hall of Lagangilang, Abra.",
@@ -325,7 +325,7 @@
       "pitch": 0
     },
     "sync_status": "synced_cloud",
-    "lat": 17.612749,
-    "lng": 120.733755
+    "lat": 17.612711,
+    "lng": 120.733756
   }
 ]

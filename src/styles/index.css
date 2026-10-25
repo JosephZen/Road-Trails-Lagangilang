@@ -138,8 +138,10 @@ body {
 }
 
 .panel-map.expanded {
-  flex: 1 !important;
+  flex: 1 1 100% !important;
   width: 100% !important;
+  height: 100% !important;
+  display: block !important;
 }
 
 .panel-map.fullscreen-collapsed {
@@ -1149,8 +1151,10 @@ body {
   }
 
   .panel-map.expanded {
-    flex: 1 !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
     height: 100% !important;
+    display: block !important;
   }
 
   .panel-map.fullscreen-collapsed {
