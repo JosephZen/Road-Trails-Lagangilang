@@ -7,83 +7,8 @@ import { calculateBearing } from '../utils/geoUtils';
 import { normalizeCategoryName, getDefaultCategoryIcon } from '../services/touristSpotsService';
 import { streetviewAlignmentService } from '../services/streetviewAlignmentService';
 
+// MapLibre GL worker initialization
 setWorkerUrl(maplibreWorkerUrl);
-
-// Coverage Gaps & Trail Corridors in Lagangilang, Abra (Research Objective 1: Unsurveyed Corridors)
-const LAGANGILANG_TRAIL_CORRIDORS = {
-  type: 'FeatureCollection',
-  features: [
-    {
-      type: 'Feature',
-      properties: {
-        name: 'Surveyed Road Corridor: UA Campus to Abra-Kalinga Main Road',
-        status: 'surveyed',
-      },
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [120.738083, 17.608250], // UA Campus Grounds & Gymnasium
-          [120.738111, 17.608167], // Campus Entrance Gate
-          [120.738139, 17.608139], // Access Road (Mapillary Sequence Start)
-          [120.738167, 17.608083],
-          [120.738222, 17.608000],
-          [120.738250, 17.607917],
-          [120.738306, 17.607750],
-          [120.738361, 17.607583],
-          [120.738389, 17.607556],
-          [120.738417, 17.607472], // Junction with Abra-Kalinga National Road (Main Road)
-        ],
-      },
-    },
-    {
-      type: 'Feature',
-      properties: {
-        name: 'Surveyed Road Corridor: Abra-Kalinga Main Road to Poblacion Center',
-        status: 'surveyed',
-      },
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [120.738417, 17.607472], // Road Junction
-          [120.738089, 17.611573], // Along Main Road North
-          [120.737382, 17.613777],
-          [120.734200, 17.614200], // Poblacion Town Hall & Freedom Park
-          [120.735000, 17.615800], // Holy Cross Parish Church
-        ],
-      },
-    },
-    {
-      type: 'Feature',
-      properties: {
-        name: 'Unsurveyed Mountain Trail Gap: Mount Mag-atong Eco-Trail',
-        status: 'gap',
-      },
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [120.734, 17.6142],
-          [120.742, 17.625],
-          [120.751, 17.632],
-        ],
-      },
-    },
-    {
-      type: 'Feature',
-      properties: {
-        name: 'Unsurveyed River Corridor Gap: Pawa Rapids to Abra Riverbank',
-        status: 'gap',
-      },
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [120.742, 17.625],
-          [120.728, 17.621],
-          [120.725, 17.6015],
-        ],
-      },
-    },
-  ],
-};
 
 /**
  * MapView component using MapLibre GL JS with OpenFreeMap tiles.
@@ -351,25 +276,6 @@ export default function MapView({
           'line-color': '#3b82f6',
           'line-width': 5,
           'line-opacity': 0.85,
-        },
-      });
-
-      // Add Trail Corridors & Coverage Gaps Source (Research Objective 1)
-      map.addSource('trail-corridors', {
-        type: 'geojson',
-        data: LAGANGILANG_TRAIL_CORRIDORS,
-      });
-
-      // Surveyed road corridors (Solid Emerald)
-      map.addLayer({
-        id: 'trail-surveyed-layer',
-        type: 'line',
-        source: 'trail-corridors',
-        filter: ['==', ['get', 'status'], 'surveyed'],
-        paint: {
-          'line-color': '#06d6a0',
-          'line-width': 3.5,
-          'line-opacity': 0.8,
         },
       });
 
@@ -715,17 +621,7 @@ export default function MapView({
           }
         }
 
-        // 3. Check surveyed road corridor lines (connecting UA Campus to Main Road)
-        if (map.getLayer('trail-surveyed-layer')) {
-          const surveyedFeatures = map.queryRenderedFeatures(e.point, {
-            layers: ['trail-surveyed-layer']
-          });
 
-          if (surveyedFeatures.length > 0) {
-            onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, null, true);
-            return;
-          }
-        }
       } catch (err) {
         console.warn('Map feature query warning:', err);
       }
@@ -910,12 +806,7 @@ export default function MapView({
     map.on('mouseleave', 'mapillary-sequences', () => {
       map.getCanvas().style.cursor = '';
     });
-    map.on('mouseenter', 'trail-surveyed-layer', () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-    map.on('mouseleave', 'trail-surveyed-layer', () => {
-      map.getCanvas().style.cursor = '';
-    });
+
 
     // Hover cursor for user-aligned streetview lines
     map.on('mouseenter', 'aligned-streetview-layer', () => {
@@ -1130,19 +1021,7 @@ export default function MapView({
         });
       }
 
-      if (!mapRef.current.getSource('trail-corridors')) {
-        mapRef.current.addSource('trail-corridors', {
-          type: 'geojson',
-          data: LAGANGILANG_TRAIL_CORRIDORS,
-        });
-        mapRef.current.addLayer({
-          id: 'trail-surveyed-layer',
-          type: 'line',
-          source: 'trail-corridors',
-          filter: ['==', ['get', 'status'], 'surveyed'],
-          paint: { 'line-color': '#06d6a0', 'line-width': 3.5, 'line-opacity': 0.8 },
-        });
-      }
+
 
       if (!mapRef.current.getSource('aligned-streetview-source')) {
         mapRef.current.addSource('aligned-streetview-source', {
@@ -1451,16 +1330,7 @@ export default function MapView({
     }
   }, [activeTouristSpotId, touristSpots]);
 
-  // Toggle Coverage & Surveyed Trail Corridors visibility
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const visibility = showCoverageGaps ? 'visible' : 'none';
 
-    if (map.getLayer('trail-surveyed-layer')) {
-      map.setLayoutProperty('trail-surveyed-layer', 'visibility', visibility);
-    }
-  }, [showCoverageGaps]);
 
   // Toggle Custom OSM overlay visibility
   useEffect(() => {
