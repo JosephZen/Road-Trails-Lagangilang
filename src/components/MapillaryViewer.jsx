@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Viewer } from 'mapillary-js';
 import 'mapillary-js/dist/mapillary.css';
+import { isNearCampusJunction, UA_HIGHWAY_JUNCTION } from '../utils/streetViewJunctions';
 
 const MAPILLARY_ACCESS_TOKEN = 'MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9';
 const DEFAULT_IMAGE_ID = '1532761357806896'; // UA Campus Entrance Gate, Lagangilang
@@ -18,11 +19,13 @@ export default function MapillaryViewer({
   onPositionChange,
   onHeadingChange,
   steerTarget,
+  onSwitchToGoogle,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPos, setCurrentPos] = useState(null);
   const currentImageIdRef = useRef(null);
   const isNavigatingRef = useRef(false);
 
@@ -64,6 +67,7 @@ export default function MapillaryViewer({
             lng: image.lngLat?.lng,
             id: String(image.id),
           };
+          setCurrentPos(pos);
           onPositionChange?.(pos);
         }
       });
@@ -292,6 +296,54 @@ export default function MapillaryViewer({
               🏠 Reset to Gate
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Highway Junction Bridge: Transition to Abra-Kalinga Highway on Google Street View */}
+      {currentPos && isNearCampusJunction(currentPos.lat, currentPos.lng) && onSwitchToGoogle && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '14px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 30,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'rgba(15, 23, 42, 0.92)',
+            padding: '6px 14px',
+            borderRadius: 'var(--radius-full, 9999px)',
+            border: '1px solid #38bdf8',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(12px)',
+            animation: 'fadeInDown 0.3s ease-out',
+          }}
+        >
+          <span style={{ fontSize: '1rem' }}>🌐</span>
+          <span style={{ fontSize: '0.78rem', color: '#bae6fd', fontWeight: 600 }}>
+            Highway Connection:
+          </span>
+          <button
+            onClick={() => onSwitchToGoogle({ lat: UA_HIGHWAY_JUNCTION.lat, lng: UA_HIGHWAY_JUNCTION.lng })}
+            style={{
+              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: 'var(--radius-full, 9999px)',
+              padding: '4px 12px',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.4)',
+            }}
+          >
+            <span>Step Out to Highway (Google)</span>
+            <span>→</span>
+          </button>
         </div>
       )}
 

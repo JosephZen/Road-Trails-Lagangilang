@@ -59,8 +59,8 @@
     "categoryIcon": "⛪",
     "barangay": "Poblacion",
     "location": {
-      "lat": 17.608615,
-      "lng": 120.735147,
+      "lat": 17.608422,
+      "lng": 120.734823,
       "address": "Church Road, Barangay Poblacion, Lagangilang, Abra"
     },
     "description": "Historic Roman Catholic parish and spiritual sanctuary of Lagangilang, known for Spanish-colonial-inspired brick architecture and Holy Cross fiesta celebrations.",
@@ -74,8 +74,8 @@
       "pitch": 0
     },
     "sync_status": "synced_cloud",
-    "lat": 17.608615,
-    "lng": 120.735147
+    "lat": 17.608422,
+    "lng": 120.734823
   },
   {
     "id": "poi_talinawen_spring",

@@ -113,12 +113,40 @@ export default function MapView({
   isAdmin = false,
   isDraggable = false,
   viewerOpen = false,
+  trailOffset = { x: -9, y: 3 },
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
   const poiMarkersRef = useRef([]);
   const coneLayerAdded = useRef(false);
+
+  // Keep latest trail offset ref for click hit-testing
+  const trailOffsetRef = useRef(trailOffset);
+  useEffect(() => {
+    trailOffsetRef.current = trailOffset;
+  }, [trailOffset]);
+
+  // Dynamically update Mapillary layer translations when trail offset changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const x = trailOffset?.x ?? -9;
+    const y = trailOffset?.y ?? 3;
+    try {
+      if (map.getLayer('mapillary-sequences-casing')) {
+        map.setPaintProperty('mapillary-sequences-casing', 'line-translate', [x, y]);
+      }
+      if (map.getLayer('mapillary-sequences')) {
+        map.setPaintProperty('mapillary-sequences', 'line-translate', [x, y]);
+      }
+      if (map.getLayer('mapillary-images')) {
+        map.setPaintProperty('mapillary-images', 'circle-translate', [x, y]);
+      }
+    } catch {
+      // ignore
+    }
+  }, [trailOffset]);
 
   // Trigger map resize when viewer opens or closes to prevent blanking
   useEffect(() => {
@@ -241,6 +269,7 @@ export default function MapView({
           'line-color': '#064e3b',
           'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 5, 17, 8],
           'line-opacity': 0.7,
+          'line-translate': [trailOffset?.x ?? -9, trailOffset?.y ?? 3],
         },
       });
 
@@ -258,6 +287,7 @@ export default function MapView({
           'line-color': '#05cb63',
           'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3.5, 17, 5],
           'line-opacity': 0.95,
+          'line-translate': [trailOffset?.x ?? -9, trailOffset?.y ?? 3],
         },
       });
 
@@ -273,6 +303,7 @@ export default function MapView({
           'circle-stroke-width': 1.5,
           'circle-stroke-color': '#ffffff',
           'circle-opacity': 0.95,
+          'circle-translate': [trailOffset?.x ?? -9, trailOffset?.y ?? 3],
         },
         minzoom: 13,
       });
@@ -465,9 +496,14 @@ export default function MapView({
       }
 
       try {
-        // 1. Check if we clicked directly on a Mapillary image point
+        // 1. Check if we clicked directly on a Mapillary image point (accounting for trail offset)
         if (map.getLayer('mapillary-images')) {
-          const imageFeatures = map.queryRenderedFeatures(e.point, {
+          const ox = trailOffsetRef.current?.x || 0;
+          const oy = trailOffsetRef.current?.y || 0;
+          const imageFeatures = map.queryRenderedFeatures([
+            [e.point.x - 16 - ox, e.point.y - 16 - oy],
+            [e.point.x + 16 - ox, e.point.y + 16 - oy],
+          ], {
             layers: ['mapillary-images']
           });
 
@@ -482,15 +518,20 @@ export default function MapView({
 
         // 2. Check sequence lines (continuous green line)
         if (map.getLayer('mapillary-sequences')) {
-          const seqFeatures = map.queryRenderedFeatures(e.point, {
+          const ox = trailOffsetRef.current?.x || 0;
+          const oy = trailOffsetRef.current?.y || 0;
+          const seqFeatures = map.queryRenderedFeatures([
+            [e.point.x - 12 - ox, e.point.y - 12 - oy],
+            [e.point.x + 12 - ox, e.point.y + 12 - oy],
+          ], {
             layers: ['mapillary-sequences']
           });
 
           if (seqFeatures.length > 0) {
-            // Check if there is an image point near the click point (within 40px)
+            // Check if there is an image point near the click point (within 45px)
             const nearbyImageFeatures = map.queryRenderedFeatures([
-              [e.point.x - 40, e.point.y - 40],
-              [e.point.x + 40, e.point.y + 40],
+              [e.point.x - 45 - ox, e.point.y - 45 - oy],
+              [e.point.x + 45 - ox, e.point.y + 45 - oy],
             ], { layers: ['mapillary-images'] });
 
             const validId = nearbyImageFeatures.length > 0
@@ -708,6 +749,7 @@ export default function MapView({
             'line-color': '#064e3b',
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 5, 17, 8],
             'line-opacity': 0.7,
+            'line-translate': [trailOffsetRef.current?.x ?? -9, trailOffsetRef.current?.y ?? 3],
           },
         });
       }
@@ -723,6 +765,7 @@ export default function MapView({
             'line-color': '#05cb63',
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3.5, 17, 5],
             'line-opacity': 0.95,
+            'line-translate': [trailOffsetRef.current?.x ?? -9, trailOffsetRef.current?.y ?? 3],
           },
         });
       }
@@ -739,6 +782,7 @@ export default function MapView({
             'circle-stroke-width': 1.5,
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 0.95,
+            'circle-translate': [trailOffsetRef.current?.x ?? -9, trailOffsetRef.current?.y ?? 3],
           },
           minzoom: 13,
         });

@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PseudoImage from './PseudoImage';
 import { normalizeCategoryName } from '../services/touristSpotsService';
 
 /**
  * Floating Street View Card for Tourist Spots & POIs.
  * Features:
- * - Dynamic category icons (never hardcoded star)
+ * - Anchored neatly at the bottom-left of the street view UI
+ * - Collapsible / minimizable into a compact pill so the panoramic scene remains unobstructed
+ * - Dynamic category icons
  * - Interactive 360 orientation/navigation
+ * - 3-Way Engine Switching (Google Street View, Mapillary Campus Trail, Dedicated 360)
  * - Admin Edit & Delete buttons directly on the card
  * - Route Here button
  */
@@ -24,6 +27,8 @@ export default function TouristSpotStreetViewCard({
   onToggleViewerMode,
   hasDedicatedPano = false,
 }) {
+  const [isMinimized, setIsMinimized] = useState(false);
+
   if (!spot) return null;
 
   const isStaged = spot.sync_status === 'staged_local';
@@ -43,22 +48,114 @@ export default function TouristSpotStreetViewCard({
     }
   };
 
+  // Compact minimized view when street view is open
+  if (isViewerOpen && isMinimized) {
+    return (
+      <div
+        className="glass-panel tourist-streetview-card"
+        style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '16px',
+          maxWidth: '300px',
+          width: 'calc(100% - 32px)',
+          zIndex: 40,
+          padding: '8px 12px',
+          borderRadius: 'var(--radius-lg, 12px)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(16px)',
+          border: isPoi ? '1.5px solid rgba(6, 214, 160, 0.45)' : '1.5px solid rgba(255, 215, 0, 0.45)',
+          animation: 'fadeInUp 0.25s ease-out',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {spot.image ? (
+            <img
+              src={spot.image}
+              alt={spot.name}
+              style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+            />
+          ) : (
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '8px',
+                background: isPoi ? 'rgba(6, 214, 160, 0.2)' : 'rgba(255, 215, 0, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.2rem',
+                flexShrink: 0,
+              }}
+            >
+              {displayIcon}
+            </div>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {spot.name}
+            </div>
+            <div style={{ fontSize: '0.68rem', color: isPoi ? '#34d399' : '#ffd700' }}>
+              {displayIcon} {categoryName}
+            </div>
+          </div>
+          <button
+            onClick={() => setIsMinimized(false)}
+            style={{
+              background: 'rgba(255,255,255,0.12)',
+              border: 'none',
+              borderRadius: '6px',
+              color: '#ffffff',
+              padding: '4px 8px',
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+            title="Expand Landmark Card"
+          >
+            ▴ Details
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '26px',
+              height: '26px',
+              color: '#94a3b8',
+              cursor: 'pointer',
+            }}
+            title="Close"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="glass-panel tourist-streetview-card"
       style={{
         position: 'absolute',
-        top: '72px',
+        top: isViewerOpen ? 'auto' : '72px',
+        bottom: isViewerOpen ? '20px' : 'auto',
         left: '16px',
-        maxWidth: '350px',
+        maxWidth: isViewerOpen ? '320px' : '350px',
         width: 'calc(100% - 32px)',
-        zIndex: 'var(--z-controls)',
+        zIndex: 40,
+        maxHeight: isViewerOpen ? 'calc(100% - 40px)' : 'none',
+        overflowY: isViewerOpen ? 'auto' : 'visible',
         padding: '12px',
-        borderRadius: 'var(--radius-lg)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        borderRadius: 'var(--radius-lg, 12px)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
         backdropFilter: 'blur(16px)',
         border: isPoi ? '1.5px solid rgba(6, 214, 160, 0.45)' : '1.5px solid rgba(255, 215, 0, 0.45)',
         animation: 'fadeInUp 0.3s ease-out',
+        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {/* Top Header */}
@@ -159,22 +256,43 @@ export default function TouristSpotStreetViewCard({
           </p>
         </div>
 
-        <button
-          onClick={onClose}
-          className="btn btn-ghost"
-          style={{
-            padding: '4px',
-            minWidth: '26px',
-            height: '26px',
-            borderRadius: '50%',
-            fontSize: '0.9rem',
-            lineHeight: 1,
-            background: 'rgba(255, 255, 255, 0.08)',
-          }}
-          title="Close Card"
-        >
-          ✕
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {isViewerOpen && (
+            <button
+              onClick={() => setIsMinimized(true)}
+              className="btn btn-ghost"
+              style={{
+                padding: '4px',
+                minWidth: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                fontSize: '0.82rem',
+                lineHeight: 1,
+                background: 'rgba(255, 255, 255, 0.08)',
+              }}
+              title="Minimize to Corner Pill"
+            >
+              –
+            </button>
+          )}
+
+          <button
+            onClick={onClose}
+            className="btn btn-ghost"
+            style={{
+              padding: '4px',
+              minWidth: '26px',
+              height: '26px',
+              borderRadius: '50%',
+              fontSize: '0.9rem',
+              lineHeight: 1,
+              background: 'rgba(255, 255, 255, 0.08)',
+            }}
+            title="Close Card"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Image or Pseudo-Image Banner */}
@@ -257,8 +375,8 @@ export default function TouristSpotStreetViewCard({
         </p>
       </div>
 
-      {/* 360 Scene Mode Switcher (When Viewer is Open and Spot has Dedicated 360 Photo) */}
-      {isViewerOpen && hasDedicatedPano && (
+      {/* 360 Scene Engine Switcher (Google Street View, Mapillary Campus Trail, Dedicated 360) */}
+      {isViewerOpen && (
         <div
           style={{
             display: 'flex',
@@ -271,38 +389,11 @@ export default function TouristSpotStreetViewCard({
           }}
         >
           <button
-            onClick={() => onToggleViewerMode?.('dedicated')}
-            style={{
-              flex: 1,
-              padding: '6px 8px',
-              fontSize: '0.74rem',
-              fontWeight: 700,
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              background: viewerPanoMode === 'dedicated'
-                ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-                : 'transparent',
-              color: viewerPanoMode === 'dedicated' ? '#ffffff' : '#94a3b8',
-              boxShadow: viewerPanoMode === 'dedicated' ? '0 2px 8px rgba(59, 130, 246, 0.4)' : 'none',
-              transition: 'all var(--transition-fast)',
-            }}
-            title="View dedicated uploaded 360 panorama for this landmark"
-          >
-            <span>📷</span>
-            <span>Dedicated 360</span>
-          </button>
-
-          <button
             onClick={() => onToggleViewerMode?.('google')}
             style={{
               flex: 1,
-              padding: '6px 8px',
-              fontSize: '0.74rem',
+              padding: '6px 4px',
+              fontSize: '0.72rem',
               fontWeight: 700,
               borderRadius: 'var(--radius-sm)',
               border: 'none',
@@ -311,9 +402,10 @@ export default function TouristSpotStreetViewCard({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '4px',
-              background: viewerPanoMode === 'google'
-                ? 'linear-gradient(135deg, #05cb63 0%, #047857 100%)'
-                : 'transparent',
+              background:
+                viewerPanoMode === 'google'
+                  ? 'linear-gradient(135deg, #05cb63 0%, #047857 100%)'
+                  : 'transparent',
               color: viewerPanoMode === 'google' ? '#ffffff' : '#94a3b8',
               boxShadow: viewerPanoMode === 'google' ? '0 2px 8px rgba(5, 203, 99, 0.4)' : 'none',
               transition: 'all var(--transition-fast)',
@@ -321,8 +413,66 @@ export default function TouristSpotStreetViewCard({
             title="Switch to Google Street View at this location"
           >
             <span>🌐</span>
-            <span>Google Street View</span>
+            <span>Google</span>
           </button>
+
+          <button
+            onClick={() => onToggleViewerMode?.('mapillary')}
+            style={{
+              flex: 1,
+              padding: '6px 4px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              background:
+                viewerPanoMode === 'mapillary'
+                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                  : 'transparent',
+              color: viewerPanoMode === 'mapillary' ? '#ffffff' : '#94a3b8',
+              boxShadow: viewerPanoMode === 'mapillary' ? '0 2px 8px rgba(16, 185, 129, 0.4)' : 'none',
+              transition: 'all var(--transition-fast)',
+            }}
+            title="Switch to Mapillary sequence (Campus grounds & interior trails)"
+          >
+            <span>🚗</span>
+            <span>Mapillary</span>
+          </button>
+
+          {hasDedicatedPano && (
+            <button
+              onClick={() => onToggleViewerMode?.('dedicated')}
+              style={{
+                flex: 1,
+                padding: '6px 4px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                background:
+                  viewerPanoMode === 'dedicated'
+                    ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                    : 'transparent',
+                color: viewerPanoMode === 'dedicated' ? '#ffffff' : '#94a3b8',
+                boxShadow: viewerPanoMode === 'dedicated' ? '0 2px 8px rgba(59, 130, 246, 0.4)' : 'none',
+                transition: 'all var(--transition-fast)',
+              }}
+              title="View dedicated uploaded 360 panorama for this landmark"
+            >
+              <span>📷</span>
+              <span>Dedicated</span>
+            </button>
+          )}
         </div>
       )}
 

@@ -5,10 +5,17 @@ import PanoramaViewer from './components/PanoramaViewer';
 import GoogleStreetViewViewer from './components/GoogleStreetViewViewer';
 import TouristSpotModal, { LAGANGILANG_BARANGAYS } from './components/TouristSpotModal';
 import TouristSpotStreetViewCard from './components/TouristSpotStreetViewCard';
+import TrailAlignmentModal from './components/TrailAlignmentModal';
 import PseudoImage from './components/PseudoImage';
 import { touristSpotsService } from './services/touristSpotsService';
 import { useMapillary } from './hooks/useMapillary';
 import { formatCoords } from './utils/geoUtils';
+import {
+  isInsideUACampus,
+  isNearCampusJunction,
+  UA_CAMPUS_GATE,
+  MAPILLARY_CAMPUS_GATE_IMAGE_ID,
+} from './utils/streetViewJunctions';
 import RoutePlanner from './components/RoutePlanner';
 import NavigationView from './components/NavigationView';
 
@@ -77,10 +84,25 @@ export default function App() {
   const [mapillaryImageId, setMapillaryImageId] = useState(null);
   const [streetViewPos, setStreetViewPos] = useState(null);
   const [mapillaryImages, setMapillaryImages] = useState([]);
-  const [viewerPanoMode, setViewerPanoMode] = useState('dedicated'); // 'dedicated' | 'road'
+  const [viewerPanoMode, setViewerPanoMode] = useState('dedicated'); // 'dedicated' | 'google' | 'mapillary'
   const [localPanoramas, setLocalPanoramas] = useState([]);
   const [mapCenterPos, setMapCenterPos] = useState(null);
   const { searchNearby } = useMapillary();
+
+  // Trail alignment state (calibrates GPS drift on Mapillary vector tiles)
+  const [trailOffset, setTrailOffset] = useState(() => {
+    try {
+      const savedX = localStorage.getItem('lagangilang_mapillary_offset_x');
+      const savedY = localStorage.getItem('lagangilang_mapillary_offset_y');
+      return {
+        x: savedX !== null ? parseFloat(savedX) : -9,
+        y: savedY !== null ? parseFloat(savedY) : 3,
+      };
+    } catch {
+      return { x: -9, y: 3 };
+    }
+  });
+  const [showAlignmentModal, setShowAlignmentModal] = useState(false);
 
   // Map resize & layout mode ('split' = 50/50 half screen, 'fullscreen' = 100% viewer)
   const [mapWidth, setMapWidth] = useState(50); // percentage (default half screen)
@@ -249,8 +271,14 @@ export default function App() {
       if (isLocalPano) {
         setViewerPanoMode('dedicated');
         setStreetViewPos({ lat, lng, id: String(customPanoId || spot.id) });
+      } else if (isInsideUACampus(lat, lng) || isDedicatedPanoId) {
+        // Area inside UA Campus has no Google Street View vehicle coverage; default directly to Mapillary Campus Trail
+        setViewerPanoMode('mapillary');
+        const chosenId = String(customPanoId || MAPILLARY_CAMPUS_GATE_IMAGE_ID);
+        setMapillaryImageId(chosenId);
+        setStreetViewPos({ lat, lng, id: chosenId });
       } else {
-        // Default to Google Street View at the exact landmark location (no redirecting to distant Mapillary gates)
+        // Default to Google Street View for general road / highway locations
         setViewerPanoMode('google');
         setStreetViewPos({ lat, lng, id: String(customPanoId || spot.id) });
       }
@@ -391,6 +419,7 @@ export default function App() {
         setActiveTouristSpot(null);
         setMapillaryImageId(String(clickedMapillaryId));
         setStreetViewPos({ lat, lng, id: String(clickedMapillaryId) });
+        setViewerPanoMode('mapillary');
         setViewerOpen(true);
         return;
       }
@@ -403,6 +432,7 @@ export default function App() {
           setActiveTouristSpot(null);
           setMapillaryImageId(String(images[0].id));
           setStreetViewPos({ lat: images[0].lat, lng: images[0].lng, id: String(images[0].id) });
+          setViewerPanoMode('mapillary');
           setViewerOpen(true);
         }
       }
@@ -541,6 +571,29 @@ export default function App() {
             }}
           >
             🧭 Route
+          </button>
+
+          {/* Calibrate Mapillary Trail Alignment Button */}
+          <button
+            className={`btn btn-sm ${showAlignmentModal ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setShowAlignmentModal(true)}
+            title="Calibrate Mapillary sequence lines and dots directly onto road centerlines"
+            style={{
+              fontSize: '0.8rem',
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-full)',
+              background: showAlignmentModal
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : 'rgba(0,0,0,0.6)',
+              border: '1px solid rgba(52, 211, 153, 0.4)',
+              color: '#34d399',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>🎯 Align Trails</span>
           </button>
 
           <div className="controls-separator" />
@@ -741,6 +794,7 @@ export default function App() {
           pickingMode={pickingTarget}
           isAdmin={isAdmin}
           isDraggable={isAdmin && pinsDraggable}
+          trailOffset={trailOffset}
         />
 
         {/* Resize handle */}
@@ -1158,7 +1212,116 @@ export default function App() {
               />
             )}
 
-            {/* 360 Viewer: Dedicated Uploaded Panorama (Pannellum) or Google Street View */}
+            {/* Unified 3-Engine Switcher Bar (Google Street View, Mapillary Campus Trail, Dedicated 360) */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '14px',
+                left: '16px',
+                zIndex: 25,
+                display: 'flex',
+                gap: '4px',
+                padding: '4px',
+                background: 'rgba(15, 23, 42, 0.88)',
+                borderRadius: 'var(--radius-full, 9999px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(12px)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                maxWidth: 'calc(100% - 130px)',
+                overflowX: 'auto',
+              }}
+            >
+              <button
+                onClick={() => setViewerPanoMode('google')}
+                style={{
+                  padding: '5px 12px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-full, 9999px)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  background:
+                    viewerPanoMode === 'google'
+                      ? 'linear-gradient(135deg, #05cb63 0%, #047857 100%)'
+                      : 'transparent',
+                  color: viewerPanoMode === 'google' ? '#ffffff' : '#94a3b8',
+                  boxShadow: viewerPanoMode === 'google' ? '0 2px 8px rgba(5, 203, 99, 0.4)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+                title="View road-level Google Street View"
+              >
+                <span>🌐</span>
+                <span>Google Street View</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setViewerPanoMode('mapillary');
+                  if (!mapillaryImageId) setMapillaryImageId(MAPILLARY_CAMPUS_GATE_IMAGE_ID);
+                }}
+                style={{
+                  padding: '5px 12px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-full, 9999px)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  background:
+                    viewerPanoMode === 'mapillary'
+                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                      : 'transparent',
+                  color: viewerPanoMode === 'mapillary' ? '#ffffff' : '#94a3b8',
+                  boxShadow: viewerPanoMode === 'mapillary' ? '0 2px 8px rgba(16, 185, 129, 0.4)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+                title="View Mapillary sequence lines & UA campus trails"
+              >
+                <span>🚗</span>
+                <span>Mapillary Campus Trail</span>
+              </button>
+
+              {activeTouristSpot &&
+                (activeTouristSpot.connected360?.type === 'local' ||
+                  !!activeTouristSpot.connected360?.imageUrl ||
+                  String(activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || '').startsWith('pano_')) && (
+                  <button
+                    onClick={() => setViewerPanoMode('dedicated')}
+                    style={{
+                      padding: '5px 12px',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      borderRadius: 'var(--radius-full, 9999px)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      whiteSpace: 'nowrap',
+                      background:
+                        viewerPanoMode === 'dedicated'
+                          ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                          : 'transparent',
+                      color: viewerPanoMode === 'dedicated' ? '#ffffff' : '#94a3b8',
+                      boxShadow: viewerPanoMode === 'dedicated' ? '0 2px 8px rgba(59, 130, 246, 0.4)' : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="View dedicated uploaded 360 photo for this spot"
+                  >
+                    <span>📷</span>
+                    <span>Dedicated 360</span>
+                  </button>
+                )}
+            </div>
+
+            {/* 360 Viewer: Dedicated Uploaded Panorama (Pannellum), Mapillary or Google Street View */}
             {activeTouristSpot &&
             (activeTouristSpot.connected360?.type === 'local' ||
               !!activeTouristSpot.connected360?.imageUrl ||
@@ -1184,7 +1347,23 @@ export default function App() {
                 steerTarget={steerTarget}
                 onCloseViewer={handleCloseViewer}
               />
-            ) : viewerPanoMode === 'google' || !mapillaryImageId ? (
+            ) : viewerPanoMode === 'mapillary' ? (
+              <MapillaryViewer
+                imageId={mapillaryImageId || MAPILLARY_CAMPUS_GATE_IMAGE_ID}
+                onPositionChange={(pos) => {
+                  setMapillaryImageId(pos.id);
+                  setStreetViewPos(pos);
+                }}
+                onHeadingChange={setViewerHeading}
+                steerTarget={steerTarget}
+                onSwitchToGoogle={(opts) => {
+                  setViewerPanoMode('google');
+                  if (opts?.lat && opts?.lng) {
+                    setStreetViewPos({ lat: opts.lat, lng: opts.lng });
+                  }
+                }}
+              />
+            ) : (
               <GoogleStreetViewViewer
                 lat={activeTouristSpot?.location?.lat ?? activeTouristSpot?.lat ?? streetViewPos?.lat ?? 17.612749}
                 lng={activeTouristSpot?.location?.lng ?? activeTouristSpot?.lng ?? streetViewPos?.lng ?? 120.733755}
@@ -1192,16 +1371,14 @@ export default function App() {
                 pitch={activeTouristSpot?.connected360?.pitch || 0}
                 title={activeTouristSpot?.name || 'Lagangilang, Abra'}
                 onClose={handleCloseViewer}
-              />
-            ) : (
-              <MapillaryViewer
-                imageId={mapillaryImageId || '1532761357806896'}
-                onPositionChange={(pos) => {
-                  setMapillaryImageId(pos.id);
-                  setStreetViewPos(pos);
+                hasDedicatedCard={!!activeTouristSpot}
+                onSwitchToMapillary={(opts) => {
+                  setViewerPanoMode('mapillary');
+                  if (opts?.imageId) setMapillaryImageId(opts.imageId);
+                  if (opts?.lat && opts?.lng) {
+                    setStreetViewPos({ lat: opts.lat, lng: opts.lng, id: opts.imageId });
+                  }
                 }}
-                onHeadingChange={setViewerHeading}
-                steerTarget={steerTarget}
               />
             )}
 
@@ -1218,7 +1395,7 @@ export default function App() {
                     ? 'Dedicated 360 Landmark'
                     : viewerPanoMode === 'google'
                     ? 'Google Street View'
-                    : 'Mapillary Street View'}
+                    : 'Mapillary Campus Trail'}
                 </div>
                 <div style={{ fontSize: '0.65rem', opacity: 0.75, whiteSpace: 'nowrap' }}>
                   Lagangilang, Abra
@@ -1380,6 +1557,18 @@ export default function App() {
           setEditingSpot(null);
         }}
         editingSpot={editingSpot}
+      />
+
+      {/* ===== Mapillary Trail Alignment & Calibration Modal ===== */}
+      <TrailAlignmentModal
+        isOpen={showAlignmentModal}
+        onClose={() => setShowAlignmentModal(false)}
+        currentOffset={trailOffset}
+        onOffsetChange={(newOffset) => setTrailOffset(newOffset)}
+        onSave={(savedOffset) => {
+          setTrailOffset(savedOffset);
+          showToast(`🎯 Trail alignment calibrated: [${savedOffset.x}px, ${savedOffset.y}px]`);
+        }}
       />
 
       {/* ===== Floating Toast Notification ===== */}
