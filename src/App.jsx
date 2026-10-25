@@ -64,8 +64,10 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const toastTimeoutRef = useRef(null);
 
-  // Mapillary raw green dots visibility toggle
+  // Mapillary raw streetview visibility toggles (Green sequence lines and dots)
+  const [showMapillaryStreetview, setShowMapillaryStreetview] = useState(true);
   const [showMapillaryDots, setShowMapillaryDots] = useState(true);
+  const [showMapillaryLines, setShowMapillaryLines] = useState(true);
 
   const showToast = useCallback((msg, duration = 3500) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -760,13 +762,19 @@ export default function App() {
             📐 {aligningSequence ? 'Exit Align' : isSelectingAlignmentTarget ? 'Cancel Select' : 'Align Line'}
           </button>
 
-          {/* Toggle Mapillary Green Dots */}
+          {/* Toggle Mapillary Streetview (Green lines & dots) */}
           <button
-            className={`btn ${showMapillaryDots ? 'btn-secondary' : 'btn-ghost'}`}
+            className={`btn ${showMapillaryStreetview ? 'btn-secondary' : 'btn-ghost'}`}
             onClick={() => {
-              const next = !showMapillaryDots;
+              const next = !showMapillaryStreetview;
+              setShowMapillaryStreetview(next);
               setShowMapillaryDots(next);
-              showToast(next ? '🟢 Mapillary green dots visible' : '⚪ Mapillary green dots hidden (cyan line remains visible)');
+              setShowMapillaryLines(next);
+              showToast(
+                next
+                  ? '🟢 Mapillary streetview (lines & dots) visible'
+                  : '⚪ Mapillary streetview hidden (cyan line remains visible)'
+              );
             }}
             style={{
               fontSize: '0.8rem',
@@ -776,9 +784,13 @@ export default function App() {
               alignItems: 'center',
               gap: '4px',
             }}
-            title={showMapillaryDots ? 'Hide raw Mapillary green dots' : 'Show Mapillary green dots'}
+            title={
+              showMapillaryStreetview
+                ? 'Hide raw Mapillary streetview (green lines & dots)'
+                : 'Show raw Mapillary streetview (green lines & dots)'
+            }
           >
-            {showMapillaryDots ? '🟢 Dots: ON' : '⚪ Dots: OFF'}
+            {showMapillaryStreetview ? '🟢 Streetview: ON' : '⚪ Streetview: OFF'}
           </button>
 
 
@@ -974,8 +986,19 @@ export default function App() {
             onResetOriginal={handleResetAlignmentOriginal}
             onCancel={() => setAligningSequence(null)}
             isSaving={isSavingAlignment}
-            showMapillaryDots={showMapillaryDots}
+            showMapillaryStreetview={showMapillaryStreetview}
+            showMapillaryStreetview={showMapillaryStreetview}
+          showMapillaryDots={showMapillaryDots}
+          showMapillaryLines={showMapillaryLines}
+            showMapillaryLines={showMapillaryLines}
+            onToggleStreetview={() => {
+              const next = !showMapillaryStreetview;
+              setShowMapillaryStreetview(next);
+              setShowMapillaryDots(next);
+              setShowMapillaryLines(next);
+            }}
             onToggleDots={() => setShowMapillaryDots(!showMapillaryDots)}
+            onToggleLines={() => setShowMapillaryLines(!showMapillaryLines)}
           />
         )}
 
@@ -1011,7 +1034,9 @@ export default function App() {
           alignedGeoJSON={alignedGeoJSON}
           isSelectingAlignmentTarget={isSelectingAlignmentTarget}
           onSelectSequenceForAlignment={handleSelectSequenceForAlignment}
+          showMapillaryStreetview={showMapillaryStreetview}
           showMapillaryDots={showMapillaryDots}
+          showMapillaryLines={showMapillaryLines}
         />
 
         {/* Resize handle */}

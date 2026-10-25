@@ -119,7 +119,9 @@ export default function MapView({
   alignedGeoJSON = null,
   isSelectingAlignmentTarget = false,
   onSelectSequenceForAlignment,
+  showMapillaryStreetview = true,
   showMapillaryDots = true,
+  showMapillaryLines = true,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -1534,16 +1536,23 @@ export default function MapView({
     };
   }, [routeOrigin, routeDestination]);
 
-  // Toggle Mapillary Green Dots visibility
+  // Toggle Mapillary Streetview layers (Green sequence lines and image dots)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const visibility = showMapillaryDots ? 'visible' : 'none';
+    const dotsVisibility = (showMapillaryStreetview && showMapillaryDots) ? 'visible' : 'none';
+    const linesVisibility = (showMapillaryStreetview && showMapillaryLines) ? 'visible' : 'none';
 
     if (map.getLayer('mapillary-images')) {
-      map.setLayoutProperty('mapillary-images', 'visibility', visibility);
+      map.setLayoutProperty('mapillary-images', 'visibility', dotsVisibility);
     }
-  }, [showMapillaryDots]);
+    if (map.getLayer('mapillary-sequences')) {
+      map.setLayoutProperty('mapillary-sequences', 'visibility', linesVisibility);
+    }
+    if (map.getLayer('mapillary-sequences-casing')) {
+      map.setLayoutProperty('mapillary-sequences-casing', 'visibility', linesVisibility);
+    }
+  }, [showMapillaryStreetview, showMapillaryDots, showMapillaryLines]);
 
   // Update Aligned Streetview Lines GeoJSON source
   useEffect(() => {

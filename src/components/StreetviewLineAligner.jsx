@@ -10,8 +10,12 @@ export default function StreetviewLineAligner({
   onResetOriginal,
   onCancel,
   isSaving = false,
+  showMapillaryStreetview = true,
   showMapillaryDots = true,
+  showMapillaryLines = true,
+  onToggleStreetview,
   onToggleDots,
+  onToggleLines,
 }) {
   if (!aligningSequence) return null;
 
@@ -51,13 +55,35 @@ export default function StreetviewLineAligner({
           {isSaving ? '⏳ Saving...' : '💾 Save Alignment'}
         </button>
 
-        {onToggleDots && (
+        {onToggleStreetview && (
           <button
-            className={`btn-secondary aligner-btn-dots ${!showMapillaryDots ? 'dots-hidden' : ''}`}
-            onClick={onToggleDots}
-            title={showMapillaryDots ? 'Hide raw green dots to see only road and cyan line' : 'Show green dots'}
+            className={`btn-secondary aligner-btn-dots ${!showMapillaryStreetview ? 'dots-hidden' : ''}`}
+            onClick={onToggleStreetview}
+            title={showMapillaryStreetview ? 'Hide raw Mapillary green lines & dots to focus on road & cyan curve' : 'Show Mapillary streetview overlay'}
           >
-            {showMapillaryDots ? '🟢 Hide Dots' : '⚪ Show Dots'}
+            {showMapillaryStreetview ? '🟢 Hide Streetview' : '⚪ Show Streetview'}
+          </button>
+        )}
+
+        {onToggleLines && showMapillaryStreetview && (
+          <button
+            className={`btn-ghost aligner-btn-sub ${!showMapillaryLines ? 'sub-hidden' : ''}`}
+            onClick={onToggleLines}
+            title={showMapillaryLines ? 'Hide green lines' : 'Show green lines'}
+            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+          >
+            {showMapillaryLines ? 'Lines: ON' : 'Lines: OFF'}
+          </button>
+        )}
+
+        {onToggleDots && showMapillaryStreetview && (
+          <button
+            className={`btn-ghost aligner-btn-sub ${!showMapillaryDots ? 'sub-hidden' : ''}`}
+            onClick={onToggleDots}
+            title={showMapillaryDots ? 'Hide green dots' : 'Show green dots'}
+            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+          >
+            {showMapillaryDots ? 'Dots: ON' : 'Dots: OFF'}
           </button>
         )}
 
