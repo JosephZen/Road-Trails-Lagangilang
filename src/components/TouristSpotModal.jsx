@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import PseudoImage from './PseudoImage';
-import { touristSpotsService } from '../services/touristSpotsService';
+import {
+  touristSpotsService,
+  normalizeCategoryName,
+  getDefaultCategoryIcon,
+} from '../services/touristSpotsService';
 import { useMapillary } from '../hooks/useMapillary';
 
 export const TOURIST_CATEGORIES = [
@@ -23,6 +27,19 @@ export const POI_CATEGORIES = [
   { name: 'Bank & ATM', icon: '🏧' },
   { name: 'Transport Terminal', icon: '🚌' },
   { name: 'Government & Emergency Services', icon: '🏛️' },
+];
+
+export const PRESET_ICONS = [
+  // Spiritual & Heritage
+  '⛪', '🏛️', '⛰️', '🎓', '🕌', '🏰',
+  // Nature & Trail
+  '🏞️', '🌊', '💧', '🪨', '🦇', '🌳', '🌄', '🌉', '🧗',
+  // Agriculture & Products
+  '🌾', '🐟', '🍫', '🌴', '🌻',
+  // Services & POI
+  '⛽', '🏪', '🍽️', '🍲', '☕', '🏨', '💊', '🏧', '🚌', '🏥', '🚨', '🛒',
+  // Markers & Highlights
+  '⭐', '📍', '✨', '🎯'
 ];
 
 export const LAGANGILANG_BARANGAYS = [
@@ -90,13 +107,17 @@ export default function TouristSpotModal({
 
       const categoryList = isPoi ? POI_CATEGORIES : TOURIST_CATEGORIES;
       const defaultCat = categoryList[0].name;
-      const currentCategory = editingSpot.category || defaultCat;
+      // Normalize category so raw DB strings like 'cat_religious' match human dropdown options
+      const currentCategory = normalizeCategoryName(editingSpot.category || defaultCat);
       const matched = categoryList.find((c) => c.name === currentCategory);
+      const defaultIcon = matched?.icon || getDefaultCategoryIcon(currentCategory, currentType);
 
       setFormData({
         name: editingSpot.name || '',
         category: currentCategory,
-        categoryIcon: editingSpot.categoryIcon || matched?.icon || (isPoi ? '📍' : '⭐'),
+        categoryIcon: editingSpot.categoryIcon && editingSpot.categoryIcon !== '⭐'
+          ? editingSpot.categoryIcon
+          : defaultIcon,
         barangay: editingSpot.barangay || BARANGAYS[0],
         lat: String(editingSpot.location?.lat || editingSpot.lat || '17.6167'),
         lng: String(editingSpot.location?.lng || editingSpot.lng || '120.7333'),
@@ -333,7 +354,7 @@ export default function TouristSpotModal({
 
         <form onSubmit={handleSaveToSystem}>
           {/* Name & Icon Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px', marginBottom: '8px' }}>
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                 {spotType === 'tourist_spot' ? 'Attraction Name *' : 'Facility / Business Name *'}
@@ -358,8 +379,55 @@ export default function TouristSpotModal({
                 onChange={handleChange}
                 className="input-field"
                 style={{ width: '60px', marginTop: '4px', textAlign: 'center', fontSize: '1.2rem' }}
-                title="Marker emoji icon"
+                title="Marker emoji icon (pick below or type custom)"
               />
+            </div>
+          </div>
+
+          {/* Quick Select Icon Palette Grid */}
+          <div
+            style={{
+              marginBottom: '12px',
+              padding: '8px 10px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(0, 0, 0, 0.25)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                ⚡ Quick Select Icon (or type above):
+              </span>
+              <span style={{ fontSize: '0.72rem', color: '#ffd700' }}>
+                Active: <strong style={{ fontSize: '0.95rem' }}>{formData.categoryIcon || '⭐'}</strong>
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+              {PRESET_ICONS.map((icon) => (
+                <button
+                  key={icon}
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, categoryIcon: icon }))}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    border: formData.categoryIcon === icon ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.12)',
+                    background: formData.categoryIcon === icon ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                    fontSize: '1.15rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s ease',
+                    boxShadow: formData.categoryIcon === icon ? '0 0 8px rgba(255, 215, 0, 0.4)' : 'none',
+                    transform: formData.categoryIcon === icon ? 'scale(1.08)' : 'scale(1)',
+                  }}
+                  title={`Select ${icon}`}
+                >
+                  {icon}
+                </button>
+              ))}
             </div>
           </div>
 

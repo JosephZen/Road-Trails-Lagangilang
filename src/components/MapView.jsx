@@ -4,6 +4,7 @@ import { setWorkerUrl } from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { calculateBearing } from '../utils/geoUtils';
+import { normalizeCategoryName, getDefaultCategoryIcon } from '../services/touristSpotsService';
 
 setWorkerUrl(maplibreWorkerUrl);
 
@@ -927,7 +928,8 @@ export default function MapView({
       if (lat === undefined || lng === undefined) return;
 
       const isPoi = spot.spotType === 'poi' || spot.type === 'poi';
-      const icon = spot.categoryIcon || (isPoi ? '📍' : '⭐');
+      const cleanCategory = normalizeCategoryName(spot.category);
+      const icon = spot.categoryIcon || getDefaultCategoryIcon(cleanCategory, spot.spotType) || (isPoi ? '📍' : '⭐');
 
       const el = document.createElement('div');
       el.className = `poi-marker ${isPoi ? 'poi-service' : 'poi-attraction'} ${
@@ -942,7 +944,7 @@ export default function MapView({
             <span class="poi-marker-icon">${icon}</span>
           </div>
           <div class="poi-marker-label">${spot.name}</div>
-          <div class="poi-marker-tooltip">${spot.category || ''}</div>
+          <div class="poi-marker-tooltip">${cleanCategory}</div>
         </div>
       `;
 

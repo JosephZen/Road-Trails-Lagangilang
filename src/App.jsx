@@ -846,52 +846,54 @@ export default function App() {
                         onClick={() => handleSelectTouristSpot(spot)}
                         style={{ flexDirection: 'column', alignItems: 'stretch' }}
                       >
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          {spot.isPseudoImage ? (
-                            <PseudoImage
-                              title={spot.name}
-                              category={spot.category}
-                              theme={spot.pseudoTheme || (isPoi ? 'cyan' : 'indigo')}
-                              height="60px"
-                              width="60px"
-                              style={{ borderRadius: 'var(--radius-sm)', flexShrink: 0 }}
-                            />
-                          ) : spot.image ? (
-                            <img
-                              src={spot.image}
-                              alt={spot.name}
-                              className="pano-thumb"
-                              style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-sm)' }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: '60px',
-                                height: '60px',
-                                borderRadius: 'var(--radius-sm)',
-                                background: isPoi ? 'rgba(6, 214, 160, 0.2)' : 'rgba(255, 215, 0, 0.2)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '1.5rem',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {spot.categoryIcon || (isPoi ? '🏪' : '⭐')}
-                            </div>
-                          )}
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                          <div style={{ width: '60px', height: '60px', minWidth: '60px', maxWidth: '60px', flexShrink: 0 }}>
+                            {spot.isPseudoImage ? (
+                              <PseudoImage
+                                title={spot.name}
+                                category={spot.category}
+                                categoryIcon={spot.categoryIcon}
+                                theme={spot.pseudoTheme || (isPoi ? 'cyan' : 'indigo')}
+                                height="60px"
+                                width="60px"
+                                style={{ borderRadius: 'var(--radius-sm)' }}
+                              />
+                            ) : spot.image ? (
+                              <img
+                                src={spot.image}
+                                alt={spot.name}
+                                className="pano-thumb"
+                                style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '60px',
+                                  height: '60px',
+                                  borderRadius: 'var(--radius-sm)',
+                                  background: isPoi ? 'rgba(6, 214, 160, 0.2)' : 'rgba(255, 215, 0, 0.2)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '1.5rem',
+                                }}
+                              >
+                                {spot.categoryIcon || (isPoi ? '🏪' : '⭐')}
+                              </div>
+                            )}
+                          </div>
 
-                          <div className="pano-info" style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <h4 style={{ fontSize: '0.85rem', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div className="pano-info" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <h4 style={{ fontSize: '0.88rem', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {spot.name}
                               </h4>
                               {spot.sync_status === 'staged_local' && (
-                                <span style={{ fontSize: '0.65rem', color: '#fbbf24', marginLeft: '4px' }}>🟡 Draft</span>
+                                <span style={{ fontSize: '0.65rem', color: '#fbbf24', marginLeft: '4px', flexShrink: 0 }}>🟡 Draft</span>
                               )}
                             </div>
-                            <p style={{ fontSize: '0.72rem', color: 'var(--accent-glow)', margin: '0 0 2px 0' }}>
-                              {spot.categoryIcon || '⭐'} {spot.category} • Brgy. {spot.barangay}
+                            <p style={{ fontSize: '0.72rem', color: isPoi ? '#34d399' : '#ffd700', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {spot.categoryIcon || (isPoi ? '🏪' : '⭐')} {spot.category} • Brgy. {spot.barangay}
                             </p>
                             <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {spot.location?.address}
@@ -1049,6 +1051,26 @@ export default function App() {
               onSwapPoints={handleSwapPoints}
             />
           )}
+
+          {/* Floating Tourist Spot Card on Map (when 360 viewer is closed) */}
+          {!viewerOpen && activeTouristSpot && (
+            <TouristSpotStreetViewCard
+              spot={activeTouristSpot}
+              onClose={() => setActiveTouristSpot(null)}
+              onNavigateTo360={handleSelectTouristSpot}
+              onSteerHeading={handleSteerHeading}
+              isViewerOpen={false}
+              isAdmin={isAdmin}
+              onEdit={(s) => {
+                setEditingSpot(s);
+                setShowSpotModal(true);
+              }}
+              onDelete={(id) => {
+                handleDeleteSpot(id);
+              }}
+              onRoute={handleRouteToSpot}
+            />
+          )}
         </div>
       </div>
 
@@ -1067,6 +1089,15 @@ export default function App() {
                 onNavigateTo360={handleSelectTouristSpot}
                 onSteerHeading={handleSteerHeading}
                 isViewerOpen={viewerOpen}
+                isAdmin={isAdmin}
+                onEdit={(s) => {
+                  setEditingSpot(s);
+                  setShowSpotModal(true);
+                }}
+                onDelete={(id) => {
+                  handleDeleteSpot(id);
+                }}
+                onRoute={handleRouteToSpot}
               />
             )}
 

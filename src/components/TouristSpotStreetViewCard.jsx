@@ -1,9 +1,14 @@
 import React from 'react';
 import PseudoImage from './PseudoImage';
+import { normalizeCategoryName } from '../services/touristSpotsService';
 
 /**
- * Floating Street View Card for Tourist Spots.
- * Features an interactive description that triggers 360° orientation/navigation.
+ * Floating Street View Card for Tourist Spots & POIs.
+ * Features:
+ * - Dynamic category icons (never hardcoded star)
+ * - Interactive 360 orientation/navigation
+ * - Admin Edit & Delete buttons directly on the card
+ * - Route Here button
  */
 export default function TouristSpotStreetViewCard({
   spot,
@@ -11,11 +16,18 @@ export default function TouristSpotStreetViewCard({
   onNavigateTo360,
   onSteerHeading,
   isViewerOpen = true,
+  isAdmin = false,
+  onEdit,
+  onDelete,
+  onRoute,
 }) {
   if (!spot) return null;
 
   const isStaged = spot.sync_status === 'staged_local';
   const isVerified = spot.sync_status === 'verified';
+  const isPoi = (spot.spotType || spot.type) === 'poi';
+  const categoryName = normalizeCategoryName(spot.category);
+  const displayIcon = spot.categoryIcon || (isPoi ? '🏪' : '⭐');
 
   const handleDescriptionClick = () => {
     // 1. If we have a steer heading handler, rotate the 360 camera toward the landmark
@@ -35,14 +47,14 @@ export default function TouristSpotStreetViewCard({
         position: 'absolute',
         top: '72px',
         left: '16px',
-        maxWidth: '340px',
+        maxWidth: '350px',
         width: 'calc(100% - 32px)',
         zIndex: 'var(--z-controls)',
         padding: '12px',
         borderRadius: 'var(--radius-lg)',
-        boxShadow: 'var(--shadow-lg)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
         backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255, 215, 0, 0.4)',
+        border: isPoi ? '1.5px solid rgba(6, 214, 160, 0.45)' : '1.5px solid rgba(255, 215, 0, 0.45)',
         animation: 'fadeInUp 0.3s ease-out',
       }}
     >
@@ -56,21 +68,25 @@ export default function TouristSpotStreetViewCard({
           gap: '8px',
         }}
       >
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
             <span
               style={{
-                fontSize: '0.65rem',
+                fontSize: '0.68rem',
                 fontWeight: 700,
                 textTransform: 'uppercase',
-                padding: '2px 6px',
+                padding: '2px 8px',
                 borderRadius: '4px',
-                background: 'rgba(255, 215, 0, 0.2)',
-                color: '#ffd700',
-                border: '1px solid rgba(255, 215, 0, 0.4)',
+                background: isPoi ? 'rgba(6, 214, 160, 0.2)' : 'rgba(255, 215, 0, 0.2)',
+                color: isPoi ? '#34d399' : '#ffd700',
+                border: isPoi ? '1px solid rgba(6, 214, 160, 0.4)' : '1px solid rgba(255, 215, 0, 0.4)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
               }}
             >
-              ⭐ POI • {spot.category || 'Attraction'}
+              <span>{displayIcon}</span>
+              <span>{categoryName}</span>
             </span>
 
             {isStaged ? (
@@ -120,18 +136,18 @@ export default function TouristSpotStreetViewCard({
 
           <h3
             style={{
-              fontSize: '1rem',
+              fontSize: '1.05rem',
               fontWeight: 700,
               color: '#ffffff',
               margin: '0 0 2px 0',
-              lineHeight: 1.3,
+              lineHeight: 1.25,
             }}
           >
             {spot.name}
           </h3>
           <p
             style={{
-              fontSize: '0.75rem',
+              fontSize: '0.74rem',
               color: 'var(--text-secondary)',
               margin: 0,
             }}
@@ -145,13 +161,14 @@ export default function TouristSpotStreetViewCard({
           className="btn btn-ghost"
           style={{
             padding: '4px',
-            minWidth: '24px',
-            height: '24px',
+            minWidth: '26px',
+            height: '26px',
             borderRadius: '50%',
-            fontSize: '0.85rem',
+            fontSize: '0.9rem',
             lineHeight: 1,
+            background: 'rgba(255, 255, 255, 0.08)',
           }}
-          title="Close Tourist Spot Card"
+          title="Close Card"
         >
           ✕
         </button>
@@ -168,8 +185,9 @@ export default function TouristSpotStreetViewCard({
         ) : (
           <PseudoImage
             title={spot.name}
-            category={spot.category}
-            theme={spot.pseudoTheme || 'indigo'}
+            category={categoryName}
+            categoryIcon={displayIcon}
+            theme={spot.pseudoTheme || (isPoi ? 'cyan' : 'indigo')}
             height="115px"
           />
         )}
@@ -184,18 +202,18 @@ export default function TouristSpotStreetViewCard({
           padding: '8px 10px',
           background: 'rgba(255, 255, 255, 0.06)',
           borderRadius: 'var(--radius-sm)',
-          border: '1px dashed rgba(255, 215, 0, 0.5)',
+          border: isPoi ? '1px dashed rgba(6, 214, 160, 0.5)' : '1px dashed rgba(255, 215, 0, 0.5)',
           transition: 'all var(--transition-fast)',
           position: 'relative',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(255, 215, 0, 0.12)';
-          e.currentTarget.style.borderColor = '#ffd700';
+          e.currentTarget.style.background = isPoi ? 'rgba(6, 214, 160, 0.12)' : 'rgba(255, 215, 0, 0.12)';
+          e.currentTarget.style.borderColor = isPoi ? '#06d6a0' : '#ffd700';
           e.currentTarget.style.transform = 'translateY(-1px)';
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-          e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.5)';
+          e.currentTarget.style.borderColor = isPoi ? 'rgba(6, 214, 160, 0.5)' : 'rgba(255, 215, 0, 0.5)';
           e.currentTarget.style.transform = 'none';
         }}
       >
@@ -211,7 +229,7 @@ export default function TouristSpotStreetViewCard({
             style={{
               fontSize: '0.68rem',
               fontWeight: 700,
-              color: '#ffd700',
+              color: isPoi ? '#34d399' : '#ffd700',
               display: 'flex',
               alignItems: 'center',
               gap: '4px',
@@ -236,7 +254,7 @@ export default function TouristSpotStreetViewCard({
         </p>
       </div>
 
-      {/* Action Navigation Footer */}
+      {/* Main Actions Row */}
       <div
         style={{
           display: 'flex',
@@ -251,14 +269,32 @@ export default function TouristSpotStreetViewCard({
             flex: 1,
             padding: '6px 10px',
             fontSize: '0.78rem',
-            background: 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
-            color: '#1a1a2e',
+            background: isPoi
+              ? 'linear-gradient(135deg, #06d6a0 0%, #0284c7 100%)'
+              : 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
+            color: isPoi ? '#ffffff' : '#1a1a2e',
             fontWeight: 700,
             border: 'none',
-            boxShadow: '0 2px 10px rgba(255, 215, 0, 0.3)',
+            boxShadow: isPoi ? '0 2px 10px rgba(6, 214, 160, 0.3)' : '0 2px 10px rgba(255, 215, 0, 0.3)',
           }}
         >
           🌐 View in 360°
+        </button>
+
+        <button
+          onClick={() => onRoute?.(spot)}
+          className="btn btn-secondary"
+          style={{
+            padding: '6px 10px',
+            fontSize: '0.78rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+          title="Plan route to this destination"
+        >
+          <span>🧭</span>
+          <span>Route</span>
         </button>
 
         {spot.connected360?.heading !== undefined && onSteerHeading && (
@@ -273,10 +309,69 @@ export default function TouristSpotStreetViewCard({
             }}
             title="Rotate camera to face this spot"
           >
-            👁️ Aim Camera
+            👁️ Aim
           </button>
         )}
       </div>
+
+      {/* Admin Action Bar (Edit & Delete on card click) */}
+      {isAdmin && (
+        <div
+          style={{
+            display: 'flex',
+            gap: '6px',
+            marginTop: '10px',
+            paddingTop: '8px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+          }}
+        >
+          <button
+            onClick={() => onEdit?.(spot)}
+            className="btn btn-ghost"
+            style={{
+              flex: 1,
+              padding: '5px 8px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              background: 'rgba(59, 130, 246, 0.15)',
+              color: '#93c5fd',
+              border: '1px solid rgba(147, 197, 253, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              borderRadius: 'var(--radius-sm)',
+            }}
+            title="Edit this location details in modal"
+          >
+            <span>✎</span>
+            <span>Edit Location</span>
+          </button>
+
+          <button
+            onClick={() => onDelete?.(spot.id)}
+            className="btn btn-ghost"
+            style={{
+              flex: 1,
+              padding: '5px 8px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              background: 'rgba(239, 68, 68, 0.15)',
+              color: '#f87171',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              borderRadius: 'var(--radius-sm)',
+            }}
+            title="Delete this location from system"
+          >
+            <span>🗑️</span>
+            <span>Delete</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

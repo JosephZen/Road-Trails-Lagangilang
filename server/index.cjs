@@ -265,6 +265,58 @@ app.get('/api/health/postgres', async (req, res) => {
   });
 });
 
+const CATEGORY_MAP = {
+  'nature & eco-tourism': 'cat_nature',
+  'historical & cultural heritage': 'cat_heritage',
+  'scenic viewpoint & overlook': 'cat_viewpoint',
+  'adventure & trekking trail': 'cat_adventure',
+  'agri-tourism & cultural handicrafts': 'cat_agri',
+  'civic & public park': 'cat_civic',
+  'religious & spiritual site': 'cat_religious',
+  'gas station & fuel': 'cat_gas',
+  'restaurant & dining': 'cat_dining',
+  'local eatery & carinderia': 'cat_eatery',
+  'hotel & accommodation': 'cat_hotel',
+  'convenience store & market': 'cat_store',
+  'pharmacy & health clinic': 'cat_pharmacy',
+  'bank & atm': 'cat_bank',
+  'transport terminal': 'cat_transport',
+  'government & emergency services': 'cat_emergency',
+};
+
+const HUMAN_CATEGORY_MAP = {
+  cat_nature: 'Nature & Eco-Tourism',
+  cat_heritage: 'Historical & Cultural Heritage',
+  cat_viewpoint: 'Scenic Viewpoint & Overlook',
+  cat_adventure: 'Adventure & Trekking Trail',
+  cat_agri: 'Agri-Tourism & Cultural Handicrafts',
+  cat_civic: 'Civic & Public Park',
+  cat_religious: 'Religious & Spiritual Site',
+  cat_gas: 'Gas Station & Fuel',
+  cat_dining: 'Restaurant & Dining',
+  cat_eatery: 'Local Eatery & Carinderia',
+  cat_hotel: 'Hotel & Accommodation',
+  cat_store: 'Convenience Store & Market',
+  cat_pharmacy: 'Pharmacy & Health Clinic',
+  cat_bank: 'Bank & ATM',
+  cat_transport: 'Transport Terminal',
+  cat_emergency: 'Government & Emergency Services',
+};
+
+function normalizeServerCategoryId(cat) {
+  if (!cat) return 'cat_heritage';
+  const lower = String(cat).toLowerCase().trim();
+  if (lower.startsWith('cat_')) return lower;
+  return CATEGORY_MAP[lower] || 'cat_heritage';
+}
+
+function normalizeServerCategoryName(catId) {
+  if (!catId) return 'General Attraction';
+  const lower = String(catId).toLowerCase().trim();
+  if (HUMAN_CATEGORY_MAP[lower]) return HUMAN_CATEGORY_MAP[lower];
+  return catId;
+}
+
 /**
  * GET /api/tourist-spots - List all tourist spots
  * Reads from Local PostgreSQL if connected; falls back to tourist_spots.json.
@@ -278,7 +330,7 @@ app.get('/api/tourist-spots', async (req, res) => {
       const spots = result.rows.map((row) => ({
         id: row.id,
         name: row.name,
-        category: row.category_id || 'General',
+        category: normalizeServerCategoryName(row.category_id),
         barangay: row.barangay,
         location: {
           lat: parseFloat(row.latitude),
@@ -321,18 +373,20 @@ app.post('/api/tourist-spots', async (req, res) => {
   const id = spot.id || `poi_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
   const lat = parseFloat(spot.location.lat);
   const lng = parseFloat(spot.location.lng);
+  const categoryId = normalizeServerCategoryId(spot.category);
 
   if (isPgConnected && pgPool) {
     try {
       await pgPool.query(
         `INSERT INTO public.tourist_spots (
-          id, name, barangay, latitude, longitude, address,
+          id, name, category_id, barangay, latitude, longitude, address,
           description, image_url, is_pseudo_image, pseudo_theme,
           primary_pano_id, target_heading, target_pitch, sync_status,
           staged_at, synced_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
         ON CONFLICT (id) DO UPDATE SET
           name = EXCLUDED.name,
+          category_id = EXCLUDED.category_id,
           barangay = EXCLUDED.barangay,
           latitude = EXCLUDED.latitude,
           longitude = EXCLUDED.longitude,
@@ -350,6 +404,7 @@ app.post('/api/tourist-spots', async (req, res) => {
         [
           id,
           spot.name,
+          categoryId,
           spot.barangay || 'Poblacion',
           lat,
           lng,
@@ -375,13 +430,14 @@ app.post('/api/tourist-spots', async (req, res) => {
     try {
       await neonPool.query(
         `INSERT INTO public.tourist_spots (
-          id, name, barangay, latitude, longitude, address,
+          id, name, category_id, barangay, latitude, longitude, address,
           description, image_url, is_pseudo_image, pseudo_theme,
           primary_pano_id, target_heading, target_pitch, sync_status,
           staged_at, synced_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'synced_cloud', NOW(), NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'synced_cloud', NOW(), NOW(), NOW())
         ON CONFLICT (id) DO UPDATE SET
           name = EXCLUDED.name,
+          category_id = EXCLUDED.category_id,
           barangay = EXCLUDED.barangay,
           latitude = EXCLUDED.latitude,
           longitude = EXCLUDED.longitude,
@@ -399,6 +455,7 @@ app.post('/api/tourist-spots', async (req, res) => {
         [
           id,
           spot.name,
+          categoryId,
           spot.barangay || 'Poblacion',
           lat,
           lng,

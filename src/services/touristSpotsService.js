@@ -24,6 +24,82 @@ const OBSOLETE_SPOT_IDS = new Set([
   'poi_abra_river_poblacion',
 ]);
 
+// Official categories with clean display names and default icons
+export const CATEGORY_DEFINITIONS = {
+  cat_religious: { id: 'cat_religious', name: 'Religious & Spiritual Site', icon: '⛪' },
+  cat_nature: { id: 'cat_nature', name: 'Nature & Eco-Tourism', icon: '🏞️' },
+  cat_heritage: { id: 'cat_heritage', name: 'Historical & Cultural Heritage', icon: '🏛️' },
+  cat_adventure: { id: 'cat_adventure', name: 'Adventure & Trekking Trail', icon: '🌉' },
+  cat_agri: { id: 'cat_agri', name: 'Agri-Tourism & Cultural Handicrafts', icon: '🌾' },
+  cat_civic: { id: 'cat_civic', name: 'Civic & Public Park', icon: '🌳' },
+  cat_viewpoint: { id: 'cat_viewpoint', name: 'Scenic Viewpoint & Overlook', icon: '🌄' },
+  // POI & Services
+  cat_gas: { id: 'cat_gas', name: 'Gas Station & Fuel', icon: '⛽' },
+  cat_dining: { id: 'cat_dining', name: 'Restaurant & Dining', icon: '🍽️' },
+  cat_eatery: { id: 'cat_eatery', name: 'Local Eatery & Carinderia', icon: '🍲' },
+  cat_hotel: { id: 'cat_hotel', name: 'Hotel & Accommodation', icon: '🏨' },
+  cat_store: { id: 'cat_store', name: 'Convenience Store & Market', icon: '🏪' },
+  cat_pharmacy: { id: 'cat_pharmacy', name: 'Pharmacy & Health Clinic', icon: '💊' },
+  cat_bank: { id: 'cat_bank', name: 'Bank & ATM', icon: '🏧' },
+  cat_transport: { id: 'cat_transport', name: 'Transport Terminal', icon: '🚌' },
+  cat_emergency: { id: 'cat_emergency', name: 'Government & Emergency Services', icon: '🏛️' },
+};
+
+/**
+ * Convert database category ID or messy string into clean human-readable name
+ */
+export function normalizeCategoryName(rawCategory) {
+  if (!rawCategory) return 'General Attraction';
+  const lower = String(rawCategory).toLowerCase().trim();
+  if (CATEGORY_DEFINITIONS[lower]) {
+    return CATEGORY_DEFINITIONS[lower].name;
+  }
+  for (const def of Object.values(CATEGORY_DEFINITIONS)) {
+    if (def.name.toLowerCase() === lower || def.id.toLowerCase() === lower) {
+      return def.name;
+    }
+  }
+  // If it's already a clean string like "Gas Station & Fuel", keep it
+  return rawCategory;
+}
+
+/**
+ * Convert clean human category name into database category ID
+ */
+export function normalizeCategoryId(categoryName) {
+  if (!categoryName) return 'cat_heritage';
+  const lower = String(categoryName).toLowerCase().trim();
+  for (const def of Object.values(CATEGORY_DEFINITIONS)) {
+    if (def.name.toLowerCase() === lower || def.id.toLowerCase() === lower) {
+      return def.id;
+    }
+  }
+  return 'cat_heritage';
+}
+
+/**
+ * Get standard icon for a category
+ */
+export function getDefaultCategoryIcon(category, spotType = 'tourist_spot') {
+  if (!category) return spotType === 'poi' ? '🏪' : '⭐';
+  const lower = String(category).toLowerCase().trim();
+  for (const def of Object.values(CATEGORY_DEFINITIONS)) {
+    if (def.name.toLowerCase() === lower || def.id.toLowerCase() === lower) {
+      return def.icon;
+    }
+  }
+  if (lower.includes('gas') || lower.includes('fuel')) return '⛽';
+  if (lower.includes('restaurant') || lower.includes('dining')) return '🍽️';
+  if (lower.includes('eatery') || lower.includes('carinderia')) return '🍲';
+  if (lower.includes('hotel') || lower.includes('accommodation')) return '🏨';
+  if (lower.includes('convenience') || lower.includes('store') || lower.includes('market')) return '🏪';
+  if (lower.includes('pharmacy') || lower.includes('clinic') || lower.includes('health')) return '💊';
+  if (lower.includes('bank') || lower.includes('atm')) return '🏧';
+  if (lower.includes('terminal') || lower.includes('transport')) return '🚌';
+  if (lower.includes('emergency') || lower.includes('police')) return '🏛️';
+  return spotType === 'poi' ? '🏪' : '⭐';
+}
+
 /**
  * Check if a spot is obsolete or deprecated
  */
@@ -211,8 +287,36 @@ export const touristSpotsService = {
           }
         }
 
-        // Normalize legacy typos (e.g. Bawa -> Pawa)
+        // Normalize legacy typos, categories, and icons
         cleaned.forEach((s) => {
+          const seedMatch = Array.isArray(seedSpots) ? seedSpots.find((seed) => seed.id === s.id) : null;
+          if (seedMatch) {
+            // Restore proper category & categoryIcon from official seed (e.g. Holy Cross Parish is always ⛪)
+            if (!s.categoryIcon || s.categoryIcon === '⭐' || s.categoryIcon === '🏪' || s.id === 'poi_holy_cross_parish') {
+              s.categoryIcon = seedMatch.categoryIcon;
+              changed = true;
+            }
+            if (s.category?.startsWith('cat_') || !s.category || s.id === 'poi_holy_cross_parish') {
+              s.category = seedMatch.category;
+              changed = true;
+            }
+            if (!s.spotType) {
+              s.spotType = seedMatch.spotType || 'tourist_spot';
+              changed = true;
+            }
+          } else {
+            // Normalize custom spots
+            const normalized = normalizeCategoryName(s.category);
+            if (s.category !== normalized) {
+              s.category = normalized;
+              changed = true;
+            }
+            if (!s.categoryIcon) {
+              s.categoryIcon = getDefaultCategoryIcon(s.category, s.spotType);
+              changed = true;
+            }
+          }
+
           if (s.barangay === 'Bawa') {
             s.barangay = 'Pawa';
             if (s.location?.address) s.location.address = s.location.address.replace('Bawa', 'Pawa');
@@ -359,15 +463,29 @@ export const touristSpotsService = {
         for (const spot of targets) {
           const lat = spot.location?.lat ?? spot.lat;
           const lng = spot.location?.lng ?? spot.lng;
+          const categoryId = normalizeCategoryId(spot.category);
+          const categoryName = normalizeCategoryName(spot.category);
+          const icon = spot.categoryIcon || getDefaultCategoryIcon(categoryName, spot.spotType);
+
+          // Ensure parent category exists in Neon public.categories to avoid foreign key errors
+          try {
+            await sql`
+              INSERT INTO public.categories (id, name, icon)
+              VALUES (${categoryId}, ${categoryName}, ${icon})
+              ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon = EXCLUDED.icon;
+            `;
+          } catch (_) {}
+
           await sql`
             INSERT INTO public.tourist_spots (
-              id, name, barangay, latitude, longitude, address,
+              id, name, category_id, barangay, latitude, longitude, address,
               description, image_url, is_pseudo_image, pseudo_theme,
               primary_pano_id, target_heading, target_pitch, sync_status,
               staged_at, synced_at, updated_at
             ) VALUES (
               ${spot.id},
               ${spot.name},
+              ${categoryId},
               ${spot.barangay || 'Poblacion'},
               ${lat},
               ${lng},
@@ -386,6 +504,7 @@ export const touristSpotsService = {
             )
             ON CONFLICT (id) DO UPDATE SET
               name = EXCLUDED.name,
+              category_id = EXCLUDED.category_id,
               barangay = EXCLUDED.barangay,
               latitude = EXCLUDED.latitude,
               longitude = EXCLUDED.longitude,
@@ -522,33 +641,42 @@ export const touristSpotsService = {
         const deletedIds = this.getDeletedSpotIds();
         const cloudSpots = rows
           .filter((r) => !deletedIds.has(r.id) && !isObsoleteSpot(r))
-          .map((r) => ({
-            id: r.id,
-            name: r.name,
-            category: r.category_id || 'General Attraction',
-            barangay: r.barangay,
-            location: {
+          .map((r) => {
+            const seedMatch = Array.isArray(seedSpots) ? seedSpots.find((seed) => seed.id === r.id) : null;
+            const categoryName = normalizeCategoryName(seedMatch?.category || r.category_id);
+            const categoryIcon = seedMatch?.categoryIcon || getDefaultCategoryIcon(categoryName, r.id.startsWith('poi_') ? 'tourist_spot' : 'poi');
+            const spotType = seedMatch?.spotType || (r.id.startsWith('poi_ua_') || r.id.startsWith('poi_holy_') || r.id.startsWith('poi_ugiao') || r.id.startsWith('poi_quirsodan') || r.id.startsWith('poi_talinawen') || r.id.startsWith('poi_galangugong') || r.id.startsWith('poi_banat') || r.id.startsWith('poi_dj_') || r.id.startsWith('poi_rizalista') ? 'tourist_spot' : 'poi');
+
+            return {
+              id: r.id,
+              name: r.name,
+              category: categoryName,
+              categoryIcon: categoryIcon,
+              spotType: spotType,
+              barangay: r.barangay,
+              location: {
+                lat: parseFloat(r.latitude),
+                lng: parseFloat(r.longitude),
+                address: r.address || `${r.name}, Lagangilang, Abra`,
+              },
               lat: parseFloat(r.latitude),
               lng: parseFloat(r.longitude),
-              address: r.address || `${r.name}, Lagangilang, Abra`,
-            },
-            lat: parseFloat(r.latitude),
-            lng: parseFloat(r.longitude),
-            description: r.description || '',
-            image: r.image_url || null,
-            isPseudoImage: r.is_pseudo_image ?? !r.image_url,
-            pseudoTheme: r.pseudo_theme || 'indigo',
-            connected360: {
-              type: 'mapillary',
-              targetId: r.primary_pano_id || null,
-              heading: parseFloat(r.target_heading) || 0,
-              pitch: parseFloat(r.target_pitch) || 0,
-            },
-            sync_status: 'synced_cloud',
-            staged_at: r.staged_at,
-            synced_at: r.synced_at,
-            updated_at: r.updated_at,
-          }));
+              description: r.description || '',
+              image: r.image_url || null,
+              isPseudoImage: r.is_pseudo_image ?? !r.image_url,
+              pseudoTheme: r.pseudo_theme || 'indigo',
+              connected360: {
+                type: 'mapillary',
+                targetId: r.primary_pano_id || null,
+                heading: parseFloat(r.target_heading) || 0,
+                pitch: parseFloat(r.target_pitch) || 0,
+              },
+              sync_status: 'synced_cloud',
+              staged_at: r.staged_at,
+              synced_at: r.synced_at,
+              updated_at: r.updated_at,
+            };
+          });
 
         const local = this.getAllSpots().filter((s) => !isObsoleteSpot(s));
         const localMap = new Map(local.map((s) => [s.id, s]));
@@ -570,7 +698,12 @@ export const touristSpotsService = {
                 sql`UPDATE public.tourist_spots SET latitude = ${lat}, longitude = ${lng}, updated_at = NOW() WHERE id = ${cs.id}`
               ).catch(() => {});
             } else {
-              finalSpots.push(cs);
+              // Ensure custom properties like categoryIcon & spotType are preserved
+              finalSpots.push({
+                ...cs,
+                categoryIcon: localSpot.categoryIcon || cs.categoryIcon,
+                spotType: localSpot.spotType || cs.spotType,
+              });
             }
           } else {
             finalSpots.push(cs);

@@ -1,4 +1,5 @@
 import React from 'react';
+import { normalizeCategoryName } from '../services/touristSpotsService';
 
 const THEMES = {
   indigo: {
@@ -54,23 +55,64 @@ const THEMES = {
 /**
  * PseudoImage Component
  * Generates an SVG pseudo-image card for tourist spots without uploaded photography.
+ * Supports both full banner mode and compact list thumbnail mode.
  */
 export default function PseudoImage({
   title = 'Tourist Attraction',
   category = 'Point of Interest',
+  categoryIcon = null,
   theme = 'indigo',
   className = '',
   height = '140px',
+  width = '100%',
+  style = {},
   showWatermark = true,
 }) {
   const t = THEMES[theme] || THEMES.indigo;
+  const activeIcon = categoryIcon || t.icon;
+  const cleanCategory = normalizeCategoryName(category);
 
+  // Detect compact thumbnail mode (e.g. 60px x 60px in sidebar list)
+  const numericWidth = typeof width === 'number' ? width : parseInt(String(width), 10);
+  const isThumbnail = !isNaN(numericWidth) && numericWidth <= 80;
+
+  if (isThumbnail) {
+    return (
+      <div
+        className={`pseudo-image-thumbnail ${className}`}
+        style={{
+          width: width || '60px',
+          height: height || '60px',
+          minWidth: width || '60px',
+          minHeight: height || '60px',
+          maxWidth: width || '60px',
+          maxHeight: height || '60px',
+          flexShrink: 0,
+          borderRadius: 'var(--radius-sm)',
+          overflow: 'hidden',
+          background: `linear-gradient(135deg, ${t.from} 0%, ${t.to} 100%)`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '1.6rem',
+          boxShadow: 'inset 0 0 10px rgba(0,0,0,0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          ...style,
+        }}
+        title={`${title} • ${cleanCategory}`}
+      >
+        <span style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' }}>{activeIcon}</span>
+      </div>
+    );
+  }
+
+  // Full Banner Mode
   return (
     <div
       className={`pseudo-image-container ${className}`}
       style={{
         position: 'relative',
-        width: '100%',
+        width: width || '100%',
         height: height,
         borderRadius: 'var(--radius-md)',
         overflow: 'hidden',
@@ -80,6 +122,7 @@ export default function PseudoImage({
         justifyContent: 'space-between',
         padding: '12px',
         boxShadow: 'inset 0 0 20px rgba(0,0,0,0.3)',
+        ...style,
       }}
     >
       {/* Background SVG Motif */}
@@ -118,7 +161,7 @@ export default function PseudoImage({
             border: `1px solid rgba(255,255,255,0.15)`,
           }}
         >
-          {category}
+          {cleanCategory}
         </span>
         <span
           style={{
@@ -126,7 +169,7 @@ export default function PseudoImage({
             filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
           }}
         >
-          {t.icon}
+          {activeIcon}
         </span>
       </div>
 
