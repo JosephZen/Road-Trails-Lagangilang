@@ -646,28 +646,26 @@ export default function App() {
                 <span>{isOnline ? 'Online' : 'Offline'}</span>
               </div>
 
-              {/* Staged Drafts */}
-              {stagedCount > 0 && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setSidebarTab('staging');
-                    setSidebarOpen(true);
-                  }}
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '4px 10px',
-                    borderRadius: 'var(--radius-full)',
-                    border: '1px solid #f59e0b',
-                    color: '#fbbf24',
-                    background: 'rgba(245, 158, 11, 0.2)',
-                    animation: 'pulse 2s infinite',
-                  }}
-                  title="Locally staged drafts pending verification/sync"
-                >
-                  🟡 {stagedCount} Staged
-                </button>
-              )}
+              {/* Staged Drafts Indicator & Queue Opener (Always accessible for Admin) */}
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setSidebarTab('staging');
+                  setSidebarOpen(true);
+                }}
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '4px 10px',
+                  borderRadius: 'var(--radius-full)',
+                  border: stagedCount > 0 ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.2)',
+                  color: stagedCount > 0 ? '#fbbf24' : '#e2e8f0',
+                  background: stagedCount > 0 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(0,0,0,0.5)',
+                  animation: stagedCount > 0 ? 'pulse 2s infinite' : 'none',
+                }}
+                title={stagedCount > 0 ? `${stagedCount} locally staged draft(s) pending sync` : 'Open Staging Queue'}
+              >
+                🟡 {stagedCount > 0 ? `${stagedCount} Staged` : 'Staging'}
+              </button>
             </>
           )}
 
@@ -763,7 +761,7 @@ export default function App() {
               >
                 ⭐ Spots ({touristSpots.length})
               </button>
-              {isAdmin && stagedCount > 0 && (
+              {isAdmin && (
                 <button
                   onClick={() => setSidebarTab('staging')}
                   style={{
@@ -777,7 +775,7 @@ export default function App() {
                     cursor: 'pointer',
                   }}
                 >
-                  🟡 Staged ({stagedCount})
+                  🟡 Staging {stagedCount > 0 ? `(${stagedCount})` : ''}
                 </button>
               )}
               <button
@@ -1294,7 +1292,11 @@ export default function App() {
           setEditingSpot(null);
         }}
         onSpotSaved={(saved) => {
-          showToast(`✅ "${saved.name}" successfully saved!`);
+          showToast(`✅ "${saved.name}" added to Staging Queue!`);
+          setSpotFilter('all');
+          setBarangayFilter('all');
+          setSidebarTab('staging');
+          setSidebarOpen(true);
           loadTouristSpots();
           handleSelectTouristSpot(saved);
         }}

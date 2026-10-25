@@ -494,66 +494,6 @@ export const touristSpotsService = {
       body: JSON.stringify(newSpot),
     }).catch((err) => console.warn('Background mirror to server omitted:', err));
 
-    // Asynchronously mirror directly to Neon Cloud Database
-    this.executeNeonQuery(async (sql) => {
-      const categoryId = normalizeCategoryId(newSpot.category);
-      const categoryName = normalizeCategoryName(newSpot.category);
-      const icon = newSpot.categoryIcon || getDefaultCategoryIcon(categoryName, newSpot.spotType);
-
-      try {
-        await sql`
-          INSERT INTO public.categories (id, name, icon)
-          VALUES (${categoryId}, ${categoryName}, ${icon})
-          ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon = EXCLUDED.icon;
-        `;
-      } catch (_) {}
-
-      await sql`
-        INSERT INTO public.tourist_spots (
-          id, name, category_id, barangay, latitude, longitude, address,
-          description, image_url, is_pseudo_image, pseudo_theme,
-          primary_pano_id, target_heading, target_pitch, sync_status,
-          staged_at, synced_at, updated_at
-        ) VALUES (
-          ${newSpot.id},
-          ${newSpot.name},
-          ${categoryId},
-          ${newSpot.barangay || 'Poblacion'},
-          ${lat},
-          ${lng},
-          ${newSpot.location?.address || `${newSpot.name}, Lagangilang, Abra`},
-          ${newSpot.description || ''},
-          ${cleanImage || null},
-          ${newSpot.isPseudoImage ?? true},
-          ${newSpot.pseudoTheme || 'indigo'},
-          ${newSpot.connected360?.targetId || null},
-          ${newSpot.connected360?.heading || 0},
-          ${newSpot.connected360?.pitch || 0},
-          'synced_cloud',
-          NOW(),
-          NOW(),
-          NOW()
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          name = EXCLUDED.name,
-          category_id = EXCLUDED.category_id,
-          barangay = EXCLUDED.barangay,
-          latitude = EXCLUDED.latitude,
-          longitude = EXCLUDED.longitude,
-          address = EXCLUDED.address,
-          description = EXCLUDED.description,
-          image_url = EXCLUDED.image_url,
-          is_pseudo_image = EXCLUDED.is_pseudo_image,
-          pseudo_theme = EXCLUDED.pseudo_theme,
-          primary_pano_id = EXCLUDED.primary_pano_id,
-          target_heading = EXCLUDED.target_heading,
-          target_pitch = EXCLUDED.target_pitch,
-          sync_status = 'synced_cloud',
-          synced_at = NOW(),
-          updated_at = NOW();
-      `;
-    }).catch((neonErr) => console.warn('Direct Neon background sync omitted (offline/buffered):', neonErr.message));
-
     return newSpot;
   },
 

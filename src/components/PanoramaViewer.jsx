@@ -98,6 +98,7 @@ export default function PanoramaViewer({
     const viewer = window.pannellum.viewer(containerRef.current, {
       type: 'equirectangular',
       panorama: imageUrl,
+      crossOrigin: 'anonymous',
       autoLoad: true,
       showControls: false,
       showZoomCtrl: false,
@@ -116,6 +117,11 @@ export default function PanoramaViewer({
       hotSpotDebug: false,
     });
 
+    // Safety watchdog: ensure loading screen dismisses even on slower connections
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 5000);
+
     // Track heading changes
     viewer.on('mouseup', () => {
       const yaw = viewer.getYaw();
@@ -130,11 +136,13 @@ export default function PanoramaViewer({
     });
 
     viewer.on('load', () => {
+      clearTimeout(timer);
       setIsLoading(false);
     });
 
     viewer.on('error', (err) => {
-      console.error('Pannellum error:', err);
+      clearTimeout(timer);
+      console.warn('Pannellum viewer load error:', err);
       setIsLoading(false);
     });
 

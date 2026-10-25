@@ -88,8 +88,12 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Serve panorama images statically
-app.use('/panoramas', express.static(PANORAMAS_DIR));
+// Serve panorama images statically with explicit CORS and WebGL texture headers
+app.use('/panoramas', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(PANORAMAS_DIR));
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -611,6 +615,23 @@ app.post('/api/panoramas', upload.single('panorama'), async (req, res) => {
 
     console.log(`\n📷 Uploading panorama: ${filename}`);
     console.log(`  📍 Location: ${lat}, ${lng}`);
+
+    // Optimize full 360 panorama for WebGL (max 4096x2048) if raw image is oversized
+    try {
+      const sharp = require('sharp');
+      const meta = await sharp(req.file.path).metadata();
+      if (meta.width > 4096 || meta.height > 2048) {
+        const tmpOpt = req.file.path + '.opt.jpg';
+        await sharp(req.file.path)
+          .resize(4096, 2048, { fit: 'inside' })
+          .jpeg({ quality: 90 })
+          .toFile(tmpOpt);
+        fs.renameSync(tmpOpt, req.file.path);
+        console.log(`  ✓ Optimized 360 panorama for WebGL: 4096x2048`);
+      }
+    } catch (optErr) {
+      console.warn('  ⚠ Could not optimize panorama resolution:', optErr.message);
+    }
 
     // Generate thumbnail
     const thumbFilename = await generateThumbnail(req.file.path, panoId);

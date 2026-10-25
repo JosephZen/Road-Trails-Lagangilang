@@ -216,26 +216,59 @@ export default function TouristSpotModal({
 
   // Dedicated 360 Panorama File Upload handler
   const handlePanoFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
 
-    // 1. Instant local preview
-    const reader = new FileReader();
-    reader.onload = (uploadEvt) => {
-      const dataUrl = uploadEvt.target.result;
-      setFormData((prev) => ({
-        ...prev,
-        uploadedPanoUrl: dataUrl,
-        connectedPanoType: 'local',
-        connectedPanoId: prev.connectedPanoId || `pano_${Date.now()}`,
-      }));
+    setDetectingMapillary(true);
+    const defaultPanoId = `pano_${Date.now()}`;
+
+    // Helper: Optimize equirectangular image to WebGL-safe resolution (max 4096x2048)
+    const optimizeForWebGL = (file) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        const objUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(objUrl);
+          const maxW = 4096;
+          const maxH = 2048;
+          if (img.width <= maxW && img.height <= maxH) {
+            resolve({ file, previewUrl: objUrl });
+            return;
+          }
+          const canvas = document.createElement('canvas');
+          const scale = Math.min(maxW / img.width, maxH / img.height);
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            const optimizedFile = new File([blob], file.name, { type: 'image/jpeg' });
+            resolve({ file: optimizedFile, previewUrl: canvas.toDataURL('image/jpeg', 0.88) });
+          }, 'image/jpeg', 0.90);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objUrl);
+          resolve({ file, previewUrl: null });
+        };
+        img.src = objUrl;
+      });
     };
-    reader.readAsDataURL(file);
 
-    // 2. Upload to backend if server is active
     try {
+      const { file: uploadFile, previewUrl } = await optimizeForWebGL(rawFile);
+
+      if (previewUrl) {
+        setFormData((prev) => ({
+          ...prev,
+          uploadedPanoUrl: previewUrl,
+          connectedPanoType: 'local',
+          connectedPanoId: prev.connectedPanoId || defaultPanoId,
+        }));
+      }
+
+      // Upload to backend if server is active
       const uploadData = new FormData();
-      uploadData.append('panorama', file);
+      uploadData.append('panorama', uploadFile);
       uploadData.append('lat', formData.lat);
       uploadData.append('lng', formData.lng);
       uploadData.append('heading', formData.heading || '0');
@@ -253,12 +286,14 @@ export default function TouristSpotModal({
           ...prev,
           connectedPanoId: result.id,
           connectedPanoType: 'local',
-          uploadedPanoUrl: `${API_BASE}/panoramas/${result.filename}`,
-          image: prev.image || `${API_BASE}/panoramas/${result.filename}`,
+          uploadedPanoUrl: `/panoramas/${result.filename}`,
+          image: `/panoramas/thumbnails/${result.id}_thumb.jpg`,
         }));
       }
     } catch (err) {
       console.warn('Backend panorama upload omitted (running client-side / offline mode):', err);
+    } finally {
+      setDetectingMapillary(false);
     }
   };
 
@@ -393,10 +428,16 @@ export default function TouristSpotModal({
       },
     };
 
-    const saved = touristSpotsService.saveDraftLocally(spotPayload, []);
-    setSaving(false);
-    onSpotSaved?.(saved);
-    onClose();
+    try {
+      const saved = touristSpotsService.saveDraftLocally(spotPayload, []);
+      setSaving(false);
+      onSpotSaved?.(saved);
+      onClose();
+    } catch (saveErr) {
+      setSaving(false);
+      console.error('Failed to save spot:', saveErr);
+      alert(`Could not save location: ${saveErr.message}`);
+    }
   };
 
   // Delete directly in system
