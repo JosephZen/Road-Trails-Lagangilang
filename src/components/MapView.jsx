@@ -647,12 +647,12 @@ export default function MapView({
         data: LAGANGILANG_TRAIL_CORRIDORS,
       });
 
-      // Surveyed road corridors Casing (Dark contrast outline)
+      // Surveyed road corridors Casing (Dark contrast outline for off-road trails)
       map.addLayer({
         id: 'trail-surveyed-casing',
         type: 'line',
         source: 'trail-corridors',
-        filter: ['==', ['get', 'status'], 'surveyed'],
+        filter: ['==', ['get', 'status'], 'surveyed_offroad'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': '#064e3b',
@@ -661,12 +661,12 @@ export default function MapView({
         },
       });
 
-      // Surveyed road corridors (Solid Emerald)
+      // Surveyed corridors (Solid Emerald for off-road trails)
       map.addLayer({
         id: 'trail-surveyed-layer',
         type: 'line',
         source: 'trail-corridors',
-        filter: ['==', ['get', 'status'], 'surveyed'],
+        filter: ['==', ['get', 'status'], 'surveyed_offroad'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': '#05cb63',
@@ -688,7 +688,21 @@ export default function MapView({
             data: geojson,
           });
 
-          // Custom roads by type
+          // Custom roads outer casing (dark amber outline for all roads)
+          mapRef.current.addLayer({
+            id: 'custom-roads-casing',
+            type: 'line',
+            source: 'custom-osm',
+            filter: ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'tertiary', 'residential', 'service', 'unclassified', 'living_street']]],
+            paint: {
+              'line-color': '#9a3412',
+              'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3.5, 14, 6, 17, 9],
+              'line-opacity': 0.85,
+            },
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+          });
+
+          // Custom primary / secondary / tertiary roads (Golden Amber)
           mapRef.current.addLayer({
             id: 'custom-roads-primary',
             type: 'line',
@@ -696,25 +710,27 @@ export default function MapView({
             filter: ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'tertiary']]],
             paint: {
               'line-color': '#f59e0b',
-              'line-width': 3,
-              'line-opacity': 0.8,
+              'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 14, 4.5, 17, 7],
+              'line-opacity': 0.95,
             },
             layout: { 'line-cap': 'round', 'line-join': 'round' },
           });
 
+          // Custom residential, service, campus access roads (Vibrant Orange road surface)
           mapRef.current.addLayer({
             id: 'custom-roads-residential',
             type: 'line',
             source: 'custom-osm',
-            filter: ['==', ['get', 'highway'], 'residential'],
+            filter: ['in', ['get', 'highway'], ['literal', ['residential', 'service', 'unclassified', 'living_street']]],
             paint: {
               'line-color': '#fb923c',
-              'line-width': 2,
-              'line-opacity': 0.7,
+              'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.8, 14, 3.5, 17, 6],
+              'line-opacity': 0.95,
             },
             layout: { 'line-cap': 'round', 'line-join': 'round' },
           });
 
+          // Custom walking paths & footways (Dashed brown)
           mapRef.current.addLayer({
             id: 'custom-roads-paths',
             type: 'line',
@@ -1272,7 +1288,7 @@ export default function MapView({
           id: 'trail-surveyed-layer',
           type: 'line',
           source: 'trail-corridors',
-          filter: ['==', ['get', 'status'], 'surveyed'],
+          filter: ['==', ['get', 'status'], 'surveyed_offroad'],
           paint: { 'line-color': '#06d6a0', 'line-width': 3.5, 'line-opacity': 0.8 },
         });
       }
@@ -1285,15 +1301,33 @@ export default function MapView({
           if (!mapRef.current.getSource('custom-osm')) {
             mapRef.current.addSource('custom-osm', { type: 'geojson', data: geojson });
             mapRef.current.addLayer({
+              id: 'custom-roads-casing', type: 'line', source: 'custom-osm',
+              filter: ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'tertiary', 'residential', 'service', 'unclassified', 'living_street']]],
+              paint: {
+                'line-color': '#9a3412',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3.5, 14, 6, 17, 9],
+                'line-opacity': 0.85,
+              },
+              layout: { 'line-cap': 'round', 'line-join': 'round' },
+            });
+            mapRef.current.addLayer({
               id: 'custom-roads-primary', type: 'line', source: 'custom-osm',
               filter: ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'tertiary']]],
-              paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-opacity': 0.8 },
+              paint: {
+                'line-color': '#f59e0b',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2.5, 14, 4.5, 17, 7],
+                'line-opacity': 0.95,
+              },
               layout: { 'line-cap': 'round', 'line-join': 'round' },
             });
             mapRef.current.addLayer({
               id: 'custom-roads-residential', type: 'line', source: 'custom-osm',
-              filter: ['==', ['get', 'highway'], 'residential'],
-              paint: { 'line-color': '#fb923c', 'line-width': 2, 'line-opacity': 0.7 },
+              filter: ['in', ['get', 'highway'], ['literal', ['residential', 'service', 'unclassified', 'living_street']]],
+              paint: {
+                'line-color': '#fb923c',
+                'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.8, 14, 3.5, 17, 6],
+                'line-opacity': 0.95,
+              },
               layout: { 'line-cap': 'round', 'line-join': 'round' },
             });
             mapRef.current.addLayer({

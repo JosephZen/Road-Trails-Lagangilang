@@ -60,9 +60,9 @@ export default function TrailAlignmentHUD({
     onSave?.(offset, normSeqId);
   };
 
-  // Preset 1: Snap to Road Legends (matches Abra-Kalinga road and UA campus access road geometry)
+  // Preset 1: Snap to Road Legends (matches road centerline geometry)
   const handleSnapToRoadLegends = () => {
-    handleUpdate({ x: -24, y: 6 });
+    handleUpdate({ x: 0, y: 0 });
   };
 
   // Preset 2: Reset to Raw GPS (0, 0)

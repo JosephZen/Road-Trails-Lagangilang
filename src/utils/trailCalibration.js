@@ -4,12 +4,12 @@
  * OpenStreetMap road legends and custom road geometry.
  */
 
-// Primary sequence for the University of Abra (UA) Campus Gate & Access Loop
+// Primary sequence for the University of Abra (UA) Campus Gate & Access Road
 export const DEFAULT_CAMPUS_SEQUENCE_ID = 'EsCxkvd59mpZD3iqzoyFjM';
 export const CAMPUS_GATE_IMAGE_ID = '1532761357806896';
 
-// Perfect snap offset for University of Abra campus access road and gate
-export const DEFAULT_CAMPUS_OFFSET = { x: -24, y: 6 };
+// Road centerline offset for University of Abra campus access road (aligned directly on road)
+export const DEFAULT_CAMPUS_OFFSET = { x: 0, y: 0 };
 
 /**
  * Predefined list of known sequence captures in the Lagangilang area
@@ -19,10 +19,10 @@ export const KNOWN_SEQUENCES = [
   {
     id: 'EsCxkvd59mpZD3iqzoyFjM',
     altImageId: '1532761357806896',
-    name: 'UA Campus Gate & Access Loop',
-    subtitle: '15 360° captures • Campus Entrance',
+    name: 'UA Campus Access Road & Gate',
+    subtitle: '15 360° captures • Campus Entrance Road',
     icon: '🏫',
-    defaultOffset: { x: -24, y: 6 },
+    defaultOffset: { x: 0, y: 0 },
     type: 'foot',
   },
   {
@@ -30,7 +30,7 @@ export const KNOWN_SEQUENCES = [
     name: 'UA Campus Interior Grounds',
     subtitle: '152 360° captures • Campus Pathways',
     icon: '🎓',
-    defaultOffset: { x: -24, y: 6 },
+    defaultOffset: { x: 0, y: 0 },
     type: 'foot',
   },
   {
@@ -82,13 +82,12 @@ export function normalizeSequenceId(id) {
 }
 
 /**
- * Retrieve saved sequence offsets from localStorage, with backward-compatibility
- * for legacy global offsets.
+ * Retrieve saved sequence offsets from localStorage, with backward-compatibility.
  */
 export function getSavedSequenceOffsets() {
   const defaultOffsets = {
-    [DEFAULT_CAMPUS_SEQUENCE_ID]: { ...DEFAULT_CAMPUS_OFFSET },
-    '6ILqHDUO8mdl7iJNbfezgn': { ...DEFAULT_CAMPUS_OFFSET },
+    [DEFAULT_CAMPUS_SEQUENCE_ID]: { x: 0, y: 0 },
+    '6ILqHDUO8mdl7iJNbfezgn': { x: 0, y: 0 },
     global: { x: 0, y: 0 },
   };
 
@@ -96,6 +95,10 @@ export function getSavedSequenceOffsets() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      // If legacy -24 offset was saved, reset to 0 so it aligns to the road
+      if (parsed[DEFAULT_CAMPUS_SEQUENCE_ID]?.x === -24) {
+        parsed[DEFAULT_CAMPUS_SEQUENCE_ID] = { x: 0, y: 0 };
+      }
       return { ...defaultOffsets, ...parsed };
     }
 
@@ -103,7 +106,10 @@ export function getSavedSequenceOffsets() {
     const legacyX = localStorage.getItem('lagangilang_mapillary_offset_x');
     const legacyY = localStorage.getItem('lagangilang_mapillary_offset_y');
     if (legacyX !== null && legacyY !== null) {
-      const legacyOffset = { x: parseFloat(legacyX), y: parseFloat(legacyY) };
+      const x = parseFloat(legacyX);
+      const y = parseFloat(legacyY);
+      // Reset legacy -24 to 0 so the road and dots align
+      const legacyOffset = (x === -24) ? { x: 0, y: 0 } : { x, y };
       defaultOffsets[DEFAULT_CAMPUS_SEQUENCE_ID] = legacyOffset;
       defaultOffsets['6ILqHDUO8mdl7iJNbfezgn'] = legacyOffset;
     }
