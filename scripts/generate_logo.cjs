@@ -6,9 +6,10 @@ async function generate() {
   const artifactDir = 'C:/Users/Joseph Zen/.gemini/antigravity/brain/a577dff6-94d1-4dbf-9e39-4dfc622846e3';
   const publicDir = './public/assets';
 
-  const sourceImagePath = path.join(publicDir, 'road_trail_360_v2.jpg');
+  // Use the new negative-alpha black & white film style render
+  let sourceImagePath = path.join(publicDir, 'logo_negative_alpha_v4.jpg');
   if (!fs.existsSync(sourceImagePath)) {
-    throw new Error('Source image road_trail_360_v2.jpg not found');
+    sourceImagePath = path.join(publicDir, 'road_trail_360_v3.jpg');
   }
 
   // Load the raw image
@@ -19,7 +20,7 @@ async function generate() {
   const width = info.width;
   const height = info.height;
 
-  // Clone buffer to clean top text (y < 115) and bottom text (y > 875)
+  // Clone buffer to clean top text (y < 118) and bottom text (y > 870)
   // Replacing top and bottom text areas with pure white
   const cleanedBuffer = Buffer.from(data);
 
@@ -39,8 +40,8 @@ async function generate() {
     }
   }
 
-  // Clear bottom margin where old text was: y from 875 to 975, between outer borders
-  for (let y = 875; y <= 975; y++) {
+  // Clear bottom margin where old text was: y from 870 to 975, between outer borders
+  for (let y = 870; y <= 975; y++) {
     for (let x = 60; x <= 964; x++) {
       setWhite(x, y);
     }
@@ -60,8 +61,8 @@ async function generate() {
   const base64Artwork = cleanedJpegBuffer.toString('base64');
 
   // Build the complete SVG with:
-  // 1. Embedded high-res artwork of the exact AI render background and camera
-  // 2. Crisp vector typography: "360" on top, "Road & Trail" on bottom
+  // 1. Embedded high-res Black & White / Negative Alpha Film Style artwork
+  // 2. Crisp vector typography: "360" on top, "Lagangilang Tourist Spots" on bottom
   // 3. Crisp outer squircle outline border
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
@@ -79,7 +80,7 @@ async function generate() {
   <!-- Base White Canvas with subtle drop shadow -->
   <rect x="52" y="52" width="920" height="920" rx="150" ry="150" fill="#ffffff" filter="url(#box-shadow)" />
 
-  <!-- Embedded High-Resolution Approved Artwork (Clipped to Squircle) -->
+  <!-- Embedded High-Resolution Negative Alpha B&W Artwork (Clipped to Squircle) -->
   <g clip-path="url(#squircle-clip)">
     <image href="data:image/jpeg;base64,${base64Artwork}" x="0" y="0" width="1024" height="1024" />
     
@@ -94,9 +95,9 @@ async function generate() {
       360
     </text>
 
-    <!-- ==================== BOTTOM TEXT: "Road & Trail" ==================== -->
-    <text x="512" y="942" font-family="'Inter', 'Montserrat', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="48" font-weight="900" fill="#0f172a" text-anchor="middle" letter-spacing="3">
-      Road &amp; Trail
+    <!-- ==================== BOTTOM TEXT: "Lagangilang Tourist Spots" ==================== -->
+    <text x="512" y="938" font-family="'Inter', 'Montserrat', 'Segoe UI', system-ui, -apple-system, sans-serif" font-size="38" font-weight="900" fill="#0f172a" text-anchor="middle" letter-spacing="2">
+      Lagangilang Tourist Spots
     </text>
   </g>
 

@@ -10,6 +10,8 @@ export default function StreetviewLineAligner({
   onResetOriginal,
   onCancel,
   isSaving = false,
+  showMapillaryDots = true,
+  onToggleDots,
 }) {
   if (!aligningSequence) return null;
 
@@ -48,6 +50,16 @@ export default function StreetviewLineAligner({
         >
           {isSaving ? '⏳ Saving...' : '💾 Save Alignment'}
         </button>
+
+        {onToggleDots && (
+          <button
+            className={`btn-secondary aligner-btn-dots ${!showMapillaryDots ? 'dots-hidden' : ''}`}
+            onClick={onToggleDots}
+            title={showMapillaryDots ? 'Hide raw green dots to see only road and cyan line' : 'Show green dots'}
+          >
+            {showMapillaryDots ? '🟢 Hide Dots' : '⚪ Show Dots'}
+          </button>
+        )}
 
         <button
           className="btn-secondary aligner-btn-reset"

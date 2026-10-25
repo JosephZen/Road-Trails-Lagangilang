@@ -119,6 +119,7 @@ export default function MapView({
   alignedGeoJSON = null,
   isSelectingAlignmentTarget = false,
   onSelectSequenceForAlignment,
+  showMapillaryDots = true,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -1532,6 +1533,17 @@ export default function MapView({
       routeMarkersRef.current = [];
     };
   }, [routeOrigin, routeDestination]);
+
+  // Toggle Mapillary Green Dots visibility
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const visibility = showMapillaryDots ? 'visible' : 'none';
+
+    if (map.getLayer('mapillary-images')) {
+      map.setLayoutProperty('mapillary-images', 'visibility', visibility);
+    }
+  }, [showMapillaryDots]);
 
   // Update Aligned Streetview Lines GeoJSON source
   useEffect(() => {

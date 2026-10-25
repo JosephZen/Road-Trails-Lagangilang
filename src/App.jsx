@@ -64,6 +64,9 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const toastTimeoutRef = useRef(null);
 
+  // Mapillary raw green dots visibility toggle
+  const [showMapillaryDots, setShowMapillaryDots] = useState(true);
+
   const showToast = useCallback((msg, duration = 3500) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMessage(msg);
@@ -757,6 +760,27 @@ export default function App() {
             📐 {aligningSequence ? 'Exit Align' : isSelectingAlignmentTarget ? 'Cancel Select' : 'Align Line'}
           </button>
 
+          {/* Toggle Mapillary Green Dots */}
+          <button
+            className={`btn ${showMapillaryDots ? 'btn-secondary' : 'btn-ghost'}`}
+            onClick={() => {
+              const next = !showMapillaryDots;
+              setShowMapillaryDots(next);
+              showToast(next ? '🟢 Mapillary green dots visible' : '⚪ Mapillary green dots hidden (cyan line remains visible)');
+            }}
+            style={{
+              fontSize: '0.8rem',
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-full)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+            title={showMapillaryDots ? 'Hide raw Mapillary green dots' : 'Show Mapillary green dots'}
+          >
+            {showMapillaryDots ? '🟢 Dots: ON' : '⚪ Dots: OFF'}
+          </button>
+
 
           <div className="controls-separator" />
 
@@ -950,6 +974,8 @@ export default function App() {
             onResetOriginal={handleResetAlignmentOriginal}
             onCancel={() => setAligningSequence(null)}
             isSaving={isSavingAlignment}
+            showMapillaryDots={showMapillaryDots}
+            onToggleDots={() => setShowMapillaryDots(!showMapillaryDots)}
           />
         )}
 
@@ -985,6 +1011,7 @@ export default function App() {
           alignedGeoJSON={alignedGeoJSON}
           isSelectingAlignmentTarget={isSelectingAlignmentTarget}
           onSelectSequenceForAlignment={handleSelectSequenceForAlignment}
+          showMapillaryDots={showMapillaryDots}
         />
 
         {/* Resize handle */}
