@@ -20,6 +20,9 @@ export default function TouristSpotStreetViewCard({
   onEdit,
   onDelete,
   onRoute,
+  viewerPanoMode = 'dedicated',
+  onToggleViewerMode,
+  hasDedicatedPano = false,
 }) {
   if (!spot) return null;
 
@@ -254,6 +257,75 @@ export default function TouristSpotStreetViewCard({
         </p>
       </div>
 
+      {/* 360 Scene Mode Switcher (When Viewer is Open and Spot has Dedicated 360 Photo) */}
+      {isViewerOpen && hasDedicatedPano && (
+        <div
+          style={{
+            display: 'flex',
+            gap: '4px',
+            marginTop: '10px',
+            padding: '3px',
+            background: 'rgba(0, 0, 0, 0.4)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+          }}
+        >
+          <button
+            onClick={() => onToggleViewerMode?.('dedicated')}
+            style={{
+              flex: 1,
+              padding: '6px 8px',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              background: viewerPanoMode === 'dedicated'
+                ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                : 'transparent',
+              color: viewerPanoMode === 'dedicated' ? '#ffffff' : '#94a3b8',
+              boxShadow: viewerPanoMode === 'dedicated' ? '0 2px 8px rgba(59, 130, 246, 0.4)' : 'none',
+              transition: 'all var(--transition-fast)',
+            }}
+            title="View dedicated uploaded 360 panorama for this landmark"
+          >
+            <span>📷</span>
+            <span>Dedicated 360</span>
+          </button>
+
+          <button
+            onClick={() => onToggleViewerMode?.('road')}
+            style={{
+              flex: 1,
+              padding: '6px 8px',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              background: viewerPanoMode === 'road'
+                ? 'linear-gradient(135deg, #05cb63 0%, #047857 100%)'
+                : 'transparent',
+              color: viewerPanoMode === 'road' ? '#ffffff' : '#94a3b8',
+              boxShadow: viewerPanoMode === 'road' ? '0 2px 8px rgba(5, 203, 99, 0.4)' : 'none',
+              transition: 'all var(--transition-fast)',
+            }}
+            title="Step out to public road Street View sequence (Mapillary)"
+          >
+            <span>🚗</span>
+            <span>Road Street View</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Actions Row */}
       <div
         style={{
@@ -262,24 +334,26 @@ export default function TouristSpotStreetViewCard({
           marginTop: '10px',
         }}
       >
-        <button
-          onClick={() => onNavigateTo360?.(spot)}
-          className="btn btn-primary"
-          style={{
-            flex: 1,
-            padding: '6px 10px',
-            fontSize: '0.78rem',
-            background: isPoi
-              ? 'linear-gradient(135deg, #06d6a0 0%, #0284c7 100%)'
-              : 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
-            color: isPoi ? '#ffffff' : '#1a1a2e',
-            fontWeight: 700,
-            border: 'none',
-            boxShadow: isPoi ? '0 2px 10px rgba(6, 214, 160, 0.3)' : '0 2px 10px rgba(255, 215, 0, 0.3)',
-          }}
-        >
-          🌐 View in 360°
-        </button>
+        {!isViewerOpen && (
+          <button
+            onClick={() => onNavigateTo360?.(spot)}
+            className="btn btn-primary"
+            style={{
+              flex: 1,
+              padding: '6px 10px',
+              fontSize: '0.78rem',
+              background: isPoi
+                ? 'linear-gradient(135deg, #06d6a0 0%, #0284c7 100%)'
+                : 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
+              color: isPoi ? '#ffffff' : '#1a1a2e',
+              fontWeight: 700,
+              border: 'none',
+              boxShadow: isPoi ? '0 2px 10px rgba(6, 214, 160, 0.3)' : '0 2px 10px rgba(255, 215, 0, 0.3)',
+            }}
+          >
+            🌐 View in 360°
+          </button>
+        )}
 
         <button
           onClick={() => onRoute?.(spot)}

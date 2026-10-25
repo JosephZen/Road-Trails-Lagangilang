@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { calculateBearing } from '../utils/geoUtils';
+import { touristSpotsService } from '../services/touristSpotsService';
 
 import 'pannellum/build/pannellum.css';
 import 'pannellum/build/pannellum.js';
@@ -8,7 +9,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 /**
  * Local 360° panorama viewer using Pannellum.
- * Supports navigation hotspots, compass sync, and bullet view transitions.
+ * Supports navigation hotspots, compass sync, Neon Cloud textures, and street view transitions.
  */
 export default function PanoramaViewer({
   panorama,
@@ -20,6 +21,7 @@ export default function PanoramaViewer({
   onPitchChange,
   steerTarget,
   onSwitchToMapillary,
+  onCloseViewer,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
@@ -31,34 +33,58 @@ export default function PanoramaViewer({
   useEffect(() => {
     if (!viewerReady || !panorama || !containerRef.current) return;
 
-    const imageUrl =
-      panorama.imageUrl ||
-      panorama.image ||
-      (getCachedUrl
-        ? getCachedUrl(panorama.id) || `${API_BASE}/panoramas/${panorama.filename}`
-        : `${API_BASE}/panoramas/${panorama.filename}`);
+    let isCancelled = false;
 
-    // Build hotspots for neighbor navigation
-    const hotSpots = buildHotspots(panorama, panoramas);
-
-    // If viewer exists and we're just switching images (bullet view), swap the texture
-    if (viewerRef.current && currentPanoRef.current) {
+    async function loadPanoTexture() {
       setIsLoading(true);
 
-      try {
-        viewerRef.current.destroy();
-      } catch (e) {
-        // ignore
+      // 1. If explicit data URI texture was passed (from Neon upload or state)
+      let finalImageUrl =
+        panorama.imageData ||
+        (panorama.imageUrl?.startsWith('data:') ? panorama.imageUrl : null) ||
+        (panorama.image?.startsWith('data:') && panorama.image.length > 35000 ? panorama.image : null);
+
+      // 2. If it's a custom/local panorama ID (starts with pano_), query Neon Cloud DB for direct image_data
+      if (!finalImageUrl && panorama.id && String(panorama.id).startsWith('pano_')) {
+        try {
+          const cloudTexture = await touristSpotsService.fetchPanoramaImageData(panorama.id);
+          if (cloudTexture && !isCancelled) {
+            finalImageUrl = cloudTexture;
+          }
+        } catch (e) {
+          console.warn('Could not retrieve Neon Cloud 360 texture:', e);
+        }
       }
 
-      createViewer(imageUrl, hotSpots, panorama.heading || 0, viewerHeading);
+      // 3. Fallback to static URL
+      if (!finalImageUrl) {
+        finalImageUrl =
+          panorama.imageUrl ||
+          panorama.image ||
+          (getCachedUrl
+            ? getCachedUrl(panorama.id) || `${API_BASE}/panoramas/${panorama.filename}`
+            : `${API_BASE}/panoramas/${panorama.filename}`);
+      }
+
+      if (isCancelled) return;
+
+      const hotSpots = buildHotspots(panorama, panoramas);
+
+      if (viewerRef.current && currentPanoRef.current) {
+        try {
+          viewerRef.current.destroy();
+        } catch (e) {}
+      }
+
+      createViewer(finalImageUrl, hotSpots, panorama.heading || 0, viewerHeading);
       currentPanoRef.current = panorama.id;
-      return;
     }
 
-    // First-time initialization
-    createViewer(imageUrl, hotSpots, panorama.heading || 0, viewerHeading);
-    currentPanoRef.current = panorama.id;
+    loadPanoTexture();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [panorama, viewerReady, panoramas, getCachedUrl]); // intentional omit viewerHeading so it doesn't trigger reload when just looking around
 
   // Handle steering / orienting camera to face a tourist landmark
@@ -267,8 +293,66 @@ export default function PanoramaViewer({
         <button className="zoom-btn" onClick={zoomOut} title="Zoom out">−</button>
       </div>
 
-      {/* Seamless Transition Pill to Mapillary Street View when near campus entrance */}
-      {(panorama?.id === 'pano_1785434840169_sqgpeq' || panorama?.id === 'pano_1785458227165_1j20c9' || (panorama?.lat && Math.abs(panorama.lat - 17.60825) < 0.0002)) && onSwitchToMapillary && (
+      {/* Top Banner: Dedicated 360 Photo Badge */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '16px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          background: 'rgba(15, 23, 42, 0.82)',
+          color: '#ffffff',
+          padding: '5px 14px',
+          borderRadius: 'var(--radius-full)',
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+          pointerEvents: 'none',
+        }}
+      >
+        <span style={{ color: '#38bdf8' }}>📷</span>
+        <span>{panorama?.label || 'Dedicated 360° Landmark View'}</span>
+      </div>
+
+      {/* Close / Back to Map Button */}
+      {onCloseViewer && (
+        <button
+          onClick={onCloseViewer}
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            zIndex: 110,
+            background: 'rgba(15, 23, 42, 0.85)',
+            color: '#ffffff',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            borderRadius: 'var(--radius-full)',
+            padding: '6px 14px',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            backdropFilter: 'blur(8px)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+            transition: 'all 0.2s ease',
+          }}
+          title="Return to 2D Map"
+        >
+          <span>✕</span>
+          <span>Back to Map</span>
+        </button>
+      )}
+
+      {/* Universal Step Out to Road Street View (Mapillary) Button */}
+      {onSwitchToMapillary && (
         <div
           style={{
             position: 'absolute',
@@ -285,22 +369,24 @@ export default function PanoramaViewer({
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '10px 18px',
+              padding: '10px 20px',
               borderRadius: 'var(--radius-full)',
               background: 'linear-gradient(135deg, #05cb63 0%, #047857 100%)',
               color: '#ffffff',
               fontWeight: 700,
               fontSize: '0.85rem',
-              border: '2px solid rgba(255, 255, 255, 0.4)',
+              border: '2px solid rgba(255, 255, 255, 0.45)',
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5), 0 0 15px rgba(5, 203, 99, 0.5)',
               cursor: 'pointer',
               transition: 'all var(--transition-fast)',
+              whiteSpace: 'nowrap',
             }}
+            title="Step out of this standalone photo onto the nearest public road Street View sequence"
           >
-            <span>🚗</span>
-            <span>Enter Street View on Main Road</span>
+            <span style={{ fontSize: '1rem' }}>🚗</span>
+            <span>Step Out to Road Street View</span>
             <span style={{ fontSize: '0.72rem', opacity: 0.85 }}>(Mapillary)</span>
-            <span>→</span>
+            <span style={{ fontSize: '1rem' }}>→</span>
           </button>
         </div>
       )}

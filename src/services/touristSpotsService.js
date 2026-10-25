@@ -368,8 +368,9 @@ export const touristSpotsService = {
         .filter((s) => !isObsoleteSpot(s))
         .map((s) => {
           const clean = { ...s };
-          // Strip out heavy base64 strings (> 20KB) to ensure localStorage quota (5MB) is never exceeded
-          if (clean.image && clean.image.startsWith('data:') && clean.image.length > 20000) {
+          // Strip out overly heavy base64 strings (> 35KB) to prevent localStorage quota (5MB) overflow
+          // while preserving compact 400x200 thumbnails (~18KB)
+          if (clean.image && clean.image.startsWith('data:') && clean.image.length > 35000) {
             clean.image = clean.connected360?.targetId
               ? `/panoramas/${clean.connected360.targetId}.jpg`
               : null;
@@ -377,7 +378,7 @@ export const touristSpotsService = {
           if (
             clean.connected360?.imageUrl &&
             clean.connected360.imageUrl.startsWith('data:') &&
-            clean.connected360.imageUrl.length > 20000
+            clean.connected360.imageUrl.length > 35000
           ) {
             clean.connected360 = {
               ...clean.connected360,
@@ -445,11 +446,11 @@ export const touristSpotsService = {
           };
     }
 
-    const cleanImage = spotData.image && spotData.image.startsWith('data:') && spotData.image.length > 20000
+    const cleanImage = spotData.image && spotData.image.startsWith('data:') && spotData.image.length > 35000
       ? (connected360?.targetId ? `/panoramas/${connected360.targetId}.jpg` : null)
       : (spotData.image || null);
 
-    const cleanPanoImageUrl = connected360?.imageUrl && connected360.imageUrl.startsWith('data:') && connected360.imageUrl.length > 20000
+    const cleanPanoImageUrl = connected360?.imageUrl && connected360.imageUrl.startsWith('data:') && connected360.imageUrl.length > 35000
       ? (connected360?.targetId ? `/panoramas/${connected360.targetId}.jpg` : null)
       : (connected360?.imageUrl || null);
 
@@ -729,8 +730,9 @@ export const touristSpotsService = {
               isPseudoImage: r.is_pseudo_image ?? !r.image_url,
               pseudoTheme: r.pseudo_theme || 'indigo',
               connected360: {
-                type: 'mapillary',
+                type: (r.primary_pano_id && String(r.primary_pano_id).startsWith('pano_')) ? 'local' : 'mapillary',
                 targetId: r.primary_pano_id || null,
+                imageUrl: (r.primary_pano_id && String(r.primary_pano_id).startsWith('pano_')) ? `/panoramas/${r.primary_pano_id}.jpg` : null,
                 heading: parseFloat(r.target_heading) || 0,
                 pitch: parseFloat(r.target_pitch) || 0,
               },
@@ -796,5 +798,195 @@ export const touristSpotsService = {
     localStorage.removeItem(DELETED_KEY);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(seedSpots));
     return seedSpots;
+  },
+
+  // In-memory cache for high-resolution 360 panorama textures & thumbnails
+  _panoCache: new Map(),
+
+  /**
+   * Client-side equirectangular compressor for WebGL compatibility & fast cloud storage.
+   * Generates a 2560x1280 WebGL texture (~500KB base64) and a 400x200 card thumbnail (~18KB base64).
+   */
+  async compressEquirectangular(fileOrDataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      let createdUrl = null;
+
+      img.onload = () => {
+        if (createdUrl) URL.revokeObjectURL(createdUrl);
+        try {
+          // 1. Generate WebGL-safe 360 equirectangular texture (max 2560 x 1280)
+          const targetW = 2560;
+          const targetH = 1280;
+          const canvas = document.createElement('canvas');
+          canvas.width = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          const fullDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+          // 2. Generate crisp 400x200 thumbnail
+          const thumbCanvas = document.createElement('canvas');
+          thumbCanvas.width = 400;
+          thumbCanvas.height = 200;
+          const tCtx = thumbCanvas.getContext('2d');
+          tCtx.drawImage(img, 0, 0, 400, 200);
+          const thumbDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.75);
+
+          resolve({
+            fullDataUrl,
+            thumbDataUrl,
+            width: targetW,
+            height: targetH,
+          });
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      img.onerror = (e) => {
+        if (createdUrl) URL.revokeObjectURL(createdUrl);
+        reject(new Error('Failed to decode 360 image for compression'));
+      };
+
+      if (typeof fileOrDataUrl === 'string') {
+        img.src = fileOrDataUrl;
+      } else {
+        createdUrl = URL.createObjectURL(fileOrDataUrl);
+        img.src = createdUrl;
+      }
+    });
+  },
+
+  /**
+   * Upload 360 Panorama directly to Neon Cloud Database.
+   * Compresses to WebGL-compliant resolution and stores in public.panoramas (image_data, thumbnail_data).
+   */
+  async uploadPanoToNeon({ id, fileOrDataUrl, lat, lng, heading = 0, label = '', description = '' }) {
+    const panoId = id || `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+
+    // Compress client-side
+    const { fullDataUrl, thumbDataUrl } = await this.compressEquirectangular(fileOrDataUrl);
+
+    // Persist directly to Neon PostgreSQL Cloud
+    await this.executeNeonQuery(async (sql) => {
+      await sql`
+        INSERT INTO public.panoramas (
+          id, source_type, filename, thumbnail_url, latitude, longitude,
+          compass_heading, label, description, image_data, thumbnail_data,
+          sync_status, captured_at
+        ) VALUES (
+          ${panoId},
+          'local',
+          ${`${panoId}.jpg`},
+          ${thumbDataUrl},
+          ${parsedLat},
+          ${parsedLng},
+          ${parseFloat(heading) || 0},
+          ${label || '360 Landmark View'},
+          ${description || ''},
+          ${fullDataUrl},
+          ${thumbDataUrl},
+          'synced_cloud',
+          NOW()
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          image_data = EXCLUDED.image_data,
+          thumbnail_data = EXCLUDED.thumbnail_data,
+          latitude = EXCLUDED.latitude,
+          longitude = EXCLUDED.longitude,
+          compass_heading = EXCLUDED.compass_heading,
+          label = EXCLUDED.label,
+          description = EXCLUDED.description;
+      `;
+    });
+
+    // Populate in-memory cache
+    this._panoCache.set(panoId, {
+      imageData: fullDataUrl,
+      thumbnailData: thumbDataUrl,
+      lat: parsedLat,
+      lng: parsedLng,
+    });
+
+    return {
+      id: panoId,
+      filename: `${panoId}.jpg`,
+      imageData: fullDataUrl,
+      thumbnailData: thumbDataUrl,
+      lat: parsedLat,
+      lng: parsedLng,
+    };
+  },
+
+  /**
+   * Retrieve high-resolution 360 image data URI directly from Neon Cloud Database.
+   */
+  async fetchPanoramaImageData(panoId) {
+    if (!panoId) return null;
+    const cleanId = String(panoId).replace(/\.jpg$/i, '');
+
+    // Check memory cache
+    if (this._panoCache.has(cleanId)) {
+      return this._panoCache.get(cleanId).imageData;
+    }
+
+    try {
+      const rows = await this.executeNeonQuery(async (sql) => {
+        return await sql`
+          SELECT id, image_data, thumbnail_data, latitude, longitude
+          FROM public.panoramas
+          WHERE id = ${cleanId}
+        `;
+      });
+
+      if (rows && rows.length > 0 && rows[0].image_data) {
+        this._panoCache.set(cleanId, {
+          imageData: rows[0].image_data,
+          thumbnailData: rows[0].thumbnail_data,
+          lat: rows[0].latitude,
+          lng: rows[0].longitude,
+        });
+        return rows[0].image_data;
+      }
+    } catch (err) {
+      console.warn(`Could not fetch 360 image data from Neon for ${cleanId}:`, err.message);
+    }
+    return null;
+  },
+
+  /**
+   * Fetch all registered local panoramas metadata from Neon Cloud Database.
+   */
+  async fetchPanoramasList() {
+    try {
+      const rows = await this.executeNeonQuery(async (sql) => {
+        return await sql`
+          SELECT id, filename, thumbnail_url, latitude as lat, longitude as lng,
+                 compass_heading as heading, label, description
+          FROM public.panoramas
+          ORDER BY captured_at DESC
+        `;
+      });
+
+      if (Array.isArray(rows)) {
+        return rows.map((r) => ({
+          id: r.id,
+          filename: r.filename || `${r.id}.jpg`,
+          thumbnail: r.thumbnail_url,
+          lat: parseFloat(r.lat),
+          lng: parseFloat(r.lng),
+          heading: parseFloat(r.heading) || 0,
+          label: r.label,
+          description: r.description,
+          neighbors: [],
+        }));
+      }
+    } catch (err) {
+      console.warn('Could not fetch panoramas list from Neon Cloud:', err.message);
+    }
+    return [];
   },
 };

@@ -78,6 +78,8 @@ export default function TouristSpotModal({
   const [spotType, setSpotType] = useState('tourist_spot'); // 'tourist_spot' | 'poi'
   const { searchNearby } = useMapillary();
   const [detectingMapillary, setDetectingMapillary] = useState(false);
+  const [uploadingNeon, setUploadingNeon] = useState(false);
+  const [neonUploaded, setNeonUploaded] = useState(false);
   const [panoSourceTab, setPanoSourceTab] = useState('upload'); // 'upload' | 'mapillary'
   const [showBlurStudio, setShowBlurStudio] = useState(false);
   const [privacyBlurredCount, setPrivacyBlurredCount] = useState(0);
@@ -214,132 +216,88 @@ export default function TouristSpotModal({
     }));
   };
 
-  // Dedicated 360 Panorama File Upload handler
+  // Dedicated 360 Panorama File Upload handler (Direct to Neon PostgreSQL Cloud DB)
   const handlePanoFileUpload = async (e) => {
     const rawFile = e.target.files?.[0];
     if (!rawFile) return;
 
+    setUploadingNeon(true);
     setDetectingMapillary(true);
-    const defaultPanoId = `pano_${Date.now()}`;
-
-    // Helper: Optimize equirectangular image to WebGL-safe resolution (max 4096x2048)
-    const optimizeForWebGL = (file) => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        const objUrl = URL.createObjectURL(file);
-        img.onload = () => {
-          URL.revokeObjectURL(objUrl);
-          const maxW = 4096;
-          const maxH = 2048;
-          if (img.width <= maxW && img.height <= maxH) {
-            resolve({ file, previewUrl: objUrl });
-            return;
-          }
-          const canvas = document.createElement('canvas');
-          const scale = Math.min(maxW / img.width, maxH / img.height);
-          canvas.width = Math.round(img.width * scale);
-          canvas.height = Math.round(img.height * scale);
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob((blob) => {
-            const optimizedFile = new File([blob], file.name, { type: 'image/jpeg' });
-            resolve({ file: optimizedFile, previewUrl: canvas.toDataURL('image/jpeg', 0.88) });
-          }, 'image/jpeg', 0.90);
-        };
-        img.onerror = () => {
-          URL.revokeObjectURL(objUrl);
-          resolve({ file, previewUrl: null });
-        };
-        img.src = objUrl;
-      });
-    };
+    const defaultPanoId = formData.connectedPanoId || `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
     try {
-      const { file: uploadFile, previewUrl } = await optimizeForWebGL(rawFile);
-
-      if (previewUrl) {
-        setFormData((prev) => ({
-          ...prev,
-          uploadedPanoUrl: previewUrl,
-          connectedPanoType: 'local',
-          connectedPanoId: prev.connectedPanoId || defaultPanoId,
-        }));
-      }
-
-      // Upload to backend if server is active
-      const uploadData = new FormData();
-      uploadData.append('panorama', uploadFile);
-      uploadData.append('lat', formData.lat);
-      uploadData.append('lng', formData.lng);
-      uploadData.append('heading', formData.heading || '0');
-      uploadData.append('label', formData.name || 'Tourist Spot 360');
-      uploadData.append('description', formData.description || '');
-
-      const res = await fetch(`${API_BASE}/api/panoramas`, {
-        method: 'POST',
-        body: uploadData,
+      // 1. Client-side compression & direct upload to Neon PostgreSQL Cloud DB
+      const result = await touristSpotsService.uploadPanoToNeon({
+        id: defaultPanoId,
+        fileOrDataUrl: rawFile,
+        lat: formData.lat,
+        lng: formData.lng,
+        heading: formData.heading || '0',
+        label: formData.name || 'Tourist Spot 360',
+        description: formData.description || '',
       });
 
-      if (res.ok) {
-        const result = await res.json();
-        setFormData((prev) => ({
-          ...prev,
-          connectedPanoId: result.id,
-          connectedPanoType: 'local',
-          uploadedPanoUrl: `/panoramas/${result.filename}`,
-          image: `/panoramas/thumbnails/${result.id}_thumb.jpg`,
-        }));
-      }
+      setFormData((prev) => ({
+        ...prev,
+        connectedPanoId: result.id,
+        connectedPanoType: 'local',
+        uploadedPanoUrl: result.imageData,
+        image: result.thumbnailData, // compact 18KB thumbnail data URI stored in tourist_spots table!
+        usePseudoImage: false,
+      }));
+      setNeonUploaded(true);
+
+      // 2. Also send to local Express server if running in background
+      try {
+        const uploadData = new FormData();
+        uploadData.append('panorama', rawFile);
+        uploadData.append('lat', formData.lat);
+        uploadData.append('lng', formData.lng);
+        uploadData.append('heading', formData.heading || '0');
+        uploadData.append('label', formData.name || 'Tourist Spot 360');
+        uploadData.append('description', formData.description || '');
+        fetch(`${API_BASE}/api/panoramas`, { method: 'POST', body: uploadData }).catch(() => {});
+      } catch (_) {}
     } catch (err) {
-      console.warn('Backend panorama upload omitted (running client-side / offline mode):', err);
+      console.error('Neon direct upload error:', err);
+      alert(`Could not upload to Neon Cloud: ${err.message}`);
     } finally {
+      setUploadingNeon(false);
       setDetectingMapillary(false);
     }
   };
 
   // Handler when privacy blur is applied from PrivacyBlurStudio
   const handleSaveBlurredImage = async (blurredDataUrl, zoneCount) => {
-    setFormData((prev) => ({
-      ...prev,
-      uploadedPanoUrl: blurredDataUrl,
-      image: blurredDataUrl,
-    }));
+    setUploadingNeon(true);
     setPrivacyBlurredCount(zoneCount);
+    const defaultPanoId = formData.connectedPanoId || `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-    // If backend Express server is running, also persist the anonymized image to server
     try {
-      const fetchRes = await fetch(blurredDataUrl);
-      const blob = await fetchRes.blob();
-      const file = new File(
-        [blob],
-        `${formData.connectedPanoId || 'pano_' + Date.now()}.jpg`,
-        { type: 'image/jpeg' }
-      );
-
-      const uploadData = new FormData();
-      uploadData.append('panorama', file);
-      uploadData.append('lat', formData.lat);
-      uploadData.append('lng', formData.lng);
-      uploadData.append('heading', formData.heading || '0');
-      uploadData.append('label', formData.name || 'Tourist Spot 360');
-      uploadData.append('description', formData.description || '');
-
-      const res = await fetch(`${API_BASE}/api/panoramas`, {
-        method: 'POST',
-        body: uploadData,
+      // Direct upload & compression of the blurred image to Neon Cloud DB
+      const result = await touristSpotsService.uploadPanoToNeon({
+        id: defaultPanoId,
+        fileOrDataUrl: blurredDataUrl,
+        lat: formData.lat,
+        lng: formData.lng,
+        heading: formData.heading || '0',
+        label: formData.name || 'Tourist Spot 360',
+        description: formData.description || '',
       });
 
-      if (res.ok) {
-        const result = await res.json();
-        setFormData((prev) => ({
-          ...prev,
-          connectedPanoId: result.id,
-          connectedPanoType: 'local',
-          uploadedPanoUrl: `${API_BASE}/panoramas/${result.filename}`,
-        }));
-      }
+      setFormData((prev) => ({
+        ...prev,
+        connectedPanoId: result.id,
+        connectedPanoType: 'local',
+        uploadedPanoUrl: result.imageData,
+        image: result.thumbnailData,
+        usePseudoImage: false,
+      }));
+      setNeonUploaded(true);
     } catch (err) {
-      console.warn('Backend privacy blur sync omitted (offline/static):', err);
+      console.warn('Neon blurred image upload warning:', err);
+    } finally {
+      setUploadingNeon(false);
     }
   };
 
@@ -388,15 +346,14 @@ export default function TouristSpotModal({
     const isLocalPano = formData.connectedPanoType === 'local' || !!formData.uploadedPanoUrl;
     const finalTargetId = formData.connectedPanoId || (isLocalPano ? `pano_${Date.now()}` : null);
 
-    // Clean image URLs - NEVER store multi-megabyte base64 strings in persistent database/localStorage
-    const isBase64 = String(formData.uploadedPanoUrl || '').startsWith('data:');
-    const cleanPanoUrl = isLocalPano
-      ? (isBase64 ? `/panoramas/${finalTargetId}.jpg` : formData.uploadedPanoUrl || `/panoramas/${finalTargetId}.jpg`)
-      : null;
-
-    const cleanImageUrl = isLocalPano
-      ? (isBase64 ? `/panoramas/thumbnails/${finalTargetId}_thumb.jpg` : formData.image || cleanPanoUrl)
+    // Image URL handling: preserve compact thumbnail (< 35KB data URI) so cards render everywhere without broken links
+    const cleanImageUrl = (formData.image && formData.image.startsWith('data:') && formData.image.length <= 35000)
+      ? formData.image
       : (formData.usePseudoImage ? null : (formData.image?.startsWith('data:') ? null : formData.image));
+
+    const cleanPanoUrl = isLocalPano
+      ? (String(formData.uploadedPanoUrl || '').startsWith('data:') ? `/panoramas/${finalTargetId}.jpg` : formData.uploadedPanoUrl || `/panoramas/${finalTargetId}.jpg`)
+      : null;
 
     const spotPayload = {
       ...(editingSpot || {}),
@@ -1015,6 +972,20 @@ export default function TouristSpotModal({
                           <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#34d399' }}>
                             ✓ Dedicated 360° Photo Attached
                           </span>
+                          {(neonUploaded || String(formData.connectedPanoId || '').startsWith('pano_')) && (
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: 'rgba(59, 130, 246, 0.25)',
+                                color: '#60a5fa',
+                                border: '1px solid rgba(96, 165, 250, 0.4)',
+                              }}
+                            >
+                              ☁ Neon Cloud Synced
+                            </span>
+                          )}
                           {privacyBlurredCount > 0 && (
                             <span
                               style={{
@@ -1030,6 +1001,11 @@ export default function TouristSpotModal({
                             </span>
                           )}
                         </div>
+                        {uploadingNeon && (
+                          <div style={{ margin: '4px 0', fontSize: '0.72rem', color: '#ffd700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>⚡ Optimizing 360 texture & uploading directly to Neon Cloud DB...</span>
+                          </div>
+                        )}
                         <p style={{ fontSize: '0.68rem', color: '#94a3b8', margin: '2px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           ID: {formData.connectedPanoId || 'local_panorama'}
                         </p>

@@ -76,6 +76,9 @@ export default function App() {
   const [mapillaryImageId, setMapillaryImageId] = useState(null);
   const [streetViewPos, setStreetViewPos] = useState(null);
   const [mapillaryImages, setMapillaryImages] = useState([]);
+  const [viewerPanoMode, setViewerPanoMode] = useState('dedicated'); // 'dedicated' | 'road'
+  const [localPanoramas, setLocalPanoramas] = useState([]);
+  const [mapCenterPos, setMapCenterPos] = useState(null);
   const { searchNearby } = useMapillary();
 
   // Map resize & layout mode ('split' = 50/50 half screen, 'fullscreen' = 100% viewer)
@@ -183,7 +186,17 @@ export default function App() {
     const spots = touristSpotsService.getAllSpots();
     setTouristSpots(spots);
 
-    // 2. Background cloud synchronization with Neon PostgreSQL
+    // 2. Fetch local panoramas list from Neon Cloud
+    touristSpotsService
+      .fetchPanoramasList()
+      .then((panos) => {
+        if (Array.isArray(panos) && panos.length > 0) {
+          setLocalPanoramas(panos);
+        }
+      })
+      .catch(() => {});
+
+    // 3. Background cloud synchronization with Neon PostgreSQL
     touristSpotsService
       .fetchFromCloud()
       .then((cloudSpots) => {
@@ -233,11 +246,14 @@ export default function App() {
         (String(customPanoId) !== '1532761357806896' || spot.id === 'poi_ua_main_gate');
 
       if (isLocalPano) {
+        setViewerPanoMode('dedicated');
         setStreetViewPos({ lat, lng, id: String(customPanoId || spot.id) });
       } else if (isDedicatedPanoId) {
+        setViewerPanoMode('road');
         setMapillaryImageId(String(customPanoId));
         setStreetViewPos({ lat, lng, id: String(customPanoId) });
       } else {
+        setViewerPanoMode('road');
         // 2. Otherwise auto-detect and load nearest street view
         try {
           const images = await searchNearby(lat, lng, 350);
@@ -265,6 +281,39 @@ export default function App() {
       }
     },
     [searchNearby]
+  );
+
+  // Seamlessly transition out of a dedicated 360 photo onto the nearest Mapillary road street view
+  const handleSwitchToRoadStreetView = useCallback(async () => {
+    if (!activeTouristSpot) return;
+    const lat = activeTouristSpot.location?.lat ?? activeTouristSpot.lat;
+    const lng = activeTouristSpot.location?.lng ?? activeTouristSpot.lng;
+
+    try {
+      const images = await searchNearby(lat, lng, 350);
+      if (images && images.length > 0) {
+        setMapillaryImageId(String(images[0].id));
+        setStreetViewPos({ lat: images[0].lat, lng: images[0].lng, id: String(images[0].id) });
+      } else {
+        setMapillaryImageId('1532761357806896');
+        setStreetViewPos({ lat: 17.6081389, lng: 120.7381389, id: '1532761357806896' });
+      }
+    } catch (e) {
+      console.warn('Could not detect nearest road street view node:', e);
+      setMapillaryImageId('1532761357806896');
+    }
+    setViewerPanoMode('road');
+  }, [activeTouristSpot, searchNearby]);
+
+  const handleToggleViewerMode = useCallback(
+    (mode) => {
+      if (mode === 'road') {
+        handleSwitchToRoadStreetView();
+      } else {
+        setViewerPanoMode('dedicated');
+      }
+    },
+    [handleSwitchToRoadStreetView]
   );
 
   // Steering camera helper
@@ -722,7 +771,7 @@ export default function App() {
           mapCenter={
             streetViewPos
               ? [streetViewPos.lng, streetViewPos.lat]
-              : [120.738083, 17.60825] // Lagangilang, Abra
+              : (mapCenterPos || [120.738083, 17.60825]) // Lagangilang, Abra
           }
           mapZoom={15}
           routeGeoJSON={routeData?.geometry || null}
@@ -1091,6 +1140,15 @@ export default function App() {
               onSteerHeading={handleSteerHeading}
               isViewerOpen={false}
               isAdmin={isAdmin}
+              viewerPanoMode={viewerPanoMode}
+              onToggleViewerMode={handleToggleViewerMode}
+              hasDedicatedPano={
+                !!(
+                  activeTouristSpot.connected360?.type === 'local' ||
+                  !!activeTouristSpot.connected360?.imageUrl ||
+                  String(activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || '').startsWith('pano_')
+                )
+              }
               onEdit={(s) => {
                 setEditingSpot(s);
                 setShowSpotModal(true);
@@ -1120,6 +1178,15 @@ export default function App() {
                 onSteerHeading={handleSteerHeading}
                 isViewerOpen={viewerOpen}
                 isAdmin={isAdmin}
+                viewerPanoMode={viewerPanoMode}
+                onToggleViewerMode={handleToggleViewerMode}
+                hasDedicatedPano={
+                  !!(
+                    activeTouristSpot.connected360?.type === 'local' ||
+                    !!activeTouristSpot.connected360?.imageUrl ||
+                    String(activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || '').startsWith('pano_')
+                  )
+                }
                 onEdit={(s) => {
                   setEditingSpot(s);
                   setShowSpotModal(true);
@@ -1135,25 +1202,28 @@ export default function App() {
             {activeTouristSpot &&
             (activeTouristSpot.connected360?.type === 'local' ||
               !!activeTouristSpot.connected360?.imageUrl ||
-              String(activeTouristSpot.connected360?.targetId || '').startsWith('pano_')) ? (
+              String(activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || '').startsWith('pano_')) &&
+            viewerPanoMode === 'dedicated' ? (
               <PanoramaViewer
                 panorama={{
-                  id: activeTouristSpot.connected360?.targetId || activeTouristSpot.id,
-                  filename: `${activeTouristSpot.connected360?.targetId || activeTouristSpot.id}.jpg`,
+                  id: activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || activeTouristSpot.id,
+                  filename: `${activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || activeTouristSpot.id}.jpg`,
                   imageUrl:
                     activeTouristSpot.connected360?.imageUrl ||
                     activeTouristSpot.image ||
-                    `${API_BASE}/panoramas/${activeTouristSpot.connected360?.targetId}.jpg`,
+                    `${API_BASE}/panoramas/${activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id}.jpg`,
                   heading: activeTouristSpot.connected360?.heading || 0,
                   pitch: activeTouristSpot.connected360?.pitch || 0,
                   lat: activeTouristSpot.location?.lat ?? activeTouristSpot.lat,
                   lng: activeTouristSpot.location?.lng ?? activeTouristSpot.lng,
                   label: activeTouristSpot.name,
                 }}
-                panoramas={[]}
+                panoramas={localPanoramas}
                 viewerHeading={viewerHeading}
                 onHeadingChange={setViewerHeading}
                 steerTarget={steerTarget}
+                onSwitchToMapillary={handleSwitchToRoadStreetView}
+                onCloseViewer={handleCloseViewer}
               />
             ) : (
               <MapillaryViewer
@@ -1172,7 +1242,13 @@ export default function App() {
               <span style={{ fontSize: '1rem' }}>🟢</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                  Street View
+                  {activeTouristSpot &&
+                  (activeTouristSpot.connected360?.type === 'local' ||
+                    !!activeTouristSpot.connected360?.imageUrl ||
+                    String(activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || '').startsWith('pano_')) &&
+                  viewerPanoMode === 'dedicated'
+                    ? 'Dedicated 360 Landmark'
+                    : 'Road Street View'}
                 </div>
                 <div style={{ fontSize: '0.65rem', opacity: 0.75, whiteSpace: 'nowrap' }}>
                   Lagangilang, Abra
@@ -1298,7 +1374,21 @@ export default function App() {
           setSidebarTab('staging');
           setSidebarOpen(true);
           loadTouristSpots();
-          handleSelectTouristSpot(saved);
+          setActiveTouristSpot(saved);
+          const savedLat = saved.location?.lat ?? saved.lat;
+          const savedLng = saved.location?.lng ?? saved.lng;
+          setMapCenterPos([savedLng, savedLat]);
+
+          const hasCustom360 =
+            saved.connected360?.type === 'local' ||
+            !!saved.connected360?.imageUrl ||
+            String(saved.connected360?.targetId || '').startsWith('pano_');
+
+          if (hasCustom360) {
+            handleSelectTouristSpot(saved);
+          } else {
+            setViewerOpen(false);
+          }
         }}
         onSpotDeleted={(id) => {
           if (activeTouristSpot?.id === id) {
