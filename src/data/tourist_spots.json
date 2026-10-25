@@ -187,8 +187,8 @@
     "categoryIcon": "🐟",
     "barangay": "Poblacion",
     "location": {
-      "lat": 17.6068,
-      "lng": 120.7392,
+      "lat": 17.612026,
+      "lng": 120.739084,
       "address": "Aquaculture Research Center, UA Main Campus, Lagangilang, Abra"
     },
     "description": "University of Abra freshwater aquaculture research facility and fish ponds, demonstrating sustainable tilapia breeding, fish farming, and aquatic agro-fishery practices.",
@@ -201,7 +201,9 @@
       "heading": 154,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "lat": 17.612026,
+    "lng": 120.739084
   },
   {
     "id": "poi_ua_tamarind_farm",

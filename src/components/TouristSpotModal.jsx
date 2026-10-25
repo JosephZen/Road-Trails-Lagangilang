@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PseudoImage, { THEMES } from './PseudoImage';
+import PrivacyBlurStudio from './PrivacyBlurStudio';
 import {
   touristSpotsService,
   normalizeCategoryName,
@@ -78,6 +79,8 @@ export default function TouristSpotModal({
   const { searchNearby } = useMapillary();
   const [detectingMapillary, setDetectingMapillary] = useState(false);
   const [panoSourceTab, setPanoSourceTab] = useState('upload'); // 'upload' | 'mapillary'
+  const [showBlurStudio, setShowBlurStudio] = useState(false);
+  const [privacyBlurredCount, setPrivacyBlurredCount] = useState(0);
   const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
@@ -256,6 +259,52 @@ export default function TouristSpotModal({
       }
     } catch (err) {
       console.warn('Backend panorama upload omitted (running client-side / offline mode):', err);
+    }
+  };
+
+  // Handler when privacy blur is applied from PrivacyBlurStudio
+  const handleSaveBlurredImage = async (blurredDataUrl, zoneCount) => {
+    setFormData((prev) => ({
+      ...prev,
+      uploadedPanoUrl: blurredDataUrl,
+      image: blurredDataUrl,
+    }));
+    setPrivacyBlurredCount(zoneCount);
+
+    // If backend Express server is running, also persist the anonymized image to server
+    try {
+      const fetchRes = await fetch(blurredDataUrl);
+      const blob = await fetchRes.blob();
+      const file = new File(
+        [blob],
+        `${formData.connectedPanoId || 'pano_' + Date.now()}.jpg`,
+        { type: 'image/jpeg' }
+      );
+
+      const uploadData = new FormData();
+      uploadData.append('panorama', file);
+      uploadData.append('lat', formData.lat);
+      uploadData.append('lng', formData.lng);
+      uploadData.append('heading', formData.heading || '0');
+      uploadData.append('label', formData.name || 'Tourist Spot 360');
+      uploadData.append('description', formData.description || '');
+
+      const res = await fetch(`${API_BASE}/api/panoramas`, {
+        method: 'POST',
+        body: uploadData,
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setFormData((prev) => ({
+          ...prev,
+          connectedPanoId: result.id,
+          connectedPanoType: 'local',
+          uploadedPanoUrl: `${API_BASE}/panoramas/${result.filename}`,
+        }));
+      }
+    } catch (err) {
+      console.warn('Backend privacy blur sync omitted (offline/static):', err);
     }
   };
 
@@ -911,15 +960,48 @@ export default function TouristSpotModal({
                         }}
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#34d399' }}>
                             ✓ Dedicated 360° Photo Attached
                           </span>
+                          {privacyBlurredCount > 0 && (
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: 'rgba(52, 211, 153, 0.2)',
+                                color: '#34d399',
+                                border: '1px solid rgba(52, 211, 153, 0.4)',
+                              }}
+                            >
+                              🛡️ Privacy Anonymized ({privacyBlurredCount} zones)
+                            </span>
+                          )}
                         </div>
                         <p style={{ fontSize: '0.68rem', color: '#94a3b8', margin: '2px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           ID: {formData.connectedPanoId || 'local_panorama'}
                         </p>
-                        <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowBlurStudio(true)}
+                            className="btn btn-secondary"
+                            style={{
+                              fontSize: '0.72rem',
+                              padding: '3px 8px',
+                              background: 'rgba(16, 185, 129, 0.2)',
+                              color: '#34d399',
+                              borderColor: 'rgba(52, 211, 153, 0.4)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                            title="Open Privacy Blur Studio to outline & blur faces, license plates, and camera rigs"
+                          >
+                            <span>🛡️</span>
+                            <span>Privacy Blur (Faces & Plates)</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
@@ -1081,6 +1163,17 @@ export default function TouristSpotModal({
           </div>
         </form>
       </div>
+
+      {/* Privacy Blur Studio Modal */}
+      {showBlurStudio && formData.uploadedPanoUrl && (
+        <PrivacyBlurStudio
+          isOpen={showBlurStudio}
+          onClose={() => setShowBlurStudio(false)}
+          imageUrl={formData.uploadedPanoUrl}
+          imageName={formData.name || '360 Panorama'}
+          onSaveBlurredImage={handleSaveBlurredImage}
+        />
+      )}
     </div>
   );
 }

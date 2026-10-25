@@ -529,26 +529,6 @@ export default function App() {
             🧭 Route
           </button>
 
-          {/* Street View Layout Toggle (Half Screen vs Full Screen) */}
-          {viewerOpen && (
-            <button
-              className="btn btn-secondary"
-              onClick={() => setViewerLayout(viewerLayout === 'fullscreen' ? 'split' : 'fullscreen')}
-              title={viewerLayout === 'fullscreen' ? 'Switch to 50/50 Half Screen' : 'Switch to Full Browser Screen'}
-              style={{
-                fontSize: '0.8rem',
-                padding: '6px 12px',
-                borderRadius: 'var(--radius-full)',
-                background: viewerLayout === 'fullscreen' ? 'rgba(67, 97, 238, 0.4)' : 'rgba(0,0,0,0.6)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                color: '#ffffff',
-                fontWeight: 600,
-              }}
-            >
-              {viewerLayout === 'fullscreen' ? '◫ 50/50 Half Screen' : '⛶ Full Screen'}
-            </button>
-          )}
-
           <div className="controls-separator" />
 
           {/* Admin-only controls */}

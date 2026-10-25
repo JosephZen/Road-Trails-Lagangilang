@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import ExifReader from 'exifreader';
+import PrivacyBlurStudio from './PrivacyBlurStudio';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -21,7 +22,36 @@ export default function UploadModal({ isOpen, onClose, onUploadComplete }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
+  const [activeBlurIndex, setActiveBlurIndex] = useState(null);
   const fileInputRef = useRef(null);
+
+  const handleSaveBlurredFile = (blurredDataUrl, zoneCount) => {
+    if (activeBlurIndex === null || !files[activeBlurIndex]) return;
+
+    fetch(blurredDataUrl)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const originalFile = files[activeBlurIndex];
+        const updatedFile = new File([blob], originalFile.name, { type: 'image/jpeg' });
+
+        setFiles((prev) => {
+          const next = [...prev];
+          next[activeBlurIndex] = updatedFile;
+          return next;
+        });
+
+        setPreviews((prev) => {
+          const next = [...prev];
+          next[activeBlurIndex] = {
+            ...next[activeBlurIndex],
+            url: blurredDataUrl,
+            blurred: true,
+            zoneCount,
+          };
+          return next;
+        });
+      });
+  };
 
   const handleFiles = useCallback((newFiles) => {
     const imageFiles = Array.from(newFiles).filter((f) =>
@@ -209,8 +239,34 @@ export default function UploadModal({ isOpen, onClose, onUploadComplete }) {
         {previews.length > 0 && (
           <div className="upload-preview">
             {previews.map((preview, index) => (
-              <div key={index} className="upload-preview-item">
+              <div key={index} className="upload-preview-item" style={{ position: 'relative' }}>
                 <img src={preview.url} alt={preview.name} />
+                <button
+                  type="button"
+                  style={{
+                    position: 'absolute',
+                    bottom: '4px',
+                    left: '4px',
+                    background: preview.blurred ? 'rgba(16, 185, 129, 0.9)' : 'rgba(15, 23, 42, 0.85)',
+                    color: preview.blurred ? '#ffffff' : '#ffd700',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    fontSize: '0.62rem',
+                    padding: '2px 5px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveBlurIndex(index);
+                  }}
+                  title="Open Privacy Blur Studio for this image"
+                >
+                  <span>🛡️</span>
+                  <span>{preview.blurred ? `Blurred (${preview.zoneCount})` : 'Privacy Blur'}</span>
+                </button>
                 <button
                   className="remove-btn"
                   onClick={(e) => {
@@ -329,6 +385,17 @@ export default function UploadModal({ isOpen, onClose, onUploadComplete }) {
           </button>
         </div>
       </div>
+
+      {/* Privacy Blur Studio Modal for active image */}
+      {activeBlurIndex !== null && previews[activeBlurIndex] && (
+        <PrivacyBlurStudio
+          isOpen={activeBlurIndex !== null}
+          onClose={() => setActiveBlurIndex(null)}
+          imageUrl={previews[activeBlurIndex].url}
+          imageName={previews[activeBlurIndex].name}
+          onSaveBlurredImage={handleSaveBlurredFile}
+        />
+      )}
     </div>
   );
 }
