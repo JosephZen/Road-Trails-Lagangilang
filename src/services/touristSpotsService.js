@@ -105,12 +105,7 @@ export function getDefaultCategoryIcon(category, spotType = 'tourist_spot') {
  */
 export function isObsoleteSpot(s) {
   if (!s) return true;
-  if (s.id && (s.id.startsWith('spot_') || OBSOLETE_SPOT_IDS.has(s.id))) return true;
-  const name = (s.name || '').toLowerCase();
-  // Filter out obsolete legacy ASIST (superseded by University of Abra Main Campus)
-  if (name.includes('asist') && !name.includes('university of abra')) return true;
-  // Filter out obsolete town hall / municipality
-  if (name.includes('town hall') || name.includes('municipality') || name.includes('municipal')) return true;
+  if (s.id && OBSOLETE_SPOT_IDS.has(s.id)) return true;
   return false;
 }
 
@@ -323,28 +318,26 @@ export const touristSpotsService = {
             changed = true;
           }
 
-          // Migrate legacy local "pano_..." or small integer IDs to verified Mapillary IDs
+          if (s.id === 'poi_quirsodan_dam' && s.connected360?.targetId === '1532761357806896') {
+            s.connected360.targetId = null;
+            changed = true;
+          }
+
+          // Preserve dedicated local uploads and valid 360 links
           const targetId = s.connected360?.targetId;
-          if (
-            targetId &&
-            (String(targetId).startsWith('pano_') ||
-              String(targetId).length < 10 ||
-              !/^\d+$/.test(String(targetId)))
-          ) {
+          const isLocalUpload =
+            s.connected360?.type === 'local' ||
+            !!s.connected360?.imageUrl ||
+            (targetId && String(targetId).startsWith('pano_'));
+
+          if (!isLocalUpload && targetId && (String(targetId).length < 10 || !/^\d+$/.test(String(targetId)))) {
             const matchedSeed = Array.isArray(seedSpots)
               ? seedSpots.find((seed) => seed.id === s.id)
               : null;
             if (matchedSeed && matchedSeed.connected360?.targetId) {
               s.connected360 = matchedSeed.connected360;
-            } else {
-              s.connected360 = {
-                type: 'mapillary',
-                targetId: '1532761357806896', // Fallback to University of Abra Main Campus Gate
-                heading: 45,
-                pitch: -5,
-              };
+              changed = true;
             }
-            changed = true;
           }
         });
 
@@ -385,34 +378,47 @@ export const touristSpotsService = {
   saveDraftLocally(spotData, availablePanoramas = []) {
     const all = this.getAllSpots();
     const id = spotData.id || `poi_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const lat = parseFloat(spotData.location?.lat ?? spotData.lat);
+    const lng = parseFloat(spotData.location?.lng ?? spotData.lng);
 
     // Resolve 360 panorama connection
     let connected360 = spotData.connected360;
-    if (!connected360 || !connected360.targetId) {
-      const nearestPano = findNearestPanorama(
-        spotData.location.lat,
-        spotData.location.lng,
-        availablePanoramas
-      );
+    const isLocalUpload =
+      connected360?.type === 'local' ||
+      !!connected360?.imageUrl ||
+      (connected360?.targetId && String(connected360.targetId).startsWith('pano_'));
+
+    if (!connected360 || (!connected360.targetId && !isLocalUpload)) {
+      const nearestPano = findNearestPanorama(lat, lng, availablePanoramas);
       connected360 = nearestPano
         ? {
-            type: 'mapillary',
+            type: nearestPano.type || 'mapillary',
             targetId: nearestPano.id,
+            imageUrl: nearestPano.imageUrl || null,
             heading: 0,
             pitch: 0,
             distanceMeters: nearestPano.distanceMeters,
           }
         : {
-            type: 'mapillary',
-            targetId: '1532761357806896',
-            heading: 0,
-            pitch: 0,
+            type: spotData.connected360?.type || 'mapillary',
+            targetId: spotData.connected360?.targetId || null,
+            imageUrl: spotData.connected360?.imageUrl || null,
+            heading: parseFloat(spotData.connected360?.heading) || 0,
+            pitch: parseFloat(spotData.connected360?.pitch) || 0,
           };
     }
 
     const newSpot = {
       ...spotData,
       id,
+      lat,
+      lng,
+      location: {
+        ...(spotData.location || {}),
+        lat,
+        lng,
+        address: spotData.address || spotData.location?.address || `${spotData.name}, Lagangilang, Abra`,
+      },
       sync_status: 'staged_local',
       staged_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -431,6 +437,14 @@ export const touristSpotsService = {
     }
 
     this.saveAllSpots(updated);
+
+    // Asynchronously mirror new spot to Express backend (persisting to tourist_spots.json & DB)
+    fetch(`${API_BASE}/api/tourist-spots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSpot),
+    }).catch((err) => console.warn('Background mirror to server omitted:', err));
+
     return newSpot;
   },
 

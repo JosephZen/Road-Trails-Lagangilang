@@ -61,12 +61,16 @@ export function useMapillary() {
 
       setLoading(false);
 
-      // Sort: 360 spherical panoramas prioritized first, then closest by distance
+      // Sort: Closest by spatial distance to requested coordinates
       items.sort((a, b) => {
-        if (a.isPano && !b.isPano) return -1;
-        if (!a.isPano && b.isPano) return 1;
         const distA = Math.hypot(a.lat - lat, a.lng - lng);
         const distB = Math.hypot(b.lat - lat, b.lng - lng);
+        // If distance difference is meaningful (> ~25m), strictly prioritize closest node
+        if (Math.abs(distA - distB) > 0.00025) {
+          return distA - distB;
+        }
+        if (a.isPano && !b.isPano) return -1;
+        if (!a.isPano && b.isPano) return 1;
         return distA - distB;
       });
 

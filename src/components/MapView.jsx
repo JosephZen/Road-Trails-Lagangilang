@@ -111,6 +111,7 @@ export default function MapView({
   routingMode = false,
   pickingMode = null,
   isAdmin = false,
+  isDraggable = false,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -931,12 +932,14 @@ export default function MapView({
       const cleanCategory = normalizeCategoryName(spot.category);
       const icon = spot.categoryIcon || getDefaultCategoryIcon(cleanCategory, spot.spotType) || (isPoi ? '📍' : '⭐');
 
+      const canDrag = !!isAdmin && !!isDraggable;
+
       const el = document.createElement('div');
       el.className = `poi-marker ${isPoi ? 'poi-service' : 'poi-attraction'} ${
         spot.id === activeTouristSpotId ? 'active' : ''
-      } ${spot.sync_status === 'staged_local' ? 'staged' : ''} ${isAdmin ? 'is-admin-draggable' : ''}`;
+      } ${spot.sync_status === 'staged_local' ? 'staged' : ''} ${canDrag ? 'is-admin-draggable' : ''}`;
       el.dataset.poiId = spot.id;
-      el.title = isAdmin ? `${spot.name} • Drag to reposition` : spot.name;
+      el.title = canDrag ? `${spot.name} • Drag to reposition` : spot.name;
 
       el.innerHTML = `
         <div class="poi-marker-inner">
@@ -959,12 +962,12 @@ export default function MapView({
       const marker = new maplibregl.Marker({
         element: el,
         anchor: 'bottom',
-        draggable: !!isAdmin,
+        draggable: canDrag,
       })
         .setLngLat([lng, lat])
         .addTo(map);
 
-      if (isAdmin) {
+      if (canDrag) {
         marker.on('dragstart', () => {
           wasDragged = true;
           el.classList.add('is-dragging');
@@ -988,7 +991,7 @@ export default function MapView({
       poiMarkersRef.current.forEach((m) => m.remove());
       poiMarkersRef.current = [];
     };
-  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot, onSpotLocationChange, isAdmin]);
+  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot, onSpotLocationChange, isAdmin, isDraggable]);
 
   // Fly to active tourist spot when selected
   useEffect(() => {

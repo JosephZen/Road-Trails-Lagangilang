@@ -43,7 +43,7 @@
     "pseudoTheme": "teal",
     "connected360": {
       "type": "mapillary",
-      "targetId": "1532761357806896",
+      "targetId": null,
       "heading": 90,
       "pitch": 0
     },
@@ -59,8 +59,8 @@
     "categoryIcon": "⛪",
     "barangay": "Poblacion",
     "location": {
-      "lat": 17.60858,
-      "lng": 120.735127,
+      "lat": 17.608615,
+      "lng": 120.735147,
       "address": "Church Road, Barangay Poblacion, Lagangilang, Abra"
     },
     "description": "Historic Roman Catholic parish and spiritual sanctuary of Lagangilang, known for Spanish-colonial-inspired brick architecture and Holy Cross fiesta celebrations.",
@@ -74,8 +74,8 @@
       "pitch": 0
     },
     "sync_status": "synced_cloud",
-    "lat": 17.60858,
-    "lng": 120.735127
+    "lat": 17.608615,
+    "lng": 120.735147
   },
   {
     "id": "poi_talinawen_spring",
@@ -187,8 +187,8 @@
     "categoryIcon": "🐟",
     "barangay": "Poblacion",
     "location": {
-      "lat": 17.612026,
-      "lng": 120.739084,
+      "lat": 17.612116,
+      "lng": 120.739168,
       "address": "Aquaculture Research Center, UA Main Campus, Lagangilang, Abra"
     },
     "description": "University of Abra freshwater aquaculture research facility and fish ponds, demonstrating sustainable tilapia breeding, fish farming, and aquatic agro-fishery practices.",
@@ -202,8 +202,8 @@
       "pitch": 0
     },
     "sync_status": "synced_cloud",
-    "lat": 17.612026,
-    "lng": 120.739084
+    "lat": 17.612116,
+    "lng": 120.739168
   },
   {
     "id": "poi_ua_tamarind_farm",

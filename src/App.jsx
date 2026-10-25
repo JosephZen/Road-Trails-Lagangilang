@@ -69,6 +69,7 @@ export default function App() {
   // Theme & Auth State
   const [mapTheme, setMapTheme] = useState(() => localStorage.getItem('lagangilang_map_theme') || 'light'); // 'dark' | 'light' | 'beige' | 'satellite'
   const [isAdmin, setIsAdmin] = useState(false);
+  const [pinsDraggable, setPinsDraggable] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
 
   // Mapillary Street View state
@@ -223,12 +224,17 @@ export default function App() {
         spot.connected360?.type === 'local' ||
         !!spot.connected360?.imageUrl ||
         (customPanoId && String(customPanoId).startsWith('pano_'));
-      const isValidPanoId =
-        customPanoId && String(customPanoId).length >= 10 && /^\d+$/.test(String(customPanoId));
+
+      // Dedicated Mapillary pano ID (exclude the legacy gate fallback 1532761357806896 unless it's actually UA gate)
+      const isDedicatedPanoId =
+        customPanoId &&
+        String(customPanoId).length >= 10 &&
+        /^\d+$/.test(String(customPanoId)) &&
+        (String(customPanoId) !== '1532761357806896' || spot.id === 'poi_ua_main_gate');
 
       if (isLocalPano) {
         setStreetViewPos({ lat, lng, id: String(customPanoId || spot.id) });
-      } else if (isValidPanoId) {
+      } else if (isDedicatedPanoId) {
         setMapillaryImageId(String(customPanoId));
         setStreetViewPos({ lat, lng, id: String(customPanoId) });
       } else {
@@ -574,6 +580,43 @@ export default function App() {
                 ⭐ + Add Spot
               </button>
 
+              {/* Pin Repositioning Lock / Unlock Button */}
+              <button
+                className={`btn btn-sm ${pinsDraggable ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => {
+                  const nextState = !pinsDraggable;
+                  setPinsDraggable(nextState);
+                  showToast(
+                    nextState
+                      ? '🔓 Pin repositioning unlocked: Drag landmarks or POIs to adjust coordinates.'
+                      : '🔒 Pin repositioning locked: Marker positions are secured.'
+                  );
+                }}
+                title={
+                  pinsDraggable
+                    ? 'Pins are UNLOCKED for dragging. Click to lock against movement.'
+                    : 'Pins are LOCKED against accidental movement. Click to unlock repositioning.'
+                }
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  background: pinsDraggable
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                    : 'rgba(0,0,0,0.6)',
+                  border: pinsDraggable
+                    ? '1px solid #34d399'
+                    : '1px solid rgba(255,255,255,0.15)',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>{pinsDraggable ? '🔓 Reposition ON' : '🔒 Pins Locked'}</span>
+              </button>
+
               {/* Online/Offline indicator */}
               <div
                 style={{
@@ -690,6 +733,7 @@ export default function App() {
           routingMode={routingMode || !!pickingTarget}
           pickingMode={pickingTarget}
           isAdmin={isAdmin}
+          isDraggable={isAdmin && pinsDraggable}
         />
 
         {/* Resize handle */}
