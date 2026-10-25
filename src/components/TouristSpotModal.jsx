@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import PseudoImage from './PseudoImage';
+import React, { useState, useEffect, useRef } from 'react';
+import PseudoImage, { THEMES } from './PseudoImage';
 import {
   touristSpotsService,
   normalizeCategoryName,
   getDefaultCategoryIcon,
 } from '../services/touristSpotsService';
 import { useMapillary } from '../hooks/useMapillary';
+
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 export const TOURIST_CATEGORIES = [
   { name: 'Nature & Eco-Tourism', icon: '🏞️' },
@@ -64,8 +66,6 @@ export const LAGANGILANG_BARANGAYS = [
 
 export const BARANGAYS = LAGANGILANG_BARANGAYS;
 
-const THEMES = ['indigo', 'emerald', 'amber', 'cyan', 'rose', 'teal', 'violet', 'orange'];
-
 export default function TouristSpotModal({
   isOpen,
   onClose,
@@ -77,11 +77,14 @@ export default function TouristSpotModal({
   const [spotType, setSpotType] = useState('tourist_spot'); // 'tourist_spot' | 'poi'
   const { searchNearby } = useMapillary();
   const [detectingMapillary, setDetectingMapillary] = useState(false);
+  const [panoSourceTab, setPanoSourceTab] = useState('upload'); // 'upload' | 'mapillary'
+  const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     name: '',
     category: TOURIST_CATEGORIES[0].name,
     categoryIcon: TOURIST_CATEGORIES[0].icon,
+    cardVisualIcon: null, // null means auto-linked to categoryIcon
     barangay: BARANGAYS[0],
     lat: '17.6167',
     lng: '120.7333',
@@ -91,6 +94,8 @@ export default function TouristSpotModal({
     usePseudoImage: true,
     pseudoTheme: 'indigo',
     connectedPanoId: '',
+    connectedPanoType: 'mapillary',
+    uploadedPanoUrl: '',
     heading: '0',
     pitch: '0',
   });
@@ -112,12 +117,22 @@ export default function TouristSpotModal({
       const matched = categoryList.find((c) => c.name === currentCategory);
       const defaultIcon = matched?.icon || getDefaultCategoryIcon(currentCategory, currentType);
 
+      const targetId = editingSpot.connected360?.targetId || '';
+      const isLocal =
+        editingSpot.connected360?.type === 'local' ||
+        editingSpot.connected360?.imageUrl ||
+        String(targetId).startsWith('pano_');
+
+      setPanoSourceTab(isLocal ? 'upload' : 'mapillary');
+
       setFormData({
         name: editingSpot.name || '',
         category: currentCategory,
-        categoryIcon: editingSpot.categoryIcon && editingSpot.categoryIcon !== '⭐'
-          ? editingSpot.categoryIcon
-          : defaultIcon,
+        categoryIcon:
+          editingSpot.categoryIcon && editingSpot.categoryIcon !== '⭐'
+            ? editingSpot.categoryIcon
+            : defaultIcon,
+        cardVisualIcon: editingSpot.cardVisualIcon || null,
         barangay: editingSpot.barangay || BARANGAYS[0],
         lat: String(editingSpot.location?.lat || editingSpot.lat || '17.6167'),
         lng: String(editingSpot.location?.lng || editingSpot.lng || '120.7333'),
@@ -126,12 +141,18 @@ export default function TouristSpotModal({
         image: editingSpot.image || '',
         usePseudoImage: editingSpot.isPseudoImage ?? !editingSpot.image,
         pseudoTheme: editingSpot.pseudoTheme || (isPoi ? 'cyan' : 'indigo'),
-        connectedPanoId: editingSpot.connected360?.targetId || '',
+        connectedPanoId: targetId,
+        connectedPanoType: isLocal ? 'local' : 'mapillary',
+        uploadedPanoUrl:
+          editingSpot.connected360?.imageUrl ||
+          (isLocal && targetId ? `${API_BASE}/panoramas/${targetId}.jpg` : '') ||
+          '',
         heading: String(editingSpot.connected360?.heading ?? '0'),
         pitch: String(editingSpot.connected360?.pitch ?? '0'),
       });
     } else {
       setSpotType('tourist_spot');
+      setPanoSourceTab('upload');
       const baseLat = initialCoords ? parseFloat(initialCoords.lat).toFixed(6) : '17.6082';
       const baseLng = initialCoords ? parseFloat(initialCoords.lng).toFixed(6) : '120.7380';
 
@@ -139,6 +160,7 @@ export default function TouristSpotModal({
         name: '',
         category: TOURIST_CATEGORIES[0].name,
         categoryIcon: TOURIST_CATEGORIES[0].icon,
+        cardVisualIcon: null,
         barangay: BARANGAYS[0],
         lat: baseLat,
         lng: baseLng,
@@ -148,6 +170,8 @@ export default function TouristSpotModal({
         usePseudoImage: true,
         pseudoTheme: 'indigo',
         connectedPanoId: '',
+        connectedPanoType: 'mapillary',
+        uploadedPanoUrl: '',
         heading: '0',
         pitch: '0',
       });
@@ -187,6 +211,54 @@ export default function TouristSpotModal({
     }));
   };
 
+  // Dedicated 360 Panorama File Upload handler
+  const handlePanoFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 1. Instant local preview
+    const reader = new FileReader();
+    reader.onload = (uploadEvt) => {
+      const dataUrl = uploadEvt.target.result;
+      setFormData((prev) => ({
+        ...prev,
+        uploadedPanoUrl: dataUrl,
+        connectedPanoType: 'local',
+        connectedPanoId: prev.connectedPanoId || `pano_${Date.now()}`,
+      }));
+    };
+    reader.readAsDataURL(file);
+
+    // 2. Upload to backend if server is active
+    try {
+      const uploadData = new FormData();
+      uploadData.append('panorama', file);
+      uploadData.append('lat', formData.lat);
+      uploadData.append('lng', formData.lng);
+      uploadData.append('heading', formData.heading || '0');
+      uploadData.append('label', formData.name || 'Tourist Spot 360');
+      uploadData.append('description', formData.description || '');
+
+      const res = await fetch(`${API_BASE}/api/panoramas`, {
+        method: 'POST',
+        body: uploadData,
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setFormData((prev) => ({
+          ...prev,
+          connectedPanoId: result.id,
+          connectedPanoType: 'local',
+          uploadedPanoUrl: `${API_BASE}/panoramas/${result.filename}`,
+          image: prev.image || `${API_BASE}/panoramas/${result.filename}`,
+        }));
+      }
+    } catch (err) {
+      console.warn('Backend panorama upload omitted (running client-side / offline mode):', err);
+    }
+  };
+
   // Auto-detect closest Mapillary street view image based on currently typed lat/lng
   const handleAutoDetectNearestPano = async () => {
     const lat = parseFloat(formData.lat);
@@ -204,6 +276,7 @@ export default function TouristSpotModal({
         setFormData((prev) => ({
           ...prev,
           connectedPanoId: closest.id,
+          connectedPanoType: 'mapillary',
         }));
         alert(`Linked to nearest Mapillary Street View image ID: "${closest.id}"!`);
       } else {
@@ -216,7 +289,7 @@ export default function TouristSpotModal({
     }
   };
 
-  // Save to System (local storage + mirrored to local disk & postgres)
+  // Save to System
   const handleSaveToSystem = (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
@@ -228,12 +301,16 @@ export default function TouristSpotModal({
     const latNum = parseFloat(formData.lat);
     const lngNum = parseFloat(formData.lng);
 
+    const isLocalPano = formData.connectedPanoType === 'local' || !!formData.uploadedPanoUrl;
+    const finalTargetId = formData.connectedPanoId || (isLocalPano ? `pano_${Date.now()}` : null);
+
     const spotPayload = {
       ...(editingSpot || {}),
       name: formData.name.trim(),
       spotType,
       category: formData.category,
       categoryIcon: formData.categoryIcon,
+      cardVisualIcon: formData.cardVisualIcon || null,
       barangay: formData.barangay,
       lat: latNum,
       lng: lngNum,
@@ -245,12 +322,13 @@ export default function TouristSpotModal({
       },
       address: formData.address,
       description: formData.description,
-      image: formData.usePseudoImage ? null : formData.image || null,
-      isPseudoImage: formData.usePseudoImage,
+      image: formData.uploadedPanoUrl || (formData.usePseudoImage ? null : formData.image || null),
+      isPseudoImage: formData.usePseudoImage && !formData.uploadedPanoUrl,
       pseudoTheme: formData.pseudoTheme,
       connected360: {
-        type: 'mapillary',
-        targetId: formData.connectedPanoId || null,
+        type: isLocalPano ? 'local' : 'mapillary',
+        targetId: finalTargetId,
+        imageUrl: formData.uploadedPanoUrl || null,
         heading: parseFloat(formData.heading) || 0,
         pitch: parseFloat(formData.pitch) || 0,
       },
@@ -276,7 +354,7 @@ export default function TouristSpotModal({
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-card glass-panel" style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="modal-card glass-panel" style={{ maxWidth: '620px', maxHeight: '90vh', overflowY: 'auto' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <div>
@@ -292,7 +370,7 @@ export default function TouristSpotModal({
           </button>
         </div>
 
-        {/* Spot Type Switcher Tabs (Tourist Attraction vs POI Services) */}
+        {/* Spot Type Switcher Tabs */}
         <div
           style={{
             display: 'flex',
@@ -467,15 +545,15 @@ export default function TouristSpotModal({
             </div>
           </div>
 
-          {/* ========== Designed Placement & Coordinates Box ========== */}
+          {/* ========== Coherent Placement & Coordinates Box ========== */}
           <div
             className="placement-box"
             style={{
               padding: '12px 14px',
               borderRadius: 'var(--radius-md)',
-              background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%)',
-              border: '1.5px solid rgba(67, 97, 238, 0.4)',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
               marginBottom: '14px',
             }}
           >
@@ -493,9 +571,9 @@ export default function TouristSpotModal({
               </div>
               <span
                 style={{
-                  fontSize: '0.7rem',
+                  fontSize: '0.72rem',
                   fontWeight: 600,
-                  padding: '3px 8px',
+                  padding: '3px 10px',
                   borderRadius: 'var(--radius-full)',
                   background: 'rgba(67, 97, 238, 0.25)',
                   color: '#93c5fd',
@@ -509,7 +587,7 @@ export default function TouristSpotModal({
             {/* Coordinates Inputs */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
               <div>
-                <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                   <span>🌐</span> Latitude (N) *
                 </label>
                 <input
@@ -525,14 +603,13 @@ export default function TouristSpotModal({
                     fontFamily: 'monospace',
                     fontSize: '0.88rem',
                     fontWeight: 600,
-                    background: 'rgba(15, 23, 42, 0.9)',
-                    borderColor: 'rgba(67, 97, 238, 0.45)',
+                    color: '#38bdf8',
                   }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                   <span>🌐</span> Longitude (E) *
                 </label>
                 <input
@@ -548,8 +625,7 @@ export default function TouristSpotModal({
                     fontFamily: 'monospace',
                     fontSize: '0.88rem',
                     fontWeight: 600,
-                    background: 'rgba(15, 23, 42, 0.9)',
-                    borderColor: 'rgba(67, 97, 238, 0.45)',
+                    color: '#38bdf8',
                   }}
                 />
               </div>
@@ -563,7 +639,7 @@ export default function TouristSpotModal({
                 gap: '6px',
                 padding: '6px 10px',
                 borderRadius: 'var(--radius-sm)',
-                background: 'rgba(0, 0, 0, 0.4)',
+                background: 'rgba(0, 0, 0, 0.3)',
                 border: '1px dashed rgba(255, 255, 255, 0.15)',
                 fontSize: '0.72rem',
                 color: '#cbd5e1',
@@ -606,21 +682,24 @@ export default function TouristSpotModal({
             />
           </div>
 
-          {/* Image & Pseudo-Image Palette */}
+          {/* ========== Card Visual Representation (14 Themes + Auto-Linked Icon) ========== */}
           <div
             style={{
-              padding: '10px',
+              padding: '12px',
               borderRadius: 'var(--radius-md)',
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid var(--border-subtle)',
-              marginBottom: '12px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              marginBottom: '14px',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                🖼️ Card Visual Representation
-              </span>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1rem' }}>🖼️</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f8fafc' }}>
+                  Card Visual Representation
+                </span>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', cursor: 'pointer', color: '#93c5fd' }}>
                 <input
                   type="checkbox"
                   name="usePseudoImage"
@@ -633,38 +712,78 @@ export default function TouristSpotModal({
 
             {formData.usePseudoImage ? (
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Theme Palette:</span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {THEMES.map((theme) => (
+                {/* 14 Themes Gradient Palette */}
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      Theme Palette ({Object.keys(THEMES).length} Gradients):
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#ffd700', fontWeight: 600 }}>
+                      {THEMES[formData.pseudoTheme]?.name || 'Theme'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {Object.values(THEMES).map((t) => (
                       <button
-                        key={theme}
+                        key={t.id}
                         type="button"
-                        onClick={() => setFormData((prev) => ({ ...prev, pseudoTheme: theme }))}
+                        onClick={() => setFormData((prev) => ({ ...prev, pseudoTheme: t.id }))}
                         style={{
-                          width: '20px',
-                          height: '20px',
+                          width: '26px',
+                          height: '26px',
                           borderRadius: '50%',
-                          border: formData.pseudoTheme === theme ? '2px solid white' : '1px solid rgba(255,255,255,0.2)',
-                          background: theme,
+                          border: formData.pseudoTheme === t.id ? '2.5px solid #ffd700' : '1px solid rgba(255,255,255,0.25)',
+                          background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
                           cursor: 'pointer',
+                          boxShadow: formData.pseudoTheme === t.id ? '0 0 10px rgba(255, 215, 0, 0.7)' : 'none',
+                          transform: formData.pseudoTheme === t.id ? 'scale(1.15)' : 'scale(1)',
+                          transition: 'all 0.15s ease',
                         }}
-                        title={theme}
+                        title={t.name}
                       />
                     ))}
                   </div>
                 </div>
 
+                {/* Card Icon Link Status */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', padding: '5px 10px', background: 'rgba(0,0,0,0.25)', borderRadius: 'var(--radius-sm)' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>
+                    Visual Card Icon:
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '1.15rem' }}>
+                      {formData.cardVisualIcon || formData.categoryIcon || '⭐'}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: !formData.cardVisualIcon ? '#34d399' : '#ffd700' }}>
+                      {!formData.cardVisualIcon ? '🔗 Synced with Location Marker' : 'Custom Card Icon'}
+                    </span>
+                    {formData.cardVisualIcon && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, cardVisualIcon: null }))}
+                        className="btn btn-ghost"
+                        style={{ fontSize: '0.68rem', padding: '1px 6px', color: '#93c5fd' }}
+                        title="Reset to automatically follow location marker icon"
+                      >
+                        Reset to Sync
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live Preview */}
                 <PseudoImage
                   title={formData.name || (spotType === 'tourist_spot' ? 'Sample Attraction' : 'Sample Facility')}
                   category={formData.category}
+                  categoryIcon={formData.cardVisualIcon || formData.categoryIcon}
                   theme={formData.pseudoTheme}
-                  height="90px"
+                  height="100px"
+                  showWatermark={true}
                 />
               </div>
             ) : (
               <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Image URL or Path</label>
+                <label style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Image URL or Path</label>
                 <input
                   type="text"
                   name="image"
@@ -672,55 +791,229 @@ export default function TouristSpotModal({
                   value={formData.image}
                   onChange={handleChange}
                   className="input-field"
-                  style={{ width: '100%', marginTop: '2px' }}
+                  style={{ width: '100%', marginTop: '4px' }}
                 />
               </div>
             )}
           </div>
 
-          {/* 360 Mapillary Street View Linkage */}
+          {/* ========== Connected 360° Street View & Dedicated Panorama Image Section ========== */}
           <div
             style={{
-              padding: '10px',
+              padding: '12px',
               borderRadius: 'var(--radius-md)',
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid var(--border-subtle)',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
               marginBottom: '16px',
             }}
           >
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-glow)', display: 'block', marginBottom: '6px' }}>
-              🌐 Connected 360° Street View & Panorama Image (Database Upload)
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.1rem' }}>🌐</span>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent-glow)' }}>
+                  Connected 360° Street View & Panorama Node
+                </span>
+              </div>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr auto 1fr 1fr', gap: '8px', alignItems: 'end' }}>
+            {/* Source Switcher: Upload 360 Photo vs Mapillary Sequence */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '6px',
+                background: 'rgba(0,0,0,0.3)',
+                padding: '3px',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: '12px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPanoSourceTab('upload')}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  background: panoSourceTab === 'upload' ? 'rgba(67, 97, 238, 0.45)' : 'transparent',
+                  color: panoSourceTab === 'upload' ? '#ffffff' : 'var(--text-muted)',
+                }}
+              >
+                <span>📷</span>
+                <span>Dedicated 360° Photo Upload</span>
+                {formData.uploadedPanoUrl && <span style={{ color: '#34d399', fontSize: '0.75rem' }}>✓</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPanoSourceTab('mapillary')}
+                style={{
+                  flex: 1,
+                  padding: '6px 10px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  background: panoSourceTab === 'mapillary' ? 'rgba(67, 97, 238, 0.45)' : 'transparent',
+                  color: panoSourceTab === 'mapillary' ? '#ffffff' : 'var(--text-muted)',
+                }}
+              >
+                <span>🌐</span>
+                <span>Mapillary Sequence Link</span>
+                {formData.connectedPanoId && panoSourceTab !== 'upload' && <span style={{ color: '#34d399', fontSize: '0.75rem' }}>✓</span>}
+              </button>
+            </div>
+
+            {panoSourceTab === 'upload' ? (
               <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>360 Image / Mapillary ID</label>
+                {/* Upload Dropzone */}
                 <input
-                  type="text"
-                  name="connectedPanoId"
-                  placeholder="e.g. 1532761357806896 or custom pano ID"
-                  value={formData.connectedPanoId}
-                  onChange={handleChange}
-                  className="input-field"
-                  style={{ width: '100%' }}
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handlePanoFileUpload}
+                  style={{ display: 'none' }}
                 />
-              </div>
 
-              <div>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleAutoDetectNearestPano}
-                  disabled={detectingMapillary}
-                  style={{ fontSize: '0.72rem', padding: '7px 10px', whiteSpace: 'nowrap' }}
-                  title="Detect nearest Mapillary 360 image from coordinates"
-                >
-                  {detectingMapillary ? '⏳ Searching...' : '🔍 Detect Nearest'}
-                </button>
+                {formData.uploadedPanoUrl ? (
+                  <div
+                    style={{
+                      position: 'relative',
+                      borderRadius: 'var(--radius-sm)',
+                      overflow: 'hidden',
+                      border: '1px solid rgba(52, 211, 153, 0.5)',
+                      background: 'rgba(0,0,0,0.4)',
+                      padding: '8px',
+                      marginBottom: '10px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <img
+                        src={formData.uploadedPanoUrl}
+                        alt="360 Panorama Preview"
+                        style={{
+                          width: '110px',
+                          height: '60px',
+                          objectFit: 'cover',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#34d399' }}>
+                            ✓ Dedicated 360° Photo Attached
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.68rem', color: '#94a3b8', margin: '2px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          ID: {formData.connectedPanoId || 'local_panorama'}
+                        </p>
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="btn btn-ghost"
+                            style={{ fontSize: '0.68rem', padding: '2px 6px', color: '#93c5fd' }}
+                          >
+                            🔄 Replace Photo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                uploadedPanoUrl: '',
+                                connectedPanoId: '',
+                                connectedPanoType: 'mapillary',
+                              }))
+                            }
+                            className="btn btn-ghost"
+                            style={{ fontSize: '0.68rem', padding: '2px 6px', color: '#ef4444' }}
+                          >
+                            ✕ Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      cursor: 'pointer',
+                      padding: '16px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '2px dashed rgba(67, 97, 238, 0.45)',
+                      background: 'rgba(67, 97, 238, 0.08)',
+                      textAlign: 'center',
+                      marginBottom: '10px',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#ffd700';
+                      e.currentTarget.style.background = 'rgba(255, 215, 0, 0.08)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(67, 97, 238, 0.45)';
+                      e.currentTarget.style.background = 'rgba(67, 97, 238, 0.08)';
+                    }}
+                  >
+                    <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '4px' }}>📁</span>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f8fafc', display: 'block' }}>
+                      Click to Browse or Drag & Drop 360° Panorama Image
+                    </span>
+                    <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                      Supports 360° equirectangular JPG / PNG photos taken at this location
+                    </span>
+                  </div>
+                )}
               </div>
+            ) : (
+              /* Mapillary Street View Linkage */
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr auto', gap: '8px', alignItems: 'end', marginBottom: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Mapillary Image ID</label>
+                  <input
+                    type="text"
+                    name="connectedPanoId"
+                    placeholder="e.g. 1532761357806896"
+                    value={formData.connectedPanoId}
+                    onChange={handleChange}
+                    className="input-field"
+                    style={{ width: '100%' }}
+                  />
+                </div>
 
+                <div>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleAutoDetectNearestPano}
+                    disabled={detectingMapillary}
+                    style={{ fontSize: '0.72rem', padding: '7px 10px', whiteSpace: 'nowrap' }}
+                    title="Detect nearest Mapillary 360 image from coordinates"
+                  >
+                    {detectingMapillary ? '⏳ Searching...' : '🔍 Detect Nearest'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Orientation Row: Heading & Pitch */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Heading (°)</label>
+                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Camera Initial Heading (°)</label>
                 <input
                   type="number"
                   name="heading"
@@ -730,11 +1023,12 @@ export default function TouristSpotModal({
                   onChange={handleChange}
                   className="input-field"
                   style={{ width: '100%' }}
+                  placeholder="0-360°"
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Pitch (°)</label>
+                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Camera Initial Pitch (°)</label>
                 <input
                   type="number"
                   name="pitch"
@@ -744,12 +1038,10 @@ export default function TouristSpotModal({
                   onChange={handleChange}
                   className="input-field"
                   style={{ width: '100%' }}
+                  placeholder="-90 to +90°"
                 />
               </div>
             </div>
-            <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '6px 0 0 0' }}>
-              Leave blank to automatically connect to the nearest Mapillary street view sequence when viewed on the map.
-            </p>
           </div>
 
           {/* Action Buttons */}
@@ -775,7 +1067,10 @@ export default function TouristSpotModal({
               disabled={saving}
               className="btn btn-primary"
               style={{
-                background: spotType === 'tourist_spot' ? 'linear-gradient(135deg, #ffd700 0%, #f59e0b 100%)' : 'linear-gradient(135deg, #06d6a0 0%, #0284c7 100%)',
+                background:
+                  spotType === 'tourist_spot'
+                    ? 'linear-gradient(135deg, #ffd700 0%, #f59e0b 100%)'
+                    : 'linear-gradient(135deg, #06d6a0 0%, #0284c7 100%)',
                 color: spotType === 'tourist_spot' ? '#1a1a2e' : '#ffffff',
                 fontWeight: 700,
                 border: 'none',

@@ -582,6 +582,36 @@ body {
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
+.input-field {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  color: #f8fafc;
+  font-family: var(--font-primary);
+  font-size: 0.88rem;
+  outline: none;
+  transition: all var(--transition-fast);
+  box-sizing: border-box;
+}
+
+.input-field:focus {
+  border-color: #ffd700;
+  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.25);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.input-field option {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 6px 10px;
+}
+
+.input-field::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
 .form-input:focus {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);

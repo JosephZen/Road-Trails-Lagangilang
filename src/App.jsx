@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import MapView from './components/MapView';
 import MapillaryViewer from './components/MapillaryViewer';
+import PanoramaViewer from './components/PanoramaViewer';
 import TouristSpotModal, { LAGANGILANG_BARANGAYS } from './components/TouristSpotModal';
 import TouristSpotStreetViewCard from './components/TouristSpotStreetViewCard';
 import PseudoImage from './components/PseudoImage';
@@ -216,11 +217,18 @@ export default function App() {
       const lat = spot.location?.lat ?? spot.lat;
       const lng = spot.location?.lng ?? spot.lng;
 
-      // 1. If landmark has its own 360 image (connected360 or primary_pano_id), use that as default
+      // 1. If landmark has its own dedicated 360 image (uploaded or linked)
       const customPanoId = spot.connected360?.targetId || spot.primary_pano_id;
-      const isValidPanoId = customPanoId && String(customPanoId).length >= 10 && /^\d+$/.test(String(customPanoId));
+      const isLocalPano =
+        spot.connected360?.type === 'local' ||
+        !!spot.connected360?.imageUrl ||
+        (customPanoId && String(customPanoId).startsWith('pano_'));
+      const isValidPanoId =
+        customPanoId && String(customPanoId).length >= 10 && /^\d+$/.test(String(customPanoId));
 
-      if (isValidPanoId) {
+      if (isLocalPano) {
+        setStreetViewPos({ lat, lng, id: String(customPanoId || spot.id) });
+      } else if (isValidPanoId) {
         setMapillaryImageId(String(customPanoId));
         setStreetViewPos({ lat, lng, id: String(customPanoId) });
       } else {
@@ -1101,16 +1109,41 @@ export default function App() {
               />
             )}
 
-            {/* Mapillary Street View Viewer */}
-            <MapillaryViewer
-              imageId={mapillaryImageId || '1532761357806896'}
-              onPositionChange={(pos) => {
-                setMapillaryImageId(pos.id);
-                setStreetViewPos(pos);
-              }}
-              onHeadingChange={setViewerHeading}
-              steerTarget={steerTarget}
-            />
+            {/* 360 Viewer: Dedicated Uploaded Panorama (Pannellum) or Public Street View (Mapillary) */}
+            {activeTouristSpot &&
+            (activeTouristSpot.connected360?.type === 'local' ||
+              !!activeTouristSpot.connected360?.imageUrl ||
+              String(activeTouristSpot.connected360?.targetId || '').startsWith('pano_')) ? (
+              <PanoramaViewer
+                panorama={{
+                  id: activeTouristSpot.connected360?.targetId || activeTouristSpot.id,
+                  filename: `${activeTouristSpot.connected360?.targetId || activeTouristSpot.id}.jpg`,
+                  imageUrl:
+                    activeTouristSpot.connected360?.imageUrl ||
+                    activeTouristSpot.image ||
+                    `${API_BASE}/panoramas/${activeTouristSpot.connected360?.targetId}.jpg`,
+                  heading: activeTouristSpot.connected360?.heading || 0,
+                  pitch: activeTouristSpot.connected360?.pitch || 0,
+                  lat: activeTouristSpot.location?.lat ?? activeTouristSpot.lat,
+                  lng: activeTouristSpot.location?.lng ?? activeTouristSpot.lng,
+                  label: activeTouristSpot.name,
+                }}
+                panoramas={[]}
+                viewerHeading={viewerHeading}
+                onHeadingChange={setViewerHeading}
+                steerTarget={steerTarget}
+              />
+            ) : (
+              <MapillaryViewer
+                imageId={mapillaryImageId || '1532761357806896'}
+                onPositionChange={(pos) => {
+                  setMapillaryImageId(pos.id);
+                  setStreetViewPos(pos);
+                }}
+                onHeadingChange={setViewerHeading}
+                steerTarget={steerTarget}
+              />
+            )}
 
             {/* Floating info badge on right-center with layout switcher */}
             <div className="mapillary-info-badge">

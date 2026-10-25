@@ -31,9 +31,12 @@ export default function PanoramaViewer({
   useEffect(() => {
     if (!viewerReady || !panorama || !containerRef.current) return;
 
-    const imageUrl = getCachedUrl
-      ? getCachedUrl(panorama.id) || `${API_BASE}/panoramas/${panorama.filename}`
-      : `${API_BASE}/panoramas/${panorama.filename}`;
+    const imageUrl =
+      panorama.imageUrl ||
+      panorama.image ||
+      (getCachedUrl
+        ? getCachedUrl(panorama.id) || `${API_BASE}/panoramas/${panorama.filename}`
+        : `${API_BASE}/panoramas/${panorama.filename}`);
 
     // Build hotspots for neighbor navigation
     const hotSpots = buildHotspots(panorama, panoramas);
