@@ -214,13 +214,15 @@ export default function App() {
 
   // Streetview Line Alignment & Bending State
   const [aligningSequence, setAligningSequence] = useState(null);
+  const [isSelectingAlignmentTarget, setIsSelectingAlignmentTarget] = useState(false);
   const [alignedGeoJSON, setAlignedGeoJSON] = useState(() => streetviewAlignmentService.toGeoJSON());
   const [isSavingAlignment, setIsSavingAlignment] = useState(false);
 
-  const handleStartAligningAtCoord = useCallback(async (lat, lng) => {
+  const handleSelectSequenceForAlignment = useCallback(async (sequenceId, lat, lng) => {
+    setIsSelectingAlignmentTarget(false);
     try {
-      showToast('⏳ Loading Mapillary sequence for alignment...');
-      const seqData = await streetviewAlignmentService.fetchNearbySequence(lat, lng);
+      showToast(`⏳ Loading sequence ${sequenceId.slice(0, 8)}... for alignment`);
+      const seqData = await streetviewAlignmentService.fetchSequenceById(sequenceId, lat, lng);
       const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
         seqData.controlPoints,
         seqData.images
@@ -230,7 +232,30 @@ export default function App() {
         coordinates,
         images: mappedImages,
       });
-      showToast('📐 Alignment Mode: Drag handles to bend line onto road curve!');
+      showToast(`📐 Alignment Mode: Drag handles to bend ${seqData.name || 'line'} onto the road curve!`);
+    } catch (err) {
+      console.error('Error starting sequence alignment:', err);
+      showToast(`⚠️ ${err.message || 'Could not load sequence'}`);
+    }
+  }, [showToast]);
+
+  const handleStartAligningAtCoord = useCallback(async (lat, lng, sequenceId = null) => {
+    setIsSelectingAlignmentTarget(false);
+    try {
+      showToast(`⏳ Loading sequence ${sequenceId ? sequenceId.slice(0, 8) + '...' : ''} for alignment...`);
+      const seqData = sequenceId
+        ? await streetviewAlignmentService.fetchSequenceById(sequenceId, lat, lng)
+        : await streetviewAlignmentService.fetchNearbySequence(lat, lng);
+      const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+        seqData.controlPoints,
+        seqData.images
+      );
+      setAligningSequence({
+        ...seqData,
+        coordinates,
+        images: mappedImages,
+      });
+      showToast(`📐 Alignment Mode: Drag handles to bend ${seqData.name || 'line'} onto road curve!`);
     } catch (err) {
       showToast(`⚠️ ${err.message || 'No Mapillary sequence found at this point'}`);
     }
@@ -314,9 +339,9 @@ export default function App() {
 
   // Right-click / Touchscreen Long-Press context menu handler
   const lastContextMenuTime = useRef(0);
-  const handleMapContextMenu = useCallback((lat, lng, screenX, screenY) => {
+  const handleMapContextMenu = useCallback((lat, lng, screenX, screenY, sequenceId = null) => {
     lastContextMenuTime.current = Date.now();
-    setContextMenu({ lat, lng, x: screenX, y: screenY });
+    setContextMenu({ lat, lng, x: screenX, y: screenY, sequenceId });
   }, []);
 
   // Dismiss context menu on click or Escape key (ignoring synthetic clicks right after long-press)
@@ -706,13 +731,17 @@ export default function App() {
 
           {/* Bend / Align Streetview Line Button */}
           <button
-            className={`btn ${aligningSequence ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => {
               if (aligningSequence) {
                 setAligningSequence(null);
+                setIsSelectingAlignmentTarget(false);
+              } else if (isSelectingAlignmentTarget) {
+                setIsSelectingAlignmentTarget(false);
+                showToast('Line selection cancelled');
               } else {
-                const targetPos = streetViewPos || { lat: 17.609, lng: 120.738 };
-                handleStartAligningAtCoord(targetPos.lat, targetPos.lng);
+                setIsSelectingAlignmentTarget(true);
+                showToast('🎯 Click directly on the green streetview line you want to bend & re-align!');
               }
             }}
             style={{
@@ -725,7 +754,7 @@ export default function App() {
             }}
             title="Bend and re-align Mapillary streetview lines onto road curves"
           >
-            📐 {aligningSequence ? 'Exit Align' : 'Align Line'}
+            📐 {aligningSequence ? 'Exit Align' : isSelectingAlignmentTarget ? 'Cancel Select' : 'Align Line'}
           </button>
 
 
@@ -900,6 +929,19 @@ export default function App() {
           </div>
         )}
 
+        {/* Floating instruction banner when selecting line to align */}
+        {isSelectingAlignmentTarget && (
+          <div className="alignment-selection-banner glass-panel">
+            <span>🎯 Click directly on the streetview line or trail you want to bend &amp; re-align</span>
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={() => setIsSelectingAlignmentTarget(false)}
+            >
+              ✕ Cancel
+            </button>
+          </div>
+        )}
+
         {/* Floating Streetview Line Aligner Toolbar */}
         {aligningSequence && (
           <StreetviewLineAligner
@@ -941,6 +983,8 @@ export default function App() {
           aligningSequence={aligningSequence}
           onUpdateAligningSequence={setAligningSequence}
           alignedGeoJSON={alignedGeoJSON}
+          isSelectingAlignmentTarget={isSelectingAlignmentTarget}
+          onSelectSequenceForAlignment={handleSelectSequenceForAlignment}
         />
 
         {/* Resize handle */}
@@ -1620,11 +1664,11 @@ export default function App() {
           </button>
           <button
             onClick={() => {
-              handleStartAligningAtCoord(contextMenu.lat, contextMenu.lng);
+              handleStartAligningAtCoord(contextMenu.lat, contextMenu.lng, contextMenu.sequenceId);
               setContextMenu(null);
             }}
           >
-            📐 Bend / Re-align Streetview Line
+            📐 Bend / Re-align Streetview Line {contextMenu.sequenceId ? `(${contextMenu.sequenceId.slice(0, 8)}...)` : ''}
           </button>
           {isAdmin && (
             <>

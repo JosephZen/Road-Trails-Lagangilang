@@ -2639,6 +2639,46 @@ body {
   }
 }
 
+/* ========== Floating Line Selection Mode Banner ========== */
+.alignment-selection-banner {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-modal);
+  padding: 8px 18px;
+  border-radius: var(--radius-full);
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid #00f0ff;
+  color: #00f0ff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 240, 255, 0.35);
+  animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.alignment-selection-banner button {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #e2e8f0;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.alignment-selection-banner button:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+
 
 
 

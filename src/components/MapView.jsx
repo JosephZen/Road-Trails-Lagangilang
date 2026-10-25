@@ -117,6 +117,8 @@ export default function MapView({
   aligningSequence = null,
   onUpdateAligningSequence,
   alignedGeoJSON = null,
+  isSelectingAlignmentTarget = false,
+  onSelectSequenceForAlignment,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -135,6 +137,16 @@ export default function MapView({
   useEffect(() => {
     onUpdateAligningSequenceRef.current = onUpdateAligningSequence;
   }, [onUpdateAligningSequence]);
+
+  const isSelectingAlignmentTargetRef = useRef(isSelectingAlignmentTarget);
+  useEffect(() => {
+    isSelectingAlignmentTargetRef.current = isSelectingAlignmentTarget;
+  }, [isSelectingAlignmentTarget]);
+
+  const onSelectSequenceForAlignmentRef = useRef(onSelectSequenceForAlignment);
+  useEffect(() => {
+    onSelectSequenceForAlignmentRef.current = onSelectSequenceForAlignment;
+  }, [onSelectSequenceForAlignment]);
 
   // Trigger map resize when viewer opens or closes to prevent blanking
   useEffect(() => {
@@ -532,6 +544,23 @@ export default function MapView({
       window.dispatchEvent(new Event('map-style-loaded'));
     });
 
+    // Helper to safely extract a sequence ID from any Mapillary feature
+    const extractMapillarySequenceId = (feature) => {
+      if (!feature) return null;
+      if (feature.layer?.id === 'mapillary-sequences' || feature.layer?.id === 'mapillary-sequences-casing') {
+        const id = feature.properties?.id || feature.properties?.sequence_id || feature.properties?.sequence || feature.id;
+        return id ? String(id) : null;
+      }
+      if (feature.layer?.id === 'mapillary-images') {
+        const id = feature.properties?.sequence_id || feature.properties?.sequence;
+        return id ? String(id) : null;
+      }
+      if (feature.layer?.id === 'aligned-streetview-layer' || feature.layer?.id === 'aligned-streetview-casing') {
+        return feature.properties?.sequenceId ? String(feature.properties.sequenceId) : null;
+      }
+      return null;
+    };
+
     // Helper to safely extract a valid 64-bit Mapillary image ID (never an internal sequence ID or vector tile index)
     const extractMapillaryImageId = (feature) => {
       if (!feature) return null;
@@ -560,6 +589,42 @@ export default function MapView({
       }
 
       try {
+        // Check if user is in "Select Streetview to Align" mode
+        if (isSelectingAlignmentTargetRef.current) {
+          const hitBox = [
+            [e.point.x - 22, e.point.y - 22],
+            [e.point.x + 22, e.point.y + 22],
+          ];
+          const seqFeatures = map.queryRenderedFeatures(hitBox, {
+            layers: ['mapillary-sequences', 'mapillary-images', 'aligned-streetview-layer'],
+          });
+          if (seqFeatures.length > 0) {
+            const seqId = extractMapillarySequenceId(seqFeatures[0]);
+            if (seqId) {
+              onSelectSequenceForAlignmentRef.current?.(seqId, e.lngLat.lat, e.lngLat.lng);
+              return;
+            }
+          }
+        }
+
+        // If currently aligning, but user clicks directly on a different streetview line to switch
+        if (aligningSequenceRef.current && !map.queryRenderedFeatures(e.point, { layers: ['active-align-handles-layer'] }).length) {
+          const hitBox = [
+            [e.point.x - 18, e.point.y - 18],
+            [e.point.x + 18, e.point.y + 18],
+          ];
+          const otherSeqFeatures = map.queryRenderedFeatures(hitBox, {
+            layers: ['mapillary-sequences', 'aligned-streetview-layer'],
+          });
+          if (otherSeqFeatures.length > 0) {
+            const otherSeqId = extractMapillarySequenceId(otherSeqFeatures[0]);
+            if (otherSeqId && otherSeqId !== aligningSequenceRef.current.sequenceId) {
+              onSelectSequenceForAlignmentRef.current?.(otherSeqId, e.lngLat.lat, e.lngLat.lng);
+              return;
+            }
+          }
+        }
+
         // 0a. If in alignment mode, clicking on the active bent line inserts a new curve handle
         if (aligningSequenceRef.current && map.getLayer('active-align-line-inner')) {
           const lineFeatures = map.queryRenderedFeatures(e.point, {
@@ -694,9 +759,24 @@ export default function MapView({
           }
         }
       }
+      // Query features under right-click to extract exact sequence ID
+      let clickedSequenceId = null;
+      try {
+        const hitBox = [
+          [e.point.x - 24, e.point.y - 24],
+          [e.point.x + 24, e.point.y + 24],
+        ];
+        const seqFeatures = map.queryRenderedFeatures(hitBox, {
+          layers: ['mapillary-sequences', 'mapillary-images', 'aligned-streetview-layer'],
+        });
+        if (seqFeatures.length > 0) {
+          clickedSequenceId = extractMapillarySequenceId(seqFeatures[0]);
+        }
+      } catch (_) {}
+
       const screenX = e.originalEvent?.clientX ?? 0;
       const screenY = e.originalEvent?.clientY ?? 0;
-      onMapContextMenuRef.current?.(e.lngLat.lat, e.lngLat.lng, screenX, screenY);
+      onMapContextMenuRef.current?.(e.lngLat.lat, e.lngLat.lng, screenX, screenY, clickedSequenceId);
     });
 
     // ========== Touchscreen Long-Press Gesture (Right-Click on Touch) ==========
@@ -760,12 +840,28 @@ export default function MapView({
           } catch (_) {}
         }
 
-        // Trigger context menu with touch coordinates
+        // Check touch target for streetview sequence
+        let touchSequenceId = null;
+        try {
+          const hitBox = [
+            [touchStartPoint.x - 30, touchStartPoint.y - 30],
+            [touchStartPoint.x + 30, touchStartPoint.y + 30],
+          ];
+          const seqFeatures = map.queryRenderedFeatures(hitBox, {
+            layers: ['mapillary-sequences', 'mapillary-images', 'aligned-streetview-layer'],
+          });
+          if (seqFeatures.length > 0) {
+            touchSequenceId = extractMapillarySequenceId(seqFeatures[0]);
+          }
+        } catch (_) {}
+
+        // Trigger context menu with touch coordinates and sequence ID
         onMapContextMenuRef.current?.(
           touchStartLngLat.lat,
           touchStartLngLat.lng,
           touchScreenX,
-          touchScreenY
+          touchScreenY,
+          touchSequenceId
         );
       }, 500);
     });
