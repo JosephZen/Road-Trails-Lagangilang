@@ -300,5 +300,32 @@
       "pitch": 0
     },
     "sync_status": "synced_cloud"
+  },
+  {
+    "id": "poi_lagangilang_municipal_hall",
+    "name": "Lagangilang Municipal Town Hall",
+    "spotType": "poi",
+    "category": "Government & Emergency Services",
+    "categoryIcon": "🏛️",
+    "barangay": "Poblacion",
+    "location": {
+      "lat": 17.612749,
+      "lng": 120.733755,
+      "address": "Lagangilang Municipal Town Hall, Poblacion, Lagangilang, Abra"
+    },
+    "description": "Government Office - Municipal Hall of Lagangilang, Abra.",
+    "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
+    "isPseudoImage": false,
+    "pseudoTheme": "cyan",
+    "connected360": {
+      "type": "local",
+      "targetId": "pano_1792907342452_r26dib",
+      "imageUrl": "/panoramas/pano_1792907342452_r26dib.jpg",
+      "heading": 0,
+      "pitch": 0
+    },
+    "sync_status": "synced_cloud",
+    "lat": 17.612749,
+    "lng": 120.733755
   }
 ]

@@ -353,6 +353,16 @@ export default function TouristSpotModal({
     const isLocalPano = formData.connectedPanoType === 'local' || !!formData.uploadedPanoUrl;
     const finalTargetId = formData.connectedPanoId || (isLocalPano ? `pano_${Date.now()}` : null);
 
+    // Clean image URLs - NEVER store multi-megabyte base64 strings in persistent database/localStorage
+    const isBase64 = String(formData.uploadedPanoUrl || '').startsWith('data:');
+    const cleanPanoUrl = isLocalPano
+      ? (isBase64 ? `/panoramas/${finalTargetId}.jpg` : formData.uploadedPanoUrl || `/panoramas/${finalTargetId}.jpg`)
+      : null;
+
+    const cleanImageUrl = isLocalPano
+      ? (isBase64 ? `/panoramas/thumbnails/${finalTargetId}_thumb.jpg` : formData.image || cleanPanoUrl)
+      : (formData.usePseudoImage ? null : (formData.image?.startsWith('data:') ? null : formData.image));
+
     const spotPayload = {
       ...(editingSpot || {}),
       name: formData.name.trim(),
@@ -371,13 +381,13 @@ export default function TouristSpotModal({
       },
       address: formData.address,
       description: formData.description,
-      image: formData.uploadedPanoUrl || (formData.usePseudoImage ? null : formData.image || null),
-      isPseudoImage: formData.usePseudoImage && !formData.uploadedPanoUrl,
+      image: cleanImageUrl || null,
+      isPseudoImage: formData.usePseudoImage && !cleanImageUrl,
       pseudoTheme: formData.pseudoTheme,
       connected360: {
         type: isLocalPano ? 'local' : 'mapillary',
         targetId: finalTargetId,
-        imageUrl: formData.uploadedPanoUrl || null,
+        imageUrl: cleanPanoUrl || null,
         heading: parseFloat(formData.heading) || 0,
         pitch: parseFloat(formData.pitch) || 0,
       },

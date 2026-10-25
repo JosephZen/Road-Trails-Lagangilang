@@ -1294,6 +1294,7 @@ export default function App() {
           setEditingSpot(null);
         }}
         onSpotSaved={(saved) => {
+          showToast(`✅ "${saved.name}" successfully saved!`);
           loadTouristSpots();
           handleSelectTouristSpot(saved);
         }}

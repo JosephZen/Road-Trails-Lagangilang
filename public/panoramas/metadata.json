@@ -247,6 +247,18 @@
         "pano_1785458933279_gohnbu",
         "pano_1785458951667_shihgp"
       ]
+    },
+    {
+      "id": "pano_1792907342452_r26dib",
+      "filename": "pano_1792907342452_r26dib.jpg",
+      "thumbnail": "thumbnails/pano_1792907342452_r26dib_thumb.jpg",
+      "lat": 17.61274919001869,
+      "lng": 120.7337552247223,
+      "heading": 0,
+      "label": "Lagangilang Municipal Town Hall",
+      "description": "Government Office",
+      "timestamp": "2026-10-25T05:49:07.330Z",
+      "neighbors": []
     }
   ]
 }

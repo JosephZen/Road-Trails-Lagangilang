@@ -364,11 +364,48 @@ export const touristSpotsService = {
    */
   saveAllSpots(spots) {
     try {
-      const sanitized = spots.filter((s) => !isObsoleteSpot(s));
+      const sanitized = spots
+        .filter((s) => !isObsoleteSpot(s))
+        .map((s) => {
+          const clean = { ...s };
+          // Strip out heavy base64 strings (> 20KB) to ensure localStorage quota (5MB) is never exceeded
+          if (clean.image && clean.image.startsWith('data:') && clean.image.length > 20000) {
+            clean.image = clean.connected360?.targetId
+              ? `/panoramas/${clean.connected360.targetId}.jpg`
+              : null;
+          }
+          if (
+            clean.connected360?.imageUrl &&
+            clean.connected360.imageUrl.startsWith('data:') &&
+            clean.connected360.imageUrl.length > 20000
+          ) {
+            clean.connected360 = {
+              ...clean.connected360,
+              imageUrl: clean.connected360.targetId
+                ? `/panoramas/${clean.connected360.targetId}.jpg`
+                : null,
+            };
+          }
+          return clean;
+        });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
       window.dispatchEvent(new Event('lagangilang_spots_updated'));
     } catch (err) {
       console.error('Failed to save spots to localStorage:', err);
+      // Fallback: If still quota exceeded, strip image payloads entirely to save spot metadata
+      try {
+        const minimal = spots
+          .filter((s) => !isObsoleteSpot(s))
+          .map((s) => ({
+            ...s,
+            image: null,
+            connected360: s.connected360 ? { ...s.connected360, imageUrl: null } : s.connected360,
+          }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
+        window.dispatchEvent(new Event('lagangilang_spots_updated'));
+      } catch (innerErr) {
+        console.error('Critical localStorage write failure:', innerErr);
+      }
     }
   },
 
@@ -408,6 +445,14 @@ export const touristSpotsService = {
           };
     }
 
+    const cleanImage = spotData.image && spotData.image.startsWith('data:') && spotData.image.length > 20000
+      ? (connected360?.targetId ? `/panoramas/${connected360.targetId}.jpg` : null)
+      : (spotData.image || null);
+
+    const cleanPanoImageUrl = connected360?.imageUrl && connected360.imageUrl.startsWith('data:') && connected360.imageUrl.length > 20000
+      ? (connected360?.targetId ? `/panoramas/${connected360.targetId}.jpg` : null)
+      : (connected360?.imageUrl || null);
+
     const newSpot = {
       ...spotData,
       id,
@@ -419,11 +464,15 @@ export const touristSpotsService = {
         lng,
         address: spotData.address || spotData.location?.address || `${spotData.name}, Lagangilang, Abra`,
       },
+      image: cleanImage,
       sync_status: 'staged_local',
       staged_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      connected360,
-      isPseudoImage: spotData.isPseudoImage ?? !spotData.image,
+      connected360: {
+        ...connected360,
+        imageUrl: cleanPanoImageUrl,
+      },
+      isPseudoImage: spotData.isPseudoImage ?? !cleanImage,
       pseudoTheme: spotData.pseudoTheme || 'indigo',
     };
 
@@ -444,6 +493,66 @@ export const touristSpotsService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newSpot),
     }).catch((err) => console.warn('Background mirror to server omitted:', err));
+
+    // Asynchronously mirror directly to Neon Cloud Database
+    this.executeNeonQuery(async (sql) => {
+      const categoryId = normalizeCategoryId(newSpot.category);
+      const categoryName = normalizeCategoryName(newSpot.category);
+      const icon = newSpot.categoryIcon || getDefaultCategoryIcon(categoryName, newSpot.spotType);
+
+      try {
+        await sql`
+          INSERT INTO public.categories (id, name, icon)
+          VALUES (${categoryId}, ${categoryName}, ${icon})
+          ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon = EXCLUDED.icon;
+        `;
+      } catch (_) {}
+
+      await sql`
+        INSERT INTO public.tourist_spots (
+          id, name, category_id, barangay, latitude, longitude, address,
+          description, image_url, is_pseudo_image, pseudo_theme,
+          primary_pano_id, target_heading, target_pitch, sync_status,
+          staged_at, synced_at, updated_at
+        ) VALUES (
+          ${newSpot.id},
+          ${newSpot.name},
+          ${categoryId},
+          ${newSpot.barangay || 'Poblacion'},
+          ${lat},
+          ${lng},
+          ${newSpot.location?.address || `${newSpot.name}, Lagangilang, Abra`},
+          ${newSpot.description || ''},
+          ${cleanImage || null},
+          ${newSpot.isPseudoImage ?? true},
+          ${newSpot.pseudoTheme || 'indigo'},
+          ${newSpot.connected360?.targetId || null},
+          ${newSpot.connected360?.heading || 0},
+          ${newSpot.connected360?.pitch || 0},
+          'synced_cloud',
+          NOW(),
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          category_id = EXCLUDED.category_id,
+          barangay = EXCLUDED.barangay,
+          latitude = EXCLUDED.latitude,
+          longitude = EXCLUDED.longitude,
+          address = EXCLUDED.address,
+          description = EXCLUDED.description,
+          image_url = EXCLUDED.image_url,
+          is_pseudo_image = EXCLUDED.is_pseudo_image,
+          pseudo_theme = EXCLUDED.pseudo_theme,
+          primary_pano_id = EXCLUDED.primary_pano_id,
+          target_heading = EXCLUDED.target_heading,
+          target_pitch = EXCLUDED.target_pitch,
+          sync_status = 'synced_cloud',
+          synced_at = NOW(),
+          updated_at = NOW();
+      `;
+    }).catch((neonErr) => console.warn('Direct Neon background sync omitted (offline/buffered):', neonErr.message));
 
     return newSpot;
   },
