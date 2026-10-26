@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://road-trails-lagangilang.vercel.app/sitemap.xml

@@ -33,17 +33,31 @@ class StreetviewAlignmentService {
   }
 
   async syncWithBackend() {
+    // 1. Try Express backend API
     try {
       const res = await fetch('/api/aligned-sequences');
       if (res.ok) {
         const remote = await res.json();
-        if (remote && typeof remote === 'object') {
+        if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
           this.alignedSequences = { ...remote, ...this.alignedSequences };
+          this.saveLocal();
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fallback for Vercel / static hosting: load bundled aligned_sequences.json
+    try {
+      const staticRes = await fetch('/data/aligned_sequences.json');
+      if (staticRes.ok) {
+        const staticData = await staticRes.json();
+        if (staticData && typeof staticData === 'object') {
+          this.alignedSequences = { ...staticData, ...this.alignedSequences };
           this.saveLocal();
         }
       }
-    } catch (_) {
-      // Backend not running or offline; local storage is authoritative
+    } catch (err) {
+      console.warn('Fallback aligned sequences load notice:', err);
     }
   }
 
@@ -123,67 +137,22 @@ class StreetviewAlignmentService {
 
   /**
    * Fetch a specific Mapillary sequence by its exact ID.
-   * If already aligned, loads existing control points and coordinates so the user can continue editing.
+   * Directly fetches all sequence photos from start to finish via sequence_ids,
+   * guaranteeing complete end-to-end connectivity on both desktop and mobile.
    */
   async fetchSequenceById(sequenceId, lat = null, lng = null) {
     if (!sequenceId) throw new Error('Missing sequence ID');
 
-    // 1. Check if already aligned in local storage / memory
-    const existing = this.alignedSequences[sequenceId];
-    if (existing && existing.controlPoints && existing.coordinates && existing.images) {
-      return {
-        sequenceId,
-        name: existing.name || `Sequence ${sequenceId.slice(0, 8)}`,
-        images: existing.images,
-        rawCoordinates: existing.images.map((i) => [i.originalLng || i.lng, i.originalLat || i.lat]),
-        controlPoints: existing.controlPoints,
-        coordinates: existing.coordinates,
-        isAlreadyAligned: true,
-      };
-    }
-
-    // 2. Query Mapillary images in Lagangilang municipal bounds
-    const centerLat = lat || 17.611;
-    const centerLng = lng || 120.738;
-    const delta = 0.04;
-
-    const url = `${MAPILLARY_GRAPH_API}/images?access_token=${ACCESS_TOKEN}&fields=id,geometry,sequence,captured_at,compass_angle&bbox=${centerLng - delta},${centerLat - delta},${centerLng + delta},${centerLat + delta}&limit=2000`;
-
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Mapillary API error: ${res.status}`);
-
-    const data = await res.json();
-    let seqImages = (data.data || [])
-      .filter((img) => img.sequence === sequenceId && img.geometry?.coordinates)
-      .map((img) => ({
-        id: String(img.id),
-        lng: img.geometry.coordinates[0],
-        lat: img.geometry.coordinates[1],
-        originalLng: img.geometry.coordinates[0],
-        originalLat: img.geometry.coordinates[1],
-        capturedAt: img.captured_at,
-        heading: img.compass_angle,
-      }));
-
-    // If bbox query didn't capture enough images, fallback to image_ids query
-    if (seqImages.length === 0) {
-      const idsUrl = `${MAPILLARY_GRAPH_API}/image_ids?sequence_id=${encodeURIComponent(sequenceId)}&access_token=${ACCESS_TOKEN}`;
-      const idsRes = await fetch(idsUrl);
-      if (idsRes.ok) {
-        const idsData = await idsRes.json();
-        const ids = (idsData.data || []).map((i) => i.id);
-        if (ids.length > 0) {
-          const sampleStep = Math.max(1, Math.floor(ids.length / 50));
-          const sampleIds = ids.filter((_, idx) => idx % sampleStep === 0);
-          const fetchedImgs = await Promise.all(
-            sampleIds.map((id) =>
-              fetch(`${MAPILLARY_GRAPH_API}/${id}?fields=id,geometry,compass_angle,captured_at,sequence&access_token=${ACCESS_TOKEN}`)
-                .then((r) => (r.ok ? r.json() : null))
-                .catch(() => null)
-            )
-          );
-          seqImages = fetchedImgs
-            .filter((img) => img && img.geometry?.coordinates)
+    // 1. Fetch complete sequence imagery from Mapillary Graph API via sequence_ids
+    let fullImages = [];
+    try {
+      const seqUrl = `${MAPILLARY_GRAPH_API}/images?sequence_ids=${encodeURIComponent(sequenceId)}&access_token=${ACCESS_TOKEN}&fields=id,geometry,compass_angle,captured_at&limit=2000`;
+      const seqRes = await fetch(seqUrl);
+      if (seqRes.ok) {
+        const seqData = await seqRes.json();
+        if (Array.isArray(seqData.data) && seqData.data.length > 0) {
+          fullImages = seqData.data
+            .filter((img) => img.geometry?.coordinates)
             .map((img) => ({
               id: String(img.id),
               lng: img.geometry.coordinates[0],
@@ -195,15 +164,69 @@ class StreetviewAlignmentService {
             }));
         }
       }
+    } catch (e) {
+      console.warn('Mapillary sequence_ids query warning:', e);
     }
 
-    if (seqImages.length === 0) {
+    // Fallback: If sequence_ids query was empty, try bbox search
+    if (fullImages.length === 0) {
+      try {
+        const centerLat = lat || 17.611;
+        const centerLng = lng || 120.738;
+        const delta = 0.04;
+        const bboxUrl = `${MAPILLARY_GRAPH_API}/images?access_token=${ACCESS_TOKEN}&fields=id,geometry,sequence,captured_at,compass_angle&bbox=${centerLng - delta},${centerLat - delta},${centerLng + delta},${centerLat + delta}&limit=2000`;
+        const bboxRes = await fetch(bboxUrl);
+        if (bboxRes.ok) {
+          const bboxData = await bboxRes.json();
+          fullImages = (bboxData.data || [])
+            .filter((img) => img.sequence === sequenceId && img.geometry?.coordinates)
+            .map((img) => ({
+              id: String(img.id),
+              lng: img.geometry.coordinates[0],
+              lat: img.geometry.coordinates[1],
+              originalLng: img.geometry.coordinates[0],
+              originalLat: img.geometry.coordinates[1],
+              capturedAt: img.captured_at,
+              heading: img.compass_angle,
+            }));
+        }
+      } catch (err) {
+        console.warn('Mapillary bbox query fallback warning:', err);
+      }
+    }
+
+    // Check if already aligned in local storage / memory
+    const existing = this.alignedSequences[sequenceId];
+    if (existing && existing.controlPoints && existing.coordinates && existing.images) {
+      // If existing saved record only has a fraction of the real sequence (e.g. truncated from earlier sessions),
+      // update it so the line spans end-to-end with all photos mapped
+      if (fullImages.length > existing.images.length + 5) {
+        fullImages.sort((a, b) => a.capturedAt - b.capturedAt);
+        const { coordinates, mappedImages } = this.generateBentGeometry(existing.controlPoints, fullImages);
+        existing.images = mappedImages;
+        existing.coordinates = coordinates;
+        this.alignedSequences[sequenceId] = existing;
+        this.saveLocal();
+      }
+
+      return {
+        sequenceId,
+        name: existing.name || `Sequence ${sequenceId.slice(0, 8)}`,
+        images: existing.images,
+        rawCoordinates: existing.images.map((i) => [i.originalLng || i.lng, i.originalLat || i.lat]),
+        controlPoints: existing.controlPoints,
+        coordinates: existing.coordinates,
+        isAlreadyAligned: true,
+      };
+    }
+
+    if (fullImages.length === 0) {
       throw new Error(`Could not load images for sequence ${sequenceId}`);
     }
 
     // Sort chronologically by capture timestamp
-    seqImages.sort((a, b) => a.capturedAt - b.capturedAt);
-    const rawCoordinates = seqImages.map((img) => [img.lng, img.lat]);
+    fullImages.sort((a, b) => a.capturedAt - b.capturedAt);
+    const rawCoordinates = fullImages.map((img) => [img.lng, img.lat]);
 
     // Generate initial control handles (between 6 and 14 evenly spaced points)
     const handleCount = Math.max(6, Math.min(14, Math.ceil(rawCoordinates.length / 8)));
@@ -218,7 +241,7 @@ class StreetviewAlignmentService {
     return {
       sequenceId,
       name: `Sequence ${sequenceId.slice(0, 8)}`,
-      images: seqImages,
+      images: fullImages,
       rawCoordinates,
       controlPoints,
       isAlreadyAligned: false,

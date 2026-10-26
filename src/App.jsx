@@ -224,6 +224,10 @@ export default function App() {
   const [isSavingAlignment, setIsSavingAlignment] = useState(false);
 
   const handleSelectSequenceForAlignment = useCallback(async (sequenceId, lat, lng) => {
+    if (!isAdmin) {
+      showToast('🔒 Line alignment is restricted to Admin only.');
+      return;
+    }
     setIsSelectingAlignmentTarget(false);
     try {
       showToast(`⏳ Loading sequence ${sequenceId.slice(0, 8)}... for alignment`);
@@ -242,9 +246,13 @@ export default function App() {
       console.error('Error starting sequence alignment:', err);
       showToast(`⚠️ ${err.message || 'Could not load sequence'}`);
     }
-  }, [showToast]);
+  }, [isAdmin, showToast]);
 
   const handleStartAligningAtCoord = useCallback(async (lat, lng, sequenceId = null) => {
+    if (!isAdmin) {
+      showToast('🔒 Line alignment is restricted to Admin only.');
+      return;
+    }
     setIsSelectingAlignmentTarget(false);
     try {
       showToast(`⏳ Loading sequence ${sequenceId ? sequenceId.slice(0, 8) + '...' : ''} for alignment...`);
@@ -734,34 +742,6 @@ export default function App() {
             🧭 Route
           </button>
 
-          {/* Bend / Align Streetview Line Button */}
-          <button
-            className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => {
-              if (aligningSequence) {
-                setAligningSequence(null);
-                setIsSelectingAlignmentTarget(false);
-              } else if (isSelectingAlignmentTarget) {
-                setIsSelectingAlignmentTarget(false);
-                showToast('Line selection cancelled');
-              } else {
-                setIsSelectingAlignmentTarget(true);
-                showToast('🎯 Click directly on the green streetview line you want to bend & re-align!');
-              }
-            }}
-            style={{
-              fontSize: '0.8rem',
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-            }}
-            title="Bend and re-align Mapillary streetview lines onto road curves"
-          >
-            📐 {aligningSequence ? 'Exit Align' : isSelectingAlignmentTarget ? 'Cancel Select' : 'Align Line'}
-          </button>
-
           {/* Toggle Mapillary Streetview (Green lines & dots) */}
           <button
             className={`btn ${showMapillaryStreetview ? 'btn-secondary' : 'btn-ghost'}`}
@@ -793,12 +773,41 @@ export default function App() {
             {showMapillaryStreetview ? '🟢 Streetview: ON' : '⚪ Streetview: OFF'}
           </button>
 
-
           <div className="controls-separator" />
 
           {/* Admin-only controls */}
           {isAdmin && (
             <>
+              {/* Bend / Align Streetview Line Button (Admin only) */}
+              <button
+                className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => {
+                  if (aligningSequence) {
+                    setAligningSequence(null);
+                    setIsSelectingAlignmentTarget(false);
+                  } else if (isSelectingAlignmentTarget) {
+                    setIsSelectingAlignmentTarget(false);
+                    showToast('Line selection cancelled');
+                  } else {
+                    setIsSelectingAlignmentTarget(true);
+                    showToast('🎯 Click directly on the green streetview line you want to bend & re-align!');
+                  }
+                }}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-full)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: aligningSequence || isSelectingAlignmentTarget
+                    ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                    : undefined,
+                }}
+                title="Bend and re-align Mapillary streetview lines onto road curves (Admin only)"
+              >
+                📐 {aligningSequence ? 'Exit Align' : isSelectingAlignmentTarget ? 'Cancel Select' : 'Align Line'}
+              </button>
               {/* Custom OSM Overlay Toggle */}
               <button
                 className={`btn btn-sm ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
@@ -978,8 +987,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Floating Streetview Line Aligner Toolbar */}
-        {aligningSequence && (
+        {/* Floating Streetview Line Aligner Toolbar (Admin Only) */}
+        {isAdmin && aligningSequence && (
           <StreetviewLineAligner
             aligningSequence={aligningSequence}
             onSave={handleSaveAlignment}
@@ -987,9 +996,7 @@ export default function App() {
             onCancel={() => setAligningSequence(null)}
             isSaving={isSavingAlignment}
             showMapillaryStreetview={showMapillaryStreetview}
-            showMapillaryStreetview={showMapillaryStreetview}
-          showMapillaryDots={showMapillaryDots}
-          showMapillaryLines={showMapillaryLines}
+            showMapillaryDots={showMapillaryDots}
             showMapillaryLines={showMapillaryLines}
             onToggleStreetview={() => {
               const next = !showMapillaryStreetview;
@@ -1029,10 +1036,10 @@ export default function App() {
           pickingMode={pickingTarget}
           isAdmin={isAdmin}
           isDraggable={isAdmin && pinsDraggable}
-          aligningSequence={aligningSequence}
+          aligningSequence={isAdmin ? aligningSequence : null}
           onUpdateAligningSequence={setAligningSequence}
           alignedGeoJSON={alignedGeoJSON}
-          isSelectingAlignmentTarget={isSelectingAlignmentTarget}
+          isSelectingAlignmentTarget={isAdmin && isSelectingAlignmentTarget}
           onSelectSequenceForAlignment={handleSelectSequenceForAlignment}
           showMapillaryStreetview={showMapillaryStreetview}
           showMapillaryDots={showMapillaryDots}
@@ -1596,55 +1603,64 @@ export default function App() {
               />
             )}
 
-            {/* Floating info badge on right-center with layout switcher */}
-            <div className="mapillary-info-badge">
-              <span style={{ fontSize: '1rem' }}>🟢</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                  {activeTouristSpot &&
-                  (activeTouristSpot.connected360?.type === 'local' ||
-                    !!activeTouristSpot.connected360?.imageUrl ||
-                    String(activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || '').startsWith('pano_')) &&
-                  viewerPanoMode === 'dedicated'
-                    ? 'Dedicated 360 Landmark'
-                    : viewerPanoMode === 'google'
-                    ? 'Google Street View'
-                    : 'Mapillary Campus Trail'}
-                </div>
-                <div style={{ fontSize: '0.65rem', opacity: 0.75, whiteSpace: 'nowrap' }}>
-                  Lagangilang, Abra
-                </div>
-              </div>
-
+            {/* Top-Right Street View Controls (Full Screen & Exit, next to Mapillary playback bar) */}
+            <div
+              className="streetview-top-right-controls"
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '14px',
+                zIndex: 50,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                pointerEvents: 'auto',
+              }}
+            >
               {/* Layout mode switcher: 50/50 Split or Full Browser Screen */}
               <button
                 onClick={() => setViewerLayout(viewerLayout === 'fullscreen' ? 'split' : 'fullscreen')}
                 title={viewerLayout === 'fullscreen' ? 'Restore to 50/50 Half Screen' : 'Expand to Full Browser Screen'}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.15)',
+                  background: 'rgba(15, 23, 42, 0.85)',
                   border: '1px solid rgba(255, 255, 255, 0.25)',
-                  borderRadius: 'var(--radius-sm)',
+                  borderRadius: 'var(--radius-full, 9999px)',
                   color: '#ffffff',
                   cursor: 'pointer',
-                  fontSize: '0.72rem',
-                  padding: '3px 8px',
+                  fontSize: '0.78rem',
+                  padding: '6px 14px',
                   fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+                  backdropFilter: 'blur(10px)',
                   whiteSpace: 'nowrap',
                 }}
               >
-                {viewerLayout === 'fullscreen' ? '◫ 50/50 Split' : '⛶ Full Screen'}
+                <span>{viewerLayout === 'fullscreen' ? '◫' : '⛶'}</span>
+                <span>{viewerLayout === 'fullscreen' ? '50/50 Split' : 'Full Screen'}</span>
               </button>
 
+              {/* Close Button */}
               <button
                 onClick={handleCloseViewer}
-                title="Close street view"
+                title="Exit street view"
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#86efac',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  borderRadius: '50%',
+                  color: '#f87171',
                   cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  padding: '0 0 0 4px',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+                  backdropFilter: 'blur(10px)',
                   lineHeight: 1,
                 }}
               >
