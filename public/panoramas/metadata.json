@@ -283,6 +283,34 @@
       "description": "Historic Catholic Church",
       "timestamp": "2026-10-26T12:00:00.000Z",
       "neighbors": []
+    },
+    {
+      "id": "pano_1793021939916_3uzsf1",
+      "filename": "pano_1793021939916_3uzsf1.jpg",
+      "thumbnail": "thumbnails/pano_1793021939916_3uzsf1_thumb.jpg",
+      "lat": 17.588469,
+      "lng": 120.736502,
+      "heading": 0,
+      "label": "Ugiao River",
+      "description": "Scenic freshwater river corridor featuring clear waters, pebble banks, and tranquil natural swimming spots popular for picnics and summer outings.",
+      "timestamp": "2026-10-26T13:39:01.838Z",
+      "neighbors": [
+        "pano_1793021963912_5uponc"
+      ]
+    },
+    {
+      "id": "pano_1793021963912_5uponc",
+      "filename": "pano_1793021963912_5uponc.jpg",
+      "thumbnail": "thumbnails/pano_1793021963912_5uponc_thumb.jpg",
+      "lat": 17.588469,
+      "lng": 120.736502,
+      "heading": 0,
+      "label": "Ugiao River",
+      "description": "Scenic freshwater river corridor featuring clear waters, pebble banks, and tranquil natural swimming spots popular for picnics and summer outings.",
+      "timestamp": "2026-10-26T13:39:24.755Z",
+      "neighbors": [
+        "pano_1793021939916_3uzsf1"
+      ]
     }
   ]
 }
