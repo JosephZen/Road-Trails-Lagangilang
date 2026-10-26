@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { touristSpotsService } from '../services/touristSpotsService';
 
 const PRESETS_STORAGE_KEY = 'lagangilang_privacy_presets_v1';
 const DEFAULT_PRESET_KEY = 'lagangilang_default_privacy_preset_id';
@@ -53,6 +54,7 @@ export default function PrivacyBlurStudio({
   // Zoom & Pan state
   const [zoomLevel, setZoomLevel] = useState(1);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const imgElementRef = useRef(null);
 
   // Presets state
@@ -79,39 +81,91 @@ export default function PrivacyBlurStudio({
     } catch (_) {}
   };
 
-  // Load image onto canvas
+  // Load image onto canvas with automatic Neon Cloud DB resolution
   useEffect(() => {
     if (!isOpen || !imageUrl) return;
 
     setImageLoaded(false);
+    setLoadError(null);
     setZones([]);
     setHistory([]);
     setCurrentRect(null);
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      imgElementRef.current = img;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+    let isCancelled = false;
 
-      canvas.width = img.naturalWidth || img.width;
-      canvas.height = img.naturalHeight || img.height;
+    async function loadStudioCanvas() {
+      let finalSrc = imageUrl;
 
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      setImageLoaded(true);
-
-      // Check if default preset is configured
-      const defaultId = localStorage.getItem(DEFAULT_PRESET_KEY);
-      if (defaultId) {
-        const found = presets.find((p) => p.id === defaultId);
-        if (found) {
-          applyPresetZones(found.zones, canvas.width, canvas.height);
+      // If imageUrl is a static path or ID instead of a base64/blob URI, resolve from Neon Cloud DB
+      if (!finalSrc.startsWith('data:') && !finalSrc.startsWith('blob:')) {
+        const match = finalSrc.match(/pano_[a-zA-Z0-9_]+|\d{12,20}/);
+        const panoId = match ? match[0] : null;
+        if (panoId) {
+          try {
+            const neonData = await touristSpotsService.fetchPanoramaImageData(panoId);
+            if (neonData && !isCancelled) {
+              finalSrc = neonData;
+            }
+          } catch (_) {}
         }
       }
+
+      if (isCancelled) return;
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      img.onload = () => {
+        if (isCancelled) return;
+        imgElementRef.current = img;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        setImageLoaded(true);
+        setLoadError(null);
+
+        // Check if default preset is configured
+        const defaultId = localStorage.getItem(DEFAULT_PRESET_KEY);
+        if (defaultId) {
+          const found = presets.find((p) => p.id === defaultId);
+          if (found) {
+            applyPresetZones(found.zones, canvas.width, canvas.height);
+          }
+        }
+      };
+
+      img.onerror = async () => {
+        if (isCancelled) return;
+        // Fallback: if regular URL failed, try Neon Cloud DB
+        if (!finalSrc.startsWith('data:')) {
+          const match = imageUrl.match(/pano_[a-zA-Z0-9_]+|\d{12,20}/);
+          const panoId = match ? match[0] : null;
+          if (panoId) {
+            try {
+              const neonData = await touristSpotsService.fetchPanoramaImageData(panoId);
+              if (neonData && !isCancelled) {
+                img.src = neonData;
+                return;
+              }
+            } catch (_) {}
+          }
+        }
+        setLoadError('Could not load 360 panorama image from cloud or server.');
+      };
+
+      img.src = finalSrc;
+    }
+
+    loadStudioCanvas();
+
+    return () => {
+      isCancelled = true;
     };
-    img.src = imageUrl;
   }, [isOpen, imageUrl]);
 
   // Apply pixelation effect to canvas area
@@ -594,7 +648,21 @@ export default function PrivacyBlurStudio({
         >
           {!imageLoaded && (
             <div style={{ color: '#94a3b8', fontSize: '0.9rem', textAlign: 'center' }}>
-              <span>⏳ Loading 360° panorama image...</span>
+              {loadError ? (
+                <div style={{ color: '#f87171', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                  <span>⚠️ {loadError}</span>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.75rem', padding: '4px 12px' }}
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <span>⏳ Loading 360° panorama image...</span>
+              )}
             </div>
           )}
 

@@ -155,6 +155,18 @@ export default function TouristSpotModal({
         heading: String(editingSpot.connected360?.heading ?? '0'),
         pitch: String(editingSpot.connected360?.pitch ?? '0'),
       });
+
+      // If spot has a local/dedicated panorama in Neon Cloud DB, resolve the real high-res texture
+      if (isLocal && targetId) {
+        touristSpotsService.fetchPanoramaImageData(targetId).then((cloudData) => {
+          if (cloudData) {
+            setFormData((prev) => ({
+              ...prev,
+              uploadedPanoUrl: cloudData,
+            }));
+          }
+        }).catch(() => {});
+      }
     } else {
       setSpotType('tourist_spot');
       setPanoSourceTab('upload');
@@ -398,6 +410,11 @@ export default function TouristSpotModal({
       setSaving(false);
       onSpotSaved?.(saved);
       onClose();
+
+      // Immediately sync to Neon Cloud DB so localhost and Vercel stay 100% in sync
+      touristSpotsService.syncToNeonCloud(saved.id).catch((syncErr) => {
+        console.warn('Background sync to Neon warning:', syncErr);
+      });
     } catch (saveErr) {
       setSaving(false);
       console.error('Failed to save spot:', saveErr);
