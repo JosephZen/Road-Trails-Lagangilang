@@ -658,6 +658,30 @@ export default function App() {
     }, 60);
   }, []);
 
+  // Gracefully fallback to Mapillary street view if custom 360 photo fails or cloud quota is exceeded
+  const handleFallbackToMapillary = useCallback(() => {
+    showToast('🔄 Switching to Mapillary Street View...');
+    if (activeTouristSpot?.id) {
+      touristSpotsService.healSpotToSeed(activeTouristSpot.id);
+      loadTouristSpots();
+    }
+    setViewerPanoMode('mapillary');
+  }, [activeTouristSpot, showToast, loadTouristSpots]);
+
+  // Configure custom Neon Cloud Database URL (Admin)
+  const handleConfigureNeonUrl = useCallback(() => {
+    const current = touristSpotsService.getNeonUrl();
+    const entered = window.prompt(
+      'Configure Neon PostgreSQL Cloud Connection URL:\n\n(If your previous Neon database hit its free monthly quota, paste a new free connection string from console.neon.tech here):',
+      current || ''
+    );
+    if (entered !== null) {
+      touristSpotsService.setNeonUrl(entered.trim());
+      showToast('☁️ Neon Cloud Database URL updated!');
+      loadTouristSpots();
+    }
+  }, [loadTouristSpots, showToast]);
+
   const handleRouteCalculated = useCallback((route) => {
     setRouteData(route);
     setRoutingMode(false);
@@ -900,8 +924,9 @@ export default function App() {
                 <span>{pinsDraggable ? '🔓 Reposition ON' : '🔒 Pins Locked'}</span>
               </button>
 
-              {/* Online/Offline indicator */}
+              {/* Online/Offline indicator & DB configuration */}
               <div
+                onClick={handleConfigureNeonUrl}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -914,8 +939,9 @@ export default function App() {
                   fontWeight: 600,
                   color: isOnline ? '#10b981' : '#f59e0b',
                   border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.4)'}`,
+                  cursor: 'pointer',
                 }}
-                title={isOnline ? 'Online • Neon PostgreSQL connected' : 'Offline • Field staging buffer active'}
+                title={isOnline ? 'Online • Neon PostgreSQL connected (Click to change DB URL)' : 'Offline • Field staging buffer active (Click to change DB URL)'}
               >
                 <span
                   style={{
@@ -926,7 +952,7 @@ export default function App() {
                     boxShadow: `0 0 6px ${isOnline ? '#10b981' : '#f59e0b'}`,
                   }}
                 />
-                <span>{isOnline ? 'Online' : 'Offline'}</span>
+                <span>{isOnline ? 'Online ⚙️' : 'Offline ⚙️'}</span>
               </div>
 
               {/* Staged Drafts Indicator & Queue Opener (Always accessible for Admin) */}
@@ -1566,6 +1592,7 @@ export default function App() {
                 onHeadingChange={setViewerHeading}
                 steerTarget={steerTarget}
                 onCloseViewer={handleCloseViewer}
+                onFallbackToMapillary={handleFallbackToMapillary}
               />
             ) : viewerPanoMode === 'mapillary' ? (
               <MapillaryViewer

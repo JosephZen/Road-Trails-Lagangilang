@@ -323,6 +323,15 @@ export const touristSpotsService = {
             changed = true;
           }
 
+          // Auto-heal Holy Cross Parish if user browser cached an un-uploaded failed blur ID
+          if (s.id === 'poi_holy_cross_parish' && s.connected360?.targetId && String(s.connected360.targetId).includes('1793026158012')) {
+            const seedMatch = Array.isArray(seedSpots) ? seedSpots.find((seed) => seed.id === s.id) : null;
+            if (seedMatch) {
+              s.connected360 = seedMatch.connected360;
+              changed = true;
+            }
+          }
+
           // Preserve dedicated local uploads and valid 360 links
           const targetId = s.connected360?.targetId;
           const isLocalUpload =
@@ -810,6 +819,19 @@ export const touristSpotsService = {
     localStorage.removeItem(DELETED_KEY);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(seedSpots));
     return seedSpots;
+  },
+
+  /**
+   * Reconnect a spot to its official seed data if custom local texture failed to load
+   */
+  healSpotToSeed(spotId) {
+    if (!spotId) return;
+    const seed = Array.isArray(seedSpots) ? seedSpots.find((s) => s.id === spotId) : null;
+    if (seed && seed.connected360) {
+      const all = this.getAllSpots();
+      const updated = all.map((s) => (s.id === spotId ? { ...s, connected360: seed.connected360 } : s));
+      this.saveAllSpots(updated, false);
+    }
   },
 
   // In-memory cache for high-resolution 360 panorama textures & thumbnails

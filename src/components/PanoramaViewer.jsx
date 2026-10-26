@@ -20,10 +20,12 @@ export default function PanoramaViewer({
   onPitchChange,
   steerTarget,
   onCloseViewer,
+  onFallbackToMapillary,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadError, setHasLoadError] = useState(false);
   const [viewerReady, setViewerReady] = useState(true);
   const currentPanoRef = useRef(null);
   const activeBlobUrlRef = useRef(null);
@@ -213,12 +215,14 @@ export default function PanoramaViewer({
     viewer.on('load', () => {
       clearTimeout(timer);
       setIsLoading(false);
+      setHasLoadError(false);
     });
 
     viewer.on('error', (err) => {
       clearTimeout(timer);
       console.warn('Pannellum viewer load error:', err);
       setIsLoading(false);
+      setHasLoadError(true);
     });
 
     viewerRef.current = viewer;
@@ -246,6 +250,59 @@ export default function PanoramaViewer({
         <div className="spinner" />
         <p className="loading-text">Loading panorama...</p>
       </div>
+
+      {/* Fallback overlay if texture cannot be loaded */}
+      {hasLoadError && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'rgba(15, 23, 42, 0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            borderRadius: '12px',
+            padding: '24px 20px',
+            textAlign: 'center',
+            zIndex: 60,
+            maxWidth: 'min(380px, 90vw)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.7)',
+            color: '#f8fafc',
+            animation: 'fadeInUp 0.3s ease',
+          }}
+        >
+          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>⚠️</div>
+          <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', color: '#f87171' }}>
+            360 Photo Unavailable
+          </h4>
+          <p style={{ margin: '0 0 16px 0', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.4 }}>
+            The custom 360 panorama image could not be accessed from the cloud database. Would you like to view the street view instead?
+          </p>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => onFallbackToMapillary?.()}
+              style={{
+                fontSize: '0.78rem',
+                padding: '6px 14px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              🚗 View Street View
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={onCloseViewer}
+              style={{ fontSize: '0.78rem', padding: '6px 14px', cursor: 'pointer' }}
+            >
+              ✕ Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Pannellum container */}
       <div ref={containerRef} className="panorama-container" />

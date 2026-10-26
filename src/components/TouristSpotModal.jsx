@@ -309,7 +309,8 @@ export default function TouristSpotModal({
       }));
       setNeonUploaded(true);
     } catch (err) {
-      console.warn('Neon blurred image upload warning:', err);
+      console.error('Neon blurred image upload error:', err);
+      alert(`⚠️ Could not save blurred 360 photo to cloud database:\n\n${err.message}\n\nNote: If Neon database quota has been reached, please check console.neon.tech or provide an updated connection URL.`);
     } finally {
       setUploadingNeon(false);
     }
