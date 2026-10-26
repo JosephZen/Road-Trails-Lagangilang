@@ -418,12 +418,14 @@ export default function App() {
   const spotHasDedicatedPano = useCallback(
     (spot) => {
       if (!spot) return false;
+      if (spot.connected360?.type === 'google' || spot.connected360?.type === 'mapillary') return false;
       const targetId = spot.connected360?.targetId || spot.primary_pano_id;
-      if (spot.connected360?.type === 'local' || !!spot.connected360?.imageUrl) return true;
-      if (targetId && String(targetId).startsWith('pano_')) return true;
+      // If it has an inline uploaded data URL (e.g. while editing or previewing)
+      if (spot.connected360?.imageUrl && String(spot.connected360.imageUrl).startsWith('data:')) return true;
+      if (!targetId) return false;
+      // Check if it exists in localPanoramas (which includes Neon DB panoramas and static disk files)
       if (
-        targetId &&
-        localPanoramas.some((p) => String(p.id) === String(targetId) || String(p.id) === `pano_${targetId}`)
+        localPanoramas.some((p) => String(p.id) === String(targetId) || String(p.id) === `pano_${targetId}` || `pano_${p.id}` === String(targetId))
       ) {
         return true;
       }
@@ -658,14 +660,25 @@ export default function App() {
     }, 60);
   }, []);
 
-  // Gracefully fallback to Mapillary street view if custom 360 photo fails or cloud quota is exceeded
+  // Gracefully fallback to Street View if custom 360 photo fails or cloud quota is exceeded
   const handleFallbackToMapillary = useCallback(() => {
-    showToast('🔄 Switching to Mapillary Street View...');
+    showToast('🔄 Switching to Street View...');
     if (activeTouristSpot?.id) {
       touristSpotsService.healSpotToSeed(activeTouristSpot.id);
       loadTouristSpots();
     }
-    setViewerPanoMode('mapillary');
+    const lat = activeTouristSpot?.location?.lat ?? activeTouristSpot?.lat;
+    const lng = activeTouristSpot?.location?.lng ?? activeTouristSpot?.lng;
+    if (lat && lng && isInsideUACampus(lat, lng)) {
+      setViewerPanoMode('mapillary');
+      setMapillaryImageId(MAPILLARY_CAMPUS_GATE_IMAGE_ID);
+      setStreetViewPos({ lat, lng, id: MAPILLARY_CAMPUS_GATE_IMAGE_ID });
+    } else if (lat && lng) {
+      setViewerPanoMode('google');
+      setStreetViewPos({ lat, lng, id: activeTouristSpot?.id || 'streetview' });
+    } else {
+      setViewerPanoMode('google');
+    }
   }, [activeTouristSpot, showToast, loadTouristSpots]);
 
   // Configure custom Neon Cloud Database URL (Admin)

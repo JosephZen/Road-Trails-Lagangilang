@@ -19,8 +19,8 @@
     "pseudoTheme": "cyan",
     "connected360": {
       "type": "local",
-      "targetId": "pano_1793021939158_npst",
-      "imageUrl": "/panoramas/pano_1793021939158_npst.jpg",
+      "targetId": "pano_1793021939916_3uzsf1",
+      "imageUrl": "/panoramas/pano_1793021939916_3uzsf1.jpg",
       "heading": 0,
       "pitch": 0
     },
@@ -74,9 +74,9 @@
     "isPseudoImage": true,
     "pseudoTheme": "amber",
     "connected360": {
-      "type": "local",
-      "targetId": "pano_1724722945416495",
-      "imageUrl": "/panoramas/pano_1724722945416495.jpg",
+      "type": "google",
+      "targetId": null,
+      "imageUrl": null,
       "heading": 180,
       "pitch": 0
     },
@@ -154,9 +154,9 @@
     "pseudoTheme": "indigo",
     "connected360": {
       "type": "local",
-      "targetId": "pano_1724722945416495",
-      "imageUrl": "/panoramas/pano_1724722945416495.jpg",
-      "heading": 180,
+      "targetId": "pano_1785434840169_sqgpeq",
+      "imageUrl": "/panoramas/pano_1785434840169_sqgpeq.jpg",
+      "heading": 45,
       "pitch": 0
     },
     "sync_status": "synced_cloud"

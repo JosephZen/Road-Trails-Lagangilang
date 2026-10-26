@@ -323,8 +323,22 @@ export const touristSpotsService = {
             changed = true;
           }
 
-          // Auto-heal Holy Cross Parish if user browser cached an un-uploaded failed blur ID
-          if (s.id === 'poi_holy_cross_parish' && s.connected360?.targetId && String(s.connected360.targetId).includes('1793026158012')) {
+          // Auto-heal Holy Cross Parish, UA Campus, and Ugiao River if user browser cached unlinked/non-existent IDs
+          if (s.id === 'poi_holy_cross_parish' && (String(s.connected360?.targetId).includes('1793026158012') || String(s.connected360?.targetId).includes('1724722945416495'))) {
+            const seedMatch = Array.isArray(seedSpots) ? seedSpots.find((seed) => seed.id === s.id) : null;
+            if (seedMatch) {
+              s.connected360 = seedMatch.connected360;
+              changed = true;
+            }
+          }
+          if (s.id === 'poi_ua_main_campus' && String(s.connected360?.targetId).includes('1724722945416495')) {
+            const seedMatch = Array.isArray(seedSpots) ? seedSpots.find((seed) => seed.id === s.id) : null;
+            if (seedMatch) {
+              s.connected360 = seedMatch.connected360;
+              changed = true;
+            }
+          }
+          if (s.id === 'poi_ugiao_river' && String(s.connected360?.targetId).includes('1793021939158_npst')) {
             const seedMatch = Array.isArray(seedSpots) ? seedSpots.find((seed) => seed.id === s.id) : null;
             if (seedMatch) {
               s.connected360 = seedMatch.connected360;
