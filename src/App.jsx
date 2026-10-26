@@ -1436,7 +1436,7 @@ export default function App() {
             {activeTouristSpot && (
               <TouristSpotStreetViewCard
                 spot={activeTouristSpot}
-                onClose={handleCloseViewer}
+                onClose={() => setActiveTouristSpot(null)}
                 onNavigateTo360={handleSelectTouristSpot}
                 onSteerHeading={handleSteerHeading}
                 isViewerOpen={viewerOpen}

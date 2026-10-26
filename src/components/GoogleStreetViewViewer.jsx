@@ -56,35 +56,7 @@ export default function GoogleStreetViewViewer({
         overflow: 'hidden',
       }}
     >
-      {/* Top of viewer is strictly clean: only Close button at Top-Right */}
-      {onClose && (
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '14px',
-            right: '16px',
-            zIndex: 30,
-            background: 'rgba(15, 23, 42, 0.9)',
-            color: '#ffffff',
-            border: '1px solid rgba(255, 255, 255, 0.25)',
-            borderRadius: 'var(--radius-full, 9999px)',
-            padding: '6px 14px',
-            fontSize: '0.78rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            backdropFilter: 'blur(10px)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-          }}
-          title="Back to Map"
-        >
-          <span>✕</span>
-          <span>Back to Map</span>
-        </button>
-      )}
+
 
       {/* Loading indicator */}
       {isLoading && (

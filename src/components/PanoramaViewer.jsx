@@ -341,63 +341,7 @@ export default function PanoramaViewer({
         <button className="zoom-btn" onClick={zoomOut} title="Zoom out">−</button>
       </div>
 
-      {/* Top Banner: Dedicated 360 Photo Badge */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '16px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 100,
-          background: 'rgba(15, 23, 42, 0.82)',
-          color: '#ffffff',
-          padding: '5px 14px',
-          borderRadius: 'var(--radius-full)',
-          fontSize: '0.78rem',
-          fontWeight: 700,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          border: '1px solid rgba(255, 255, 255, 0.25)',
-          backdropFilter: 'blur(8px)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-          pointerEvents: 'none',
-        }}
-      >
-        <span style={{ color: '#38bdf8' }}>📷</span>
-        <span>{panorama?.label || 'Dedicated 360° Landmark View'}</span>
-      </div>
 
-      {/* Close / Back to Map Button */}
-      {onCloseViewer && (
-        <button
-          onClick={onCloseViewer}
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            zIndex: 110,
-            background: 'rgba(15, 23, 42, 0.85)',
-            color: '#ffffff',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            borderRadius: 'var(--radius-full)',
-            padding: '6px 14px',
-            fontSize: '0.78rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            backdropFilter: 'blur(8px)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-            transition: 'all 0.2s ease',
-          }}
-          title="Return to 2D Map"
-        >
-          <span>✕</span>
-          <span>Back to Map</span>
-        </button>
-      )}
 
 
 
