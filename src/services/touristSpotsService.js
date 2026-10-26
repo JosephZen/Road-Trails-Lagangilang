@@ -930,6 +930,8 @@ export const touristSpotsService = {
         ON CONFLICT (id) DO UPDATE SET
           image_data = EXCLUDED.image_data,
           thumbnail_data = EXCLUDED.thumbnail_data,
+          thumbnail_url = EXCLUDED.thumbnail_url,
+          filename = EXCLUDED.filename,
           latitude = EXCLUDED.latitude,
           longitude = EXCLUDED.longitude,
           compass_heading = EXCLUDED.compass_heading,
