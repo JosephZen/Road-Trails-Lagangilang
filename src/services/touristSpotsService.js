@@ -362,7 +362,7 @@ export const touristSpotsService = {
   /**
    * Save all tourist spots to localStorage.
    */
-  saveAllSpots(spots) {
+  saveAllSpots(spots, notify = true) {
     try {
       const sanitized = spots
         .filter((s) => !isObsoleteSpot(s))
@@ -390,7 +390,9 @@ export const touristSpotsService = {
           return clean;
         });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-      window.dispatchEvent(new Event('lagangilang_spots_updated'));
+      if (notify) {
+        window.dispatchEvent(new Event('lagangilang_spots_updated'));
+      }
     } catch (err) {
       console.error('Failed to save spots to localStorage:', err);
       // Fallback: If still quota exceeded, strip image payloads entirely to save spot metadata
@@ -403,7 +405,9 @@ export const touristSpotsService = {
             connected360: s.connected360 ? { ...s.connected360, imageUrl: null } : s.connected360,
           }));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
-        window.dispatchEvent(new Event('lagangilang_spots_updated'));
+        if (notify) {
+          window.dispatchEvent(new Event('lagangilang_spots_updated'));
+        }
       } catch (innerErr) {
         console.error('Critical localStorage write failure:', innerErr);
       }
@@ -790,7 +794,7 @@ export const touristSpotsService = {
           }
         }
 
-        this.saveAllSpots(finalSpots);
+        this.saveAllSpots(finalSpots, false);
         return finalSpots;
       }
     } catch (err) {

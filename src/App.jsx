@@ -412,13 +412,6 @@ export default function App() {
 
   useEffect(() => {
     loadTouristSpots();
-    const handleSpotsUpdated = () => {
-      loadTouristSpots();
-    };
-    window.addEventListener('lagangilang_spots_updated', handleSpotsUpdated);
-    return () => {
-      window.removeEventListener('lagangilang_spots_updated', handleSpotsUpdated);
-    };
   }, [loadTouristSpots]);
 
   // Helper: check if a tourist spot has a dedicated local 360 panorama (either in Neon Cloud DB, local files, or explicit type)
