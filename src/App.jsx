@@ -758,42 +758,41 @@ export default function App() {
             🧭 Route
           </button>
 
-          {/* Toggle Mapillary Streetview (Green lines & dots) */}
-          <button
-            className={`btn ${showMapillaryStreetview ? 'btn-secondary' : 'btn-ghost'}`}
-            onClick={() => {
-              const next = !showMapillaryStreetview;
-              setShowMapillaryStreetview(next);
-              setShowMapillaryDots(next);
-              setShowMapillaryLines(next);
-              showToast(
-                next
-                  ? '🟢 Mapillary streetview (lines & dots) visible'
-                  : '⚪ Mapillary streetview hidden (cyan line remains visible)'
-              );
-            }}
-            style={{
-              fontSize: '0.8rem',
-              padding: '6px 12px',
-              borderRadius: 'var(--radius-full)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-            title={
-              showMapillaryStreetview
-                ? 'Hide raw Mapillary streetview (green lines & dots)'
-                : 'Show raw Mapillary streetview (green lines & dots)'
-            }
-          >
-            {showMapillaryStreetview ? '🟢 Streetview: ON' : '⚪ Streetview: OFF'}
-          </button>
-
-          <div className="controls-separator" />
-
           {/* Admin-only controls */}
           {isAdmin && (
             <>
+              <div className="controls-separator" />
+
+              {/* Toggle Mapillary Streetview (Green lines & dots) - Admin only */}
+              <button
+                className={`btn ${showMapillaryStreetview ? 'btn-secondary' : 'btn-ghost'}`}
+                onClick={() => {
+                  const next = !showMapillaryStreetview;
+                  setShowMapillaryStreetview(next);
+                  setShowMapillaryDots(next);
+                  setShowMapillaryLines(next);
+                  showToast(
+                    next
+                      ? '🟢 Mapillary streetview (lines & dots) visible'
+                      : '⚪ Mapillary streetview hidden (cyan line remains visible)'
+                  );
+                }}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+                title={
+                  showMapillaryStreetview
+                    ? 'Hide raw Mapillary streetview (green lines & dots)'
+                    : 'Show raw Mapillary streetview (green lines & dots)'
+                }
+              >
+                {showMapillaryStreetview ? '🟢 Streetview: ON' : '⚪ Streetview: OFF'}
+              </button>
               {/* Bend / Align Streetview Line Button (Admin only) */}
               <button
                 className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
