@@ -414,6 +414,24 @@ export default function App() {
     loadTouristSpots();
   }, [loadTouristSpots]);
 
+  // Helper: check if a tourist spot has a dedicated local 360 panorama (either in Neon Cloud DB, local files, or explicit type)
+  const spotHasDedicatedPano = useCallback(
+    (spot) => {
+      if (!spot) return false;
+      const targetId = spot.connected360?.targetId || spot.primary_pano_id;
+      if (spot.connected360?.type === 'local' || !!spot.connected360?.imageUrl) return true;
+      if (targetId && String(targetId).startsWith('pano_')) return true;
+      if (
+        targetId &&
+        localPanoramas.some((p) => String(p.id) === String(targetId) || String(p.id) === `pano_${targetId}`)
+      ) {
+        return true;
+      }
+      return false;
+    },
+    [localPanoramas]
+  );
+
   // Handle selecting a Tourist Spot (POI) from map or sidebar
   const handleSelectTouristSpot = useCallback(
     async (spot) => {
@@ -425,13 +443,11 @@ export default function App() {
 
       // 1. If landmark has its own dedicated 360 image (uploaded or linked)
       const customPanoId = spot.connected360?.targetId || spot.primary_pano_id;
-      const isLocalPano =
-        spot.connected360?.type === 'local' ||
-        !!spot.connected360?.imageUrl ||
-        (customPanoId && String(customPanoId).startsWith('pano_'));
+      const isLocalPano = spotHasDedicatedPano(spot);
 
-      // Dedicated Mapillary pano ID (exclude the legacy gate fallback 1532761357806896 unless it's actually UA gate)
+      // Dedicated Mapillary pano ID (exclude if it's already a dedicated local panorama or UA gate)
       const isDedicatedPanoId =
+        !isLocalPano &&
         customPanoId &&
         String(customPanoId).length >= 10 &&
         /^\d+$/.test(String(customPanoId)) &&
@@ -1405,13 +1421,7 @@ export default function App() {
               isAdmin={isAdmin}
               viewerPanoMode={viewerPanoMode}
               onToggleViewerMode={handleToggleViewerMode}
-              hasDedicatedPano={
-                !!(
-                  activeTouristSpot.connected360?.type === 'local' ||
-                  !!activeTouristSpot.connected360?.imageUrl ||
-                  String(activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || '').startsWith('pano_')
-                )
-              }
+              hasDedicatedPano={spotHasDedicatedPano(activeTouristSpot)}
               onEdit={(s) => {
                 setEditingSpot(s);
                 setShowSpotModal(true);
@@ -1443,13 +1453,7 @@ export default function App() {
                 isAdmin={isAdmin}
                 viewerPanoMode={viewerPanoMode}
                 onToggleViewerMode={handleToggleViewerMode}
-                hasDedicatedPano={
-                  !!(
-                    activeTouristSpot.connected360?.type === 'local' ||
-                    !!activeTouristSpot.connected360?.imageUrl ||
-                    String(activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || '').startsWith('pano_')
-                  )
-                }
+                hasDedicatedPano={spotHasDedicatedPano(activeTouristSpot)}
                 onEdit={(s) => {
                   setEditingSpot(s);
                   setShowSpotModal(true);
@@ -1543,11 +1547,7 @@ export default function App() {
             )}
 
             {/* 360 Viewer: Dedicated Uploaded Panorama (Pannellum), Mapillary or Google Street View */}
-            {activeTouristSpot &&
-            (activeTouristSpot.connected360?.type === 'local' ||
-              !!activeTouristSpot.connected360?.imageUrl ||
-              String(activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || '').startsWith('pano_')) &&
-            viewerPanoMode === 'dedicated' ? (
+            {activeTouristSpot && spotHasDedicatedPano(activeTouristSpot) && viewerPanoMode === 'dedicated' ? (
               <PanoramaViewer
                 panorama={{
                   id: activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || activeTouristSpot.id,

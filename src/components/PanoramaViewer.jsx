@@ -79,10 +79,13 @@ export default function PanoramaViewer({
         (panorama.imageUrl?.startsWith('data:') ? panorama.imageUrl : null) ||
         (panorama.image?.startsWith('data:') && panorama.image.length > 35000 ? panorama.image : null);
 
-      // 2. If it's a custom/local panorama ID (starts with pano_), query Neon Cloud DB for direct image_data
-      if (!finalImageUrl && panorama.id && String(panorama.id).startsWith('pano_')) {
+      // 2. Query Neon Cloud DB for direct image_data if not found in props
+      if (!finalImageUrl && panorama.id) {
         try {
-          const cloudTexture = await touristSpotsService.fetchPanoramaImageData(panorama.id);
+          let cloudTexture = await touristSpotsService.fetchPanoramaImageData(panorama.id);
+          if (!cloudTexture && !String(panorama.id).startsWith('pano_')) {
+            cloudTexture = await touristSpotsService.fetchPanoramaImageData(`pano_${panorama.id}`);
+          }
           if (cloudTexture && !isCancelled) {
             finalImageUrl = cloudTexture;
           }

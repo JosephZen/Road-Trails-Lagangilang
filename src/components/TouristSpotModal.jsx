@@ -223,7 +223,9 @@ export default function TouristSpotModal({
 
     setUploadingNeon(true);
     setDetectingMapillary(true);
-    const defaultPanoId = formData.connectedPanoId || `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const defaultPanoId = (formData.connectedPanoId && String(formData.connectedPanoId).startsWith('pano_'))
+      ? formData.connectedPanoId
+      : `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
     try {
       // 1. Client-side compression & direct upload to Neon PostgreSQL Cloud DB
@@ -271,7 +273,9 @@ export default function TouristSpotModal({
   const handleSaveBlurredImage = async (blurredDataUrl, zoneCount) => {
     setUploadingNeon(true);
     setPrivacyBlurredCount(zoneCount);
-    const defaultPanoId = formData.connectedPanoId || `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const defaultPanoId = (formData.connectedPanoId && String(formData.connectedPanoId).startsWith('pano_'))
+      ? formData.connectedPanoId
+      : `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
     try {
       // Direct upload & compression of the blurred image to Neon Cloud DB
@@ -343,8 +347,12 @@ export default function TouristSpotModal({
     const latNum = parseFloat(formData.lat);
     const lngNum = parseFloat(formData.lng);
 
-    const isLocalPano = formData.connectedPanoType === 'local' || !!formData.uploadedPanoUrl;
-    const finalTargetId = formData.connectedPanoId || (isLocalPano ? `pano_${Date.now()}` : null);
+    const isLocalPano = formData.connectedPanoType === 'local' || !!formData.uploadedPanoUrl || neonUploaded;
+    const finalTargetId = isLocalPano
+      ? ((formData.connectedPanoId && String(formData.connectedPanoId).startsWith('pano_'))
+          ? formData.connectedPanoId
+          : `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`)
+      : formData.connectedPanoId;
 
     // Image URL handling: preserve compact thumbnail (< 35KB data URI) so cards render everywhere without broken links
     const cleanImageUrl = (formData.image && formData.image.startsWith('data:') && formData.image.length <= 35000)

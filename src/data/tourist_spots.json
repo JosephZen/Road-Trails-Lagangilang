@@ -7,8 +7,8 @@
     "categoryIcon": "🏞️",
     "barangay": "Pawa",
     "location": {
-      "lat": 17.587492,
-      "lng": 120.73661,
+      "lat": 17.588469,
+      "lng": 120.736502,
       "address": "Ugiao River, Barangay Pawa, Lagangilang, Abra"
     },
     "description": "Scenic freshwater river corridor featuring clear waters, pebble banks, and tranquil natural swimming spots popular for picnics and summer outings.",
@@ -22,8 +22,8 @@
       "pitch": 0
     },
     "sync_status": "synced_cloud",
-    "lat": 17.587492,
-    "lng": 120.73661
+    "lat": 17.588469,
+    "lng": 120.736502
   },
   {
     "id": "poi_quirsodan_dam",
@@ -33,8 +33,8 @@
     "categoryIcon": "🌊",
     "barangay": "San Isidro",
     "location": {
-      "lat": 17.59235,
-      "lng": 120.785336,
+      "lat": 17.587388,
+      "lng": 120.792517,
       "address": "Sitio Quirsodan, Barangay San Isidro, Lagangilang, Abra"
     },
     "description": "Scenic irrigation dam and freshwater river spillway surrounded by verdant mountain ridges, scenic river boulders, and tranquil countryside waters.",
@@ -48,8 +48,8 @@
       "pitch": 0
     },
     "sync_status": "synced_cloud",
-    "lat": 17.59235,
-    "lng": 120.785336
+    "lat": 17.587388,
+    "lng": 120.792517
   },
   {
     "id": "poi_holy_cross_parish",
@@ -68,40 +68,15 @@
     "isPseudoImage": true,
     "pseudoTheme": "amber",
     "connected360": {
-      "type": "mapillary",
-      "targetId": "1724722945416495",
+      "type": "local",
+      "targetId": "pano_1724722945416495",
+      "imageUrl": "/panoramas/pano_1724722945416495.jpg",
       "heading": 180,
       "pitch": 0
     },
     "sync_status": "synced_cloud",
     "lat": 17.608422,
     "lng": 120.734823
-  },
-  {
-    "id": "poi_talinawen_spring",
-    "name": "Talinawen Spring",
-    "spotType": "tourist_spot",
-    "category": "Nature & Eco-Tourism",
-    "categoryIcon": "💧",
-    "barangay": "Paganao",
-    "location": {
-      "lat": 17.606224,
-      "lng": 120.732113,
-      "address": "Talinawen Natural Spring, Lagangilang, Abra"
-    },
-    "description": "Famous natural freshwater spring pool bubbling from limestone aquifers, celebrated for its refreshing cool waters, swimming basins, and lush tropical canopy.",
-    "image": null,
-    "isPseudoImage": true,
-    "pseudoTheme": "cyan",
-    "connected360": {
-      "type": "mapillary",
-      "targetId": "1458052846269748",
-      "heading": 150,
-      "pitch": 0
-    },
-    "sync_status": "synced_cloud",
-    "lat": 17.606224,
-    "lng": 120.732113
   },
   {
     "id": "poi_galangugong_rocks",
@@ -172,8 +147,9 @@
     "isPseudoImage": true,
     "pseudoTheme": "indigo",
     "connected360": {
-      "type": "mapillary",
-      "targetId": "1724722945416495",
+      "type": "local",
+      "targetId": "pano_1724722945416495",
+      "imageUrl": "/panoramas/pano_1724722945416495.jpg",
       "heading": 180,
       "pitch": 0
     },
@@ -196,8 +172,9 @@
     "isPseudoImage": true,
     "pseudoTheme": "teal",
     "connected360": {
-      "type": "mapillary",
-      "targetId": "1735531687819496",
+      "type": "local",
+      "targetId": "pano_1735531687819496",
+      "imageUrl": "/panoramas/pano_1735531687819496.jpg",
       "heading": 154,
       "pitch": 0
     },
@@ -248,8 +225,9 @@
     "isPseudoImage": true,
     "pseudoTheme": "orange",
     "connected360": {
-      "type": "mapillary",
-      "targetId": "1735531687819496",
+      "type": "local",
+      "targetId": "pano_1735531687819496",
+      "imageUrl": "/panoramas/pano_1735531687819496.jpg",
       "heading": 154,
       "pitch": 0
     },
@@ -263,8 +241,8 @@
     "categoryIcon": "🌾",
     "barangay": "Nagtupacan",
     "location": {
-      "lat": 17.5901,
-      "lng": 120.7402,
+      "lat": 17.591696,
+      "lng": 120.743929,
       "address": "Barangay Nagtupacan, Lagangilang, Abra"
     },
     "description": "Prominent integrated agricultural and livestock eco-farm in Barangay Nagtupacan featuring dragon fruit orchards, poultry farming, and agricultural tourism.",
@@ -277,7 +255,9 @@
       "heading": 158,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "lat": 17.591696,
+    "lng": 120.743929
   },
   {
     "id": "poi_rizalista_cave",

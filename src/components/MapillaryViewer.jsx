@@ -168,11 +168,15 @@ export default function MapillaryViewer({
             }
           };
           viewer.on('navigable', handler);
-          setTimeout(resolve, 3000); // safety fallback timeout
+          setTimeout(resolve, 2000); // safety fallback timeout
         });
       }
 
       if (isCancelled || !viewerRef.current) return;
+      if (!viewerRef.current.isNavigable) {
+        console.warn('Mapillary viewer still initializing; waiting for navigable event.');
+        return;
+      }
 
       try {
         currentImageIdRef.current = targetId;
@@ -194,7 +198,7 @@ export default function MapillaryViewer({
         console.warn('Mapillary navigation warning:', err);
 
         // Auto-recover to working default entrance gate if the requested image fails to cache or load
-        if (targetId !== DEFAULT_IMAGE_ID && viewerRef.current) {
+        if (targetId !== DEFAULT_IMAGE_ID && viewerRef.current && viewerRef.current.isNavigable) {
           console.warn(`Image ${targetId} failed to load. Auto-recovering to campus gate (${DEFAULT_IMAGE_ID})...`);
           try {
             currentImageIdRef.current = DEFAULT_IMAGE_ID;
@@ -241,13 +245,23 @@ export default function MapillaryViewer({
     setIsLoading(true);
     const target = String(imageId || currentImageIdRef.current || DEFAULT_IMAGE_ID);
     if (viewerRef.current) {
-      viewerRef.current.moveTo(target).then(() => {
-        setIsLoading(false);
-        setError(null);
-      }).catch((e) => {
-        setError(e?.message || 'Failed to load street view image');
-        setIsLoading(false);
-      });
+      const doMove = () => {
+        viewerRef.current
+          .moveTo(target)
+          .then(() => {
+            setIsLoading(false);
+            setError(null);
+          })
+          .catch((e) => {
+            setError(e?.message || 'Failed to load street view image');
+            setIsLoading(false);
+          });
+      };
+      if (viewerRef.current.isNavigable) {
+        doMove();
+      } else {
+        viewerRef.current.once('navigable', doMove);
+      }
     }
   }, [imageId]);
 

@@ -259,6 +259,30 @@
       "description": "Government Office",
       "timestamp": "2026-10-25T05:49:07.330Z",
       "neighbors": []
+    },
+    {
+      "id": "pano_1735531687819496",
+      "filename": "pano_1735531687819496.jpg",
+      "thumbnail": "",
+      "lat": 17.612116,
+      "lng": 120.739168,
+      "heading": 154,
+      "label": "University of Abra - Fish Pond",
+      "description": "Aquaculture Research Center",
+      "timestamp": "2026-10-26T12:00:00.000Z",
+      "neighbors": []
+    },
+    {
+      "id": "pano_1724722945416495",
+      "filename": "pano_1724722945416495.jpg",
+      "thumbnail": "",
+      "lat": 17.608422,
+      "lng": 120.734823,
+      "heading": 180,
+      "label": "Holy Cross Parish",
+      "description": "Historic Catholic Church",
+      "timestamp": "2026-10-26T12:00:00.000Z",
+      "neighbors": []
     }
   ]
 }

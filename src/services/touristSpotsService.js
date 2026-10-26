@@ -697,7 +697,10 @@ export const touristSpotsService = {
     try {
       const rows = await this.executeNeonQuery(async (sql) => {
         return await sql`
-          SELECT * FROM public.tourist_spots ORDER BY created_at ASC
+          SELECT ts.*, p.id as registered_pano_id
+          FROM public.tourist_spots ts
+          LEFT JOIN public.panoramas p ON (ts.primary_pano_id = p.id OR ('pano_' || ts.primary_pano_id) = p.id)
+          ORDER BY ts.created_at ASC
         `;
       });
 
@@ -710,6 +713,11 @@ export const touristSpotsService = {
             const categoryName = normalizeCategoryName(seedMatch?.category || r.category_id);
             const categoryIcon = seedMatch?.categoryIcon || getDefaultCategoryIcon(categoryName, r.id.startsWith('poi_') ? 'tourist_spot' : 'poi');
             const spotType = seedMatch?.spotType || (r.id.startsWith('poi_ua_') || r.id.startsWith('poi_holy_') || r.id.startsWith('poi_ugiao') || r.id.startsWith('poi_quirsodan') || r.id.startsWith('poi_talinawen') || r.id.startsWith('poi_galangugong') || r.id.startsWith('poi_banat') || r.id.startsWith('poi_dj_') || r.id.startsWith('poi_rizalista') ? 'tourist_spot' : 'poi');
+
+            const isDedicatedLocal = Boolean(
+              r.registered_pano_id ||
+              (r.primary_pano_id && String(r.primary_pano_id).startsWith('pano_'))
+            );
 
             return {
               id: r.id,
@@ -730,9 +738,9 @@ export const touristSpotsService = {
               isPseudoImage: r.is_pseudo_image ?? !r.image_url,
               pseudoTheme: r.pseudo_theme || 'indigo',
               connected360: {
-                type: (r.primary_pano_id && String(r.primary_pano_id).startsWith('pano_')) ? 'local' : 'mapillary',
-                targetId: r.primary_pano_id || null,
-                imageUrl: (r.primary_pano_id && String(r.primary_pano_id).startsWith('pano_')) ? `/panoramas/${r.primary_pano_id}.jpg` : null,
+                type: isDedicatedLocal ? 'local' : 'mapillary',
+                targetId: r.registered_pano_id || r.primary_pano_id || null,
+                imageUrl: isDedicatedLocal ? `/panoramas/${r.registered_pano_id || r.primary_pano_id}.jpg` : null,
                 heading: parseFloat(r.target_heading) || 0,
                 pitch: parseFloat(r.target_pitch) || 0,
               },
@@ -863,7 +871,8 @@ export const touristSpotsService = {
    * Compresses to WebGL-compliant resolution and stores in public.panoramas (image_data, thumbnail_data).
    */
   async uploadPanoToNeon({ id, fileOrDataUrl, lat, lng, heading = 0, label = '', description = '' }) {
-    const panoId = id || `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    // Dedicated uploads must always have a clean 'pano_' prefix to distinguish from external Mapillary sequence IDs
+    const panoId = (id && String(id).startsWith('pano_')) ? id : `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const parsedLat = parseFloat(lat);
     const parsedLng = parseFloat(lng);
 
@@ -927,10 +936,14 @@ export const touristSpotsService = {
   async fetchPanoramaImageData(panoId) {
     if (!panoId) return null;
     const cleanId = String(panoId).replace(/\.jpg$/i, '');
+    const altId = cleanId.startsWith('pano_') ? cleanId.replace(/^pano_/, '') : `pano_${cleanId}`;
 
     // Check memory cache
     if (this._panoCache.has(cleanId)) {
       return this._panoCache.get(cleanId).imageData;
+    }
+    if (this._panoCache.has(altId)) {
+      return this._panoCache.get(altId).imageData;
     }
 
     try {
@@ -938,7 +951,8 @@ export const touristSpotsService = {
         return await sql`
           SELECT id, image_data, thumbnail_data, latitude, longitude
           FROM public.panoramas
-          WHERE id = ${cleanId}
+          WHERE id = ${cleanId} OR id = ${altId}
+          LIMIT 1
         `;
       });
 
