@@ -418,12 +418,13 @@ export default function App() {
   const spotHasDedicatedPano = useCallback(
     (spot) => {
       if (!spot) return false;
-      if (spot.connected360?.type === 'google' || spot.connected360?.type === 'mapillary') return false;
       const targetId = spot.connected360?.targetId || spot.primary_pano_id;
-      // If it has an inline uploaded data URL (e.g. while editing or previewing)
-      if (spot.connected360?.imageUrl && String(spot.connected360.imageUrl).startsWith('data:')) return true;
+      // If explicitly marked local or has a dedicated pano_ ID, it is a dedicated panorama
+      if (spot.connected360?.type === 'local') return true;
+      if (targetId && String(targetId).startsWith('pano_')) return true;
+      if (spot.connected360?.imageUrl && !String(spot.connected360.imageUrl).includes('maps.google')) return true;
+      if (spot.connected360?.type === 'google' || spot.connected360?.type === 'mapillary') return false;
       if (!targetId) return false;
-      // Check if it exists in localPanoramas (which includes Neon DB panoramas and static disk files)
       if (
         localPanoramas.some((p) => String(p.id) === String(targetId) || String(p.id) === `pano_${targetId}` || `pano_${p.id}` === String(targetId))
       ) {
@@ -1818,12 +1819,22 @@ export default function App() {
           const savedLng = saved.location?.lng ?? saved.lng;
           setMapCenterPos([savedLng, savedLat]);
 
+          const targetPanoId = saved.connected360?.targetId || saved.primary_pano_id;
           const hasCustom360 =
             saved.connected360?.type === 'local' ||
             !!saved.connected360?.imageUrl ||
-            String(saved.connected360?.targetId || '').startsWith('pano_');
+            String(targetPanoId || '').startsWith('pano_');
 
           if (hasCustom360) {
+            setViewerPanoMode('dedicated');
+            if (targetPanoId) {
+              setLocalPanoramas((prev) => {
+                if (!prev.some((p) => p.id === targetPanoId)) {
+                  return [{ id: targetPanoId, label: saved.name, filename: `${targetPanoId}.jpg` }, ...prev];
+                }
+                return prev;
+              });
+            }
             handleSelectTouristSpot(saved);
           } else {
             setViewerOpen(false);

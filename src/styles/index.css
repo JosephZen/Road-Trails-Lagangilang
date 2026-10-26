@@ -1732,38 +1732,40 @@ body {
 .role-indicator {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
+  gap: 8px;
+  padding: 6px 15px;
   border-radius: var(--radius-full);
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 800;
   letter-spacing: 0.03em;
-  backdrop-filter: blur(12px);
   transition: all var(--transition-fast);
   cursor: pointer;
   user-select: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 .role-indicator.admin {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(220, 38, 38, 0.15) 100%);
-  border: 1px solid rgba(239, 68, 68, 0.5);
-  color: #fca5a5;
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  border: 1.5px solid #ef4444;
+  color: #ffffff;
 }
 
 .role-indicator.admin:hover {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(220, 38, 38, 0.3) 100%);
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.3);
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.5);
+  transform: translateY(-1px);
 }
 
 .role-indicator.tourist {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.12) 100%);
-  border: 1px solid rgba(34, 197, 94, 0.4);
-  color: #86efac;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border: 1.5px solid #10b981;
+  color: #ffffff;
 }
 
 .role-indicator.tourist:hover {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.35) 0%, rgba(16, 185, 129, 0.25) 100%);
-  box-shadow: 0 0 16px rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5);
+  transform: translateY(-1px);
 }
 
 .role-indicator-dot {
@@ -1774,13 +1776,13 @@ body {
 }
 
 .role-indicator.admin .role-indicator-dot {
-  background: #ef4444;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
 }
 
 .role-indicator.tourist .role-indicator-dot {
-  background: #22c55e;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
 }
 
 /* Admin Toolbar Strip */
