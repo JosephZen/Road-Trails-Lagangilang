@@ -62,8 +62,9 @@ export default function PanoramaViewer({
   useEffect(() => {
     if (!viewerReady || !panorama || !containerRef.current) return;
 
-    // Guard: Prevent re-initialization if the exact same panorama is already loaded and active
-    if (currentPanoRef.current === panorama.id && viewerRef.current) {
+    // Guard: Prevent re-initialization if the exact same panorama and texture is already loaded and active
+    const panoTextureKey = `${panorama.id}_${panorama.imageData ? panorama.imageData.length : ''}_${panorama.imageUrl || ''}`;
+    if (currentPanoRef.current === panoTextureKey && viewerRef.current) {
       return;
     }
 
@@ -122,7 +123,7 @@ export default function PanoramaViewer({
       }
 
       createViewer(finalImageUrl, [], panorama.heading || 0, viewerHeading);
-      currentPanoRef.current = panorama.id;
+      currentPanoRef.current = panoTextureKey;
     }
 
     loadPanoTexture();
@@ -130,7 +131,7 @@ export default function PanoramaViewer({
     return () => {
       isCancelled = true;
     };
-  }, [panorama?.id, viewerReady, getCachedUrl]); // Stable dependency on panorama.id instead of object reference
+  }, [panorama?.id, panorama?.imageData, panorama?.imageUrl, viewerReady, getCachedUrl]);
 
   // Handle steering / orienting camera to face a tourist landmark
   useEffect(() => {

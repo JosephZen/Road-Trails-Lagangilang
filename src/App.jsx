@@ -412,6 +412,13 @@ export default function App() {
 
   useEffect(() => {
     loadTouristSpots();
+    const handleSpotsUpdated = () => {
+      loadTouristSpots();
+    };
+    window.addEventListener('lagangilang_spots_updated', handleSpotsUpdated);
+    return () => {
+      window.removeEventListener('lagangilang_spots_updated', handleSpotsUpdated);
+    };
   }, [loadTouristSpots]);
 
   // Helper: check if a tourist spot has a dedicated local 360 panorama (either in Neon Cloud DB, local files, or explicit type)
@@ -1768,10 +1775,10 @@ export default function App() {
           setEditingSpot(null);
         }}
         onSpotSaved={(saved) => {
-          showToast(`✅ "${saved.name}" added to Staging Queue!`);
+          showToast(`✅ "${saved.name}" saved & synced to Neon Cloud!`);
           setSpotFilter('all');
           setBarangayFilter('all');
-          setSidebarTab('staging');
+          setSidebarTab('spots');
           setSidebarOpen(true);
           loadTouristSpots();
           setActiveTouristSpot(saved);

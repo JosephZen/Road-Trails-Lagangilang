@@ -235,9 +235,8 @@ export default function TouristSpotModal({
 
     setUploadingNeon(true);
     setDetectingMapillary(true);
-    const defaultPanoId = (formData.connectedPanoId && String(formData.connectedPanoId).startsWith('pano_'))
-      ? formData.connectedPanoId
-      : `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    // Always assign a fresh unique panorama ID on upload/replace to guarantee cache busting & instant viewer re-render
+    const defaultPanoId = `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
     try {
       // 1. Client-side compression & direct upload to Neon PostgreSQL Cloud DB
@@ -285,9 +284,8 @@ export default function TouristSpotModal({
   const handleSaveBlurredImage = async (blurredDataUrl, zoneCount) => {
     setUploadingNeon(true);
     setPrivacyBlurredCount(zoneCount);
-    const defaultPanoId = (formData.connectedPanoId && String(formData.connectedPanoId).startsWith('pano_'))
-      ? formData.connectedPanoId
-      : `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    // Always assign a fresh unique panorama ID on blur save to guarantee instant viewer update
+    const defaultPanoId = `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
     try {
       // Direct upload & compression of the blurred image to Neon Cloud DB
@@ -348,7 +346,7 @@ export default function TouristSpotModal({
   };
 
   // Save to System
-  const handleSaveToSystem = (e) => {
+  const handleSaveToSystem = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       alert('Please enter a location name.');
@@ -407,14 +405,17 @@ export default function TouristSpotModal({
 
     try {
       const saved = touristSpotsService.saveDraftLocally(spotPayload, []);
+      // Immediately sync to Neon Cloud DB so localhost and Vercel stay 100% in sync
+      try {
+        await touristSpotsService.syncToNeonCloud(saved.id);
+        saved.sync_status = 'synced_cloud';
+      } catch (syncErr) {
+        console.warn('Sync to Neon warning:', syncErr);
+      }
+
       setSaving(false);
       onSpotSaved?.(saved);
       onClose();
-
-      // Immediately sync to Neon Cloud DB so localhost and Vercel stay 100% in sync
-      touristSpotsService.syncToNeonCloud(saved.id).catch((syncErr) => {
-        console.warn('Background sync to Neon warning:', syncErr);
-      });
     } catch (saveErr) {
       setSaving(false);
       console.error('Failed to save spot:', saveErr);

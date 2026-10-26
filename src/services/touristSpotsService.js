@@ -519,7 +519,7 @@ export const touristSpotsService = {
       : all.filter((s) => s.sync_status === 'staged_local' || s.sync_status === 'verified');
 
     if (targets.length === 0) {
-      return { success: true, count: 0, message: 'No staged spots to sync.' };
+      return { success: true, count: 0, message: 'All spots are already synchronized with Neon Cloud!' };
     }
 
     try {
@@ -928,6 +928,17 @@ export const touristSpotsService = {
       lat: parsedLat,
       lng: parsedLng,
     };
+  },
+
+  /**
+   * Invalidate cached 360 image data in memory
+   */
+  invalidatePanoCache(panoId) {
+    if (!panoId) return;
+    const cleanId = String(panoId).replace(/\.jpg$/i, '');
+    const altId = cleanId.startsWith('pano_') ? cleanId.replace(/^pano_/, '') : `pano_${cleanId}`;
+    this._panoCache.delete(cleanId);
+    this._panoCache.delete(altId);
   },
 
   /**

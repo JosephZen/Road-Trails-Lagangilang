@@ -270,7 +270,9 @@
       "label": "University of Abra - Fish Pond",
       "description": "Aquaculture Research Center",
       "timestamp": "2026-10-26T12:00:00.000Z",
-      "neighbors": []
+      "neighbors": [
+        "pano_1793024621127_0wbwas"
+      ]
     },
     {
       "id": "pano_1724722945416495",
@@ -310,6 +312,20 @@
       "timestamp": "2026-10-26T13:39:24.755Z",
       "neighbors": [
         "pano_1793021939916_3uzsf1"
+      ]
+    },
+    {
+      "id": "pano_1793024621127_0wbwas",
+      "filename": "pano_1793024621127_0wbwas.jpg",
+      "thumbnail": "thumbnails/pano_1793024621127_0wbwas_thumb.jpg",
+      "lat": 17.612116,
+      "lng": 120.739168,
+      "heading": 154,
+      "label": "University of Abra - Fish Pond",
+      "description": "University of Abra freshwater aquaculture research facility and fish ponds, demonstrating sustainable tilapia breeding, fish farming, and aquatic agro-fishery practices.",
+      "timestamp": "2026-10-26T14:23:41.931Z",
+      "neighbors": [
+        "pano_1735531687819496"
       ]
     }
   ]
