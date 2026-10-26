@@ -44,9 +44,9 @@ export default function MapView({
   alignedGeoJSON = null,
   isSelectingAlignmentTarget = false,
   onSelectSequenceForAlignment,
-  showMapillaryStreetview = true,
-  showMapillaryDots = true,
-  showMapillaryLines = true,
+  showMapillaryStreetview = false,
+  showMapillaryDots = false,
+  showMapillaryLines = false,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -192,6 +192,7 @@ export default function MapView({
         layout: {
           'line-cap': 'round',
           'line-join': 'round',
+          'visibility': 'none',
         },
         paint: {
           'line-color': '#064e3b',
@@ -209,6 +210,7 @@ export default function MapView({
         layout: {
           'line-cap': 'round',
           'line-join': 'round',
+          'visibility': 'none',
         },
         paint: {
           'line-color': '#05cb63',
@@ -223,6 +225,9 @@ export default function MapView({
         type: 'circle',
         source: 'mapillary',
         'source-layer': 'image',
+        layout: {
+          'visibility': 'none',
+        },
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 3.5, 16, 6, 18, 8],
           'circle-color': '#05cb63',
@@ -946,7 +951,11 @@ export default function MapView({
           type: 'line',
           source: 'mapillary',
           'source-layer': 'sequence',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+            'visibility': showMapillaryStreetview && showMapillaryLines ? 'visible' : 'none',
+          },
           paint: {
             'line-color': '#064e3b',
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 5, 17, 8],
@@ -961,7 +970,11 @@ export default function MapView({
           type: 'line',
           source: 'mapillary',
           'source-layer': 'sequence',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+            'visibility': showMapillaryStreetview && showMapillaryLines ? 'visible' : 'none',
+          },
           paint: {
             'line-color': '#05cb63',
             'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3.5, 17, 5],
@@ -976,6 +989,9 @@ export default function MapView({
           type: 'circle',
           source: 'mapillary',
           'source-layer': 'image',
+          layout: {
+            'visibility': showMapillaryStreetview && showMapillaryDots ? 'visible' : 'none',
+          },
           paint: {
             'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 3.5, 16, 6, 18, 8],
             'circle-color': '#05cb63',

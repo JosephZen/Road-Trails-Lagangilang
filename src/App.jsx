@@ -64,10 +64,10 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const toastTimeoutRef = useRef(null);
 
-  // Mapillary raw streetview visibility toggles (Green sequence lines and dots)
-  const [showMapillaryStreetview, setShowMapillaryStreetview] = useState(true);
-  const [showMapillaryDots, setShowMapillaryDots] = useState(true);
-  const [showMapillaryLines, setShowMapillaryLines] = useState(true);
+  // Mapillary raw streetview visibility toggles (Green sequence lines and dots) - Default OFF for clean aesthetic
+  const [showMapillaryStreetview, setShowMapillaryStreetview] = useState(false);
+  const [showMapillaryDots, setShowMapillaryDots] = useState(false);
+  const [showMapillaryLines, setShowMapillaryLines] = useState(false);
 
   const showToast = useCallback((msg, duration = 3500) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
