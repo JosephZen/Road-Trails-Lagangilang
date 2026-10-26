@@ -69,7 +69,7 @@ try {
 const neonDbUrl =
   process.env.VITE_NEON_DATABASE_URL ||
   process.env.NEON_DATABASE_URL ||
-  'postgresql://neondb_owner:npg_ZN9TowMbiJ8j@ep-gentle-water-azs3l8ig-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+  'postgresql://neondb_owner:npg_NCe0hgVyZ7qx@ep-shy-art-aoq0wgaf-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
 
 let neonPool = null;
 try {
