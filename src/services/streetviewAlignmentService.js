@@ -198,17 +198,6 @@ class StreetviewAlignmentService {
     // Check if already aligned in local storage / memory
     const existing = this.alignedSequences[sequenceId];
     if (existing && existing.controlPoints && existing.coordinates && existing.images) {
-      // If existing saved record only has a fraction of the real sequence (e.g. truncated from earlier sessions),
-      // update it so the line spans end-to-end with all photos mapped
-      if (fullImages.length > existing.images.length + 5) {
-        fullImages.sort((a, b) => a.capturedAt - b.capturedAt);
-        const { coordinates, mappedImages } = this.generateBentGeometry(existing.controlPoints, fullImages);
-        existing.images = mappedImages;
-        existing.coordinates = coordinates;
-        this.alignedSequences[sequenceId] = existing;
-        this.saveLocal();
-      }
-
       return {
         sequenceId,
         name: existing.name || `Sequence ${sequenceId.slice(0, 8)}`,

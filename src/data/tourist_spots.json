@@ -213,8 +213,8 @@
     "categoryIcon": "🌳",
     "barangay": "Poblacion",
     "location": {
-      "lat": 17.6095,
-      "lng": 120.741,
+      "lat": 17.606408,
+      "lng": 120.738791,
       "address": "Horticulture Field Station, UA Main Campus, Lagangilang, Abra"
     },
     "description": "Specialized sweet tamarind research orchard and genetic conservation genebank producing high-value tamarind cultivars and fruit processing demonstrations.",
@@ -227,7 +227,9 @@
       "heading": 165,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "lat": 17.606408,
+    "lng": 120.738791
   },
   {
     "id": "poi_ua_cacao_garden",
