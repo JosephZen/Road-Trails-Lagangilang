@@ -948,29 +948,6 @@ export default function App() {
               <span>Lagangilang Trails</span>
             </div>
 
-            {/* Explore Spots Drawer Toggle */}
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setSidebarTab('spots');
-                setSidebarOpen(true);
-              }}
-              title="Explore Spots & Landmarks"
-              style={{
-                fontSize: '0.8rem',
-                padding: '6px 12px',
-                borderRadius: 'var(--radius-full)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}
-            >
-              <span>📍</span>
-              <span className="btn-label-text">Spots</span>
-            </button>
-
             {/* Live Weather Forecast & Trail Advisory Pill */}
             <WeatherWidget isCompact={viewerOpen && viewerLayout === 'split'} />
 
@@ -985,12 +962,14 @@ export default function App() {
                 borderRadius: 'var(--radius-full)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '5px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
-                background: 'rgba(239, 68, 68, 0.18)',
-                border: '1px solid rgba(239, 68, 68, 0.4)',
-                color: '#fca5a5',
+                background: 'rgba(15, 23, 42, 0.92)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#ffffff',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                backdropFilter: 'blur(12px)',
               }}
             >
               <span>🚨</span>
@@ -1008,12 +987,14 @@ export default function App() {
                 borderRadius: 'var(--radius-full)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '5px',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
-                background: 'rgba(16, 185, 129, 0.16)',
-                border: '1px solid rgba(16, 185, 129, 0.35)',
-                color: '#6ee7b7',
+                background: 'rgba(15, 23, 42, 0.92)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#ffffff',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                backdropFilter: 'blur(12px)',
               }}
             >
               <span>📥</span>
@@ -1070,9 +1051,11 @@ export default function App() {
                 flexShrink: 0,
                 background: showMapillaryStreetview
                   ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                  : undefined,
-                color: showMapillaryStreetview ? '#ffffff' : undefined,
-                border: showMapillaryStreetview ? 'none' : undefined,
+                  : 'rgba(15, 23, 42, 0.92)',
+                color: '#ffffff',
+                border: showMapillaryStreetview ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                backdropFilter: 'blur(12px)',
               }}
               title={
                 showMapillaryStreetview
@@ -1103,10 +1086,10 @@ export default function App() {
                 }}
                 aria-label="Map theme dropdown"
               >
-                <option value="light">☀️ Light</option>
-                <option value="dark">🌙 Dark</option>
-                <option value="beige">📜 Beige</option>
-                <option value="satellite">🛰️ Satellite</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="beige">Beige</option>
+                <option value="satellite">Satellite</option>
               </select>
               <span className="theme-dropdown-chevron">▼</span>
             </div>
@@ -2941,6 +2924,15 @@ export default function App() {
       <EmergencyModal
         isOpen={showEmergencyModal}
         onClose={() => setShowEmergencyModal(false)}
+        onLocateSpot={(spotId) => {
+          setShowEmergencyModal(false);
+          const spot = touristSpots.find((s) => s.id === spotId);
+          if (spot) {
+            handleSelectTouristSpot(spot);
+          } else {
+            showToast?.('📍 Navigating to emergency station location');
+          }
+        }}
       />
 
       {/* ===== Offline Guide & Data Saver Modal ===== */}

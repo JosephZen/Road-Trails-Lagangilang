@@ -258,36 +258,12 @@ export default function RouteSummaryCard({
           </button>
         )}
 
-        {onStartStreetViewRoute && (
-          <button
-            onClick={onStartStreetViewRoute}
-            title="Open 360° Street View along this trail"
-            style={{
-              flex: 1.4,
-              padding: '8px 10px',
-              borderRadius: '8px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: '#ffffff',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)',
-            }}
-          >
-            📷 Street View Trail
-          </button>
-        )}
-
         {steps.length > 0 && (
           <button
             onClick={() => setShowSteps(!showSteps)}
             title="Toggle Step-by-Step Directions"
             style={{
+              flex: 1,
               padding: '8px 10px',
               borderRadius: '8px',
               border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -296,9 +272,13 @@ export default function RouteSummaryCard({
               fontSize: '0.78rem',
               fontWeight: 600,
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
             }}
           >
-            {showSteps ? '▲ Steps' : '▼ Steps'}
+            {showSteps ? '▲ Hide Steps' : '▼ View Steps'}
           </button>
         )}
       </div>

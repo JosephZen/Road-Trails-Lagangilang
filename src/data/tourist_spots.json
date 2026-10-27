@@ -422,5 +422,145 @@
       "vehicle": "2 mins"
     },
     "safety_guidelines": "Municipal help desk, tourism brochures, and emergency response office on site."
+  },
+  {
+    "id": "poi_lagangilang_mdrrmo",
+    "name": "Lagangilang MDRRMO (Disaster & Rescue)",
+    "spotType": "poi",
+    "category": "Government & Emergency Services",
+    "categoryIcon": "🚑",
+    "barangay": "Poblacion",
+    "location": {
+      "lat": 17.61305,
+      "lng": 120.73412,
+      "address": "MDRRMO Rescue Base, Poblacion, Lagangilang, Abra"
+    },
+    "lat": 17.61305,
+    "lng": 120.73412,
+    "description": "Lagangilang Municipal Disaster Risk Reduction & Management Office (MDRRMO). 24/7 Search & Rescue, Medical Evacuation, Flood/Typhoon Emergency Assistance. Hotlines: 0917-829-4501 / 0920-948-2311.",
+    "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
+    "isPseudoImage": false,
+    "pseudoTheme": "cyan",
+    "sync_status": "synced_cloud",
+    "trail_difficulty": "Easy",
+    "trail_condition": "Paved Road - Emergency Station",
+    "operating_hours": "24/7 Emergency Operations",
+    "estimated_travel_time": {
+      "foot": "2-4 mins from Town Hall",
+      "vehicle": "1 min"
+    },
+    "safety_guidelines": "For immediate emergency response, call 0917-829-4501. Responders on standby 24/7."
+  },
+  {
+    "id": "poi_lagangilang_pnp",
+    "name": "PNP Lagangilang Municipal Police",
+    "spotType": "poi",
+    "category": "Government & Emergency Services",
+    "categoryIcon": "👮",
+    "barangay": "Poblacion",
+    "location": {
+      "lat": 17.61245,
+      "lng": 120.73348,
+      "address": "PNP Police Station, Poblacion, Lagangilang, Abra"
+    },
+    "lat": 17.61245,
+    "lng": 120.73348,
+    "description": "Philippine National Police (PNP) - Lagangilang Municipal Police Station. Public Safety, Law Enforcement, Tourist Security & Foot Patrols. Hotlines: 0998-598-7742 / 0917-123-7670.",
+    "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
+    "isPseudoImage": false,
+    "pseudoTheme": "cyan",
+    "sync_status": "synced_cloud",
+    "trail_difficulty": "Easy",
+    "trail_condition": "Paved Town Center - 24/7 Police Post",
+    "operating_hours": "24/7 Police Assistance",
+    "estimated_travel_time": {
+      "foot": "2-3 mins from Town Hall",
+      "vehicle": "1 min"
+    },
+    "safety_guidelines": "Dial 0998-598-7742 for tourist assistance and immediate police emergency response."
+  },
+  {
+    "id": "poi_lagangilang_bfp",
+    "name": "BFP Lagangilang Fire Station",
+    "spotType": "poi",
+    "category": "Government & Emergency Services",
+    "categoryIcon": "🚒",
+    "barangay": "Poblacion",
+    "location": {
+      "lat": 17.61328,
+      "lng": 120.73435,
+      "address": "BFP Fire Station, Poblacion, Lagangilang, Abra"
+    },
+    "lat": 17.61328,
+    "lng": 120.73435,
+    "description": "Bureau of Fire Protection (BFP) - Lagangilang Fire Station. Fire Emergency, Mountain/Forest Fire Response, Vehicular Extrication, Road Clearing. Hotlines: 0915-432-8921 / (074) 752-8111.",
+    "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
+    "isPseudoImage": false,
+    "pseudoTheme": "cyan",
+    "sync_status": "synced_cloud",
+    "trail_difficulty": "Easy",
+    "trail_condition": "Paved Road - Fire Station",
+    "operating_hours": "24/7 Fire & Rescue",
+    "estimated_travel_time": {
+      "foot": "3-5 mins from Town Hall",
+      "vehicle": "1 min"
+    },
+    "safety_guidelines": "Call 0915-432-8921 immediately for grass fires, structural fires, or trail rescue support."
+  },
+  {
+    "id": "poi_lagangilang_rhu",
+    "name": "Lagangilang Rural Health Unit (RHU)",
+    "spotType": "poi",
+    "category": "Government & Emergency Services",
+    "categoryIcon": "🏥",
+    "barangay": "Poblacion",
+    "location": {
+      "lat": 17.61215,
+      "lng": 120.73318,
+      "address": "Municipal Rural Health Unit (RHU), Poblacion, Lagangilang, Abra"
+    },
+    "lat": 17.61215,
+    "lng": 120.73318,
+    "description": "Lagangilang Rural Health Unit (RHU) & Municipal Health Office. Emergency First Aid, Outpatient Consultations, Medical Supplies & Ambulance Dispatch. Hotlines: (074) 752-8012 / 0977-802-3490.",
+    "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
+    "isPseudoImage": false,
+    "pseudoTheme": "cyan",
+    "sync_status": "synced_cloud",
+    "trail_difficulty": "Easy",
+    "trail_condition": "Paved Town Center - Clinic & Ambulance Base",
+    "operating_hours": "8:00 AM - 5:00 PM Mon-Fri (Emergency First Aid 24/7)",
+    "estimated_travel_time": {
+      "foot": "3-4 mins from Town Hall",
+      "vehicle": "1 min"
+    },
+    "safety_guidelines": "Ambulance on-call 24/7. First aid station for injured trail hikers and visitors."
+  },
+  {
+    "id": "poi_lagangilang_tourism_office",
+    "name": "Lagangilang Municipal Tourism Office",
+    "spotType": "poi",
+    "category": "Government & Emergency Services",
+    "categoryIcon": "🌴",
+    "barangay": "Poblacion",
+    "location": {
+      "lat": 17.612711,
+      "lng": 120.733756,
+      "address": "Municipal Tourism Office, Town Hall Ground Floor, Poblacion, Lagangilang, Abra"
+    },
+    "lat": 17.612711,
+    "lng": 120.733756,
+    "description": "Official Municipal Tourism & Information Office. Trail maps, accredited local eco-guides, cave exploration permits, and tourist assistance. Hotlines: 0917-504-2299 / (074) 752-8001.",
+    "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
+    "isPseudoImage": false,
+    "pseudoTheme": "cyan",
+    "sync_status": "synced_cloud",
+    "trail_difficulty": "Easy",
+    "trail_condition": "Municipal Town Hall - Ground Floor Helpdesk",
+    "operating_hours": "8:00 AM - 5:00 PM Mon-Fri",
+    "estimated_travel_time": {
+      "foot": "Inside Municipal Town Hall Complex",
+      "vehicle": "0 min"
+    },
+    "safety_guidelines": "Please register at the Tourism Office before hiking to BANAT Caves or remote river gorges."
   }
 ]

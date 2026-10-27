@@ -32,11 +32,20 @@ export default function OfflineGuideModal({
     try {
       const res = await offlineCacheService.cacheOfflineBundle(touristSpots, customGeoJSON);
       setCachedBundle(offlineCacheService.getCachedBundle());
-      showToast?.(`📥 Successfully cached ${res.count} spots & trail guide for offline use!`);
+      showToast?.(`📥 Successfully cached map styles, ${res.count} spots & hotlines into device storage!`);
     } catch (e) {
       showToast?.(`⚠️ Cache error: ${e.message}`);
     } finally {
       setIsCaching(false);
+    }
+  };
+
+  const handleDownloadHtmlFile = () => {
+    try {
+      offlineCacheService.downloadOfflineMapHtml(touristSpots);
+      showToast?.('💾 Standalone offline map file downloaded to your device!');
+    } catch (e) {
+      showToast?.('⚠️ Could not generate offline map file');
     }
   };
 
@@ -58,7 +67,20 @@ export default function OfflineGuideModal({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 9999 }}>
+    <div
+      className="modal-overlay modal-backdrop"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
       <div
         className="glass-panel"
         onClick={(e) => e.stopPropagation()}
@@ -124,32 +146,61 @@ export default function OfflineGuideModal({
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              className="btn btn-primary"
+              onClick={handleDownload}
+              disabled={isCaching}
+              style={{
+                flex: 1,
+                padding: '9px 14px',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                borderColor: '#10b981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>{isCaching ? '⏳' : '📥'}</span>
+              <span>{isCaching ? 'Caching Map & Guide...' : 'Cache Map & Guide in App'}</span>
+            </button>
+
+            {cachedBundle && (
+              <button
+                className="btn btn-danger"
+                onClick={handleClear}
+                style={{ padding: '8px 12px', fontSize: '0.78rem' }}
+                title="Clear cached offline bundle"
+              >
+                🗑️ Clear
+              </button>
+            )}
+          </div>
+
           <button
-            className="btn btn-primary"
-            onClick={handleDownload}
-            disabled={isCaching}
+            className="btn btn-secondary"
+            onClick={handleDownloadHtmlFile}
             style={{
-              flex: 1,
-              padding: '8px 14px',
+              padding: '9px 14px',
               fontSize: '0.82rem',
               fontWeight: 700,
-              background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-              borderColor: '#10b981',
+              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+              borderColor: '#38bdf8',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
             }}
+            title="Download a standalone interactive map file that opens without any internet"
           >
-            {isCaching ? '⏳ Downloading Guide...' : '📥 Download Offline Guide'}
+            <span>💾</span>
+            <span>Download Offline Interactive Map (.html file)</span>
           </button>
-
-          {cachedBundle && (
-            <button
-              className="btn btn-danger"
-              onClick={handleClear}
-              style={{ padding: '8px 12px', fontSize: '0.78rem' }}
-            >
-              🗑️ Clear Cache
-            </button>
-          )}
         </div>
 
         {/* Data Saver Mode Toggle */}

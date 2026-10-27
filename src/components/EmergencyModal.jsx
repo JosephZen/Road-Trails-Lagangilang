@@ -6,13 +6,26 @@ import { EMERGENCY_HOTLINES, TRAIL_SAFETY_GUIDELINES } from '../services/offline
  * Directly addresses Municipal Office feedback:
  * "Embed LGU/barangay emergency hotlines and trail safety guidelines"
  */
-export default function EmergencyModal({ isOpen, onClose }) {
+export default function EmergencyModal({ isOpen, onClose, onLocateSpot }) {
   const [activeTab, setActiveTab] = useState('hotlines'); // 'hotlines' | 'safety'
 
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 9999 }}>
+    <div
+      className="modal-overlay modal-backdrop"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
       <div
         className="glass-panel modal-content-emergency"
         onClick={(e) => e.stopPropagation()}
@@ -217,6 +230,30 @@ export default function EmergencyModal({ isOpen, onClose }) {
                         <span>Alt:</span>
                         <span>{h.altNumber}</span>
                       </a>
+                    )}
+
+                    {h.spotId && onLocateSpot && (
+                      <button
+                        onClick={() => onLocateSpot(h.spotId)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 14px',
+                          borderRadius: 'var(--radius-full, 9999px)',
+                          background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                          border: 'none',
+                          color: '#ffffff',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(2, 132, 199, 0.4)',
+                        }}
+                        title="Locate this station on the interactive map"
+                      >
+                        <span>📍</span>
+                        <span>Locate Station on Map</span>
+                      </button>
                     )}
                   </div>
                 </div>

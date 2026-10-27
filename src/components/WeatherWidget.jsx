@@ -83,7 +83,7 @@ export default function WeatherWidget({ isCompact = false }) {
 
   return (
     <>
-      {/* Clickable Weather Pill */}
+      {/* Clickable Weather Pill (Solid Dark Theme) */}
       <button
         className="weather-pill"
         onClick={() => setShowDetails(true)}
@@ -92,13 +92,15 @@ export default function WeatherWidget({ isCompact = false }) {
           display: 'inline-flex',
           alignItems: 'center',
           gap: '5px',
-          padding: isCompact ? '4px 8px' : '5px 11px',
+          padding: isCompact ? '4px 8px' : '6px 12px',
           borderRadius: 'var(--radius-full, 9999px)',
-          background: weather.safeForHiking ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.18)',
-          border: weather.safeForHiking ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(239, 68, 68, 0.4)',
+          background: 'rgba(15, 23, 42, 0.92)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
           color: '#ffffff',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+          backdropFilter: 'blur(12px)',
           cursor: 'pointer',
-          fontSize: '0.76rem',
+          fontSize: '0.78rem',
           fontWeight: 700,
           whiteSpace: 'nowrap',
           transition: 'all 0.18s ease',
@@ -108,15 +110,28 @@ export default function WeatherWidget({ isCompact = false }) {
         <span style={{ fontSize: '0.95rem' }}>{weather.icon}</span>
         <span>{weather.temp}°C</span>
         {!isCompact && (
-          <span style={{ fontSize: '0.68rem', color: weather.safeForHiking ? '#6ee7b7' : '#fca5a5' }}>
+          <span style={{ fontSize: '0.7rem', color: weather.safeForHiking ? '#34d399' : '#f87171', fontWeight: 600 }}>
             {weather.safeForHiking ? '• Safe Trail' : '• Caution'}
           </span>
         )}
       </button>
 
-      {/* Detailed Weather Advisory Modal */}
+      {/* Detailed Weather Advisory Modal - Centered Floating Dialog */}
       {showDetails && (
-        <div className="modal-backdrop" onClick={() => setShowDetails(false)} style={{ zIndex: 9999 }}>
+        <div
+          className="modal-overlay modal-backdrop"
+          onClick={() => setShowDetails(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
           <div
             className="glass-panel"
             onClick={(e) => e.stopPropagation()}
