@@ -2933,90 +2933,28 @@ body {
   transform: scale(1.12);
 }
 
-/* Floating interactive street view trail navigation HUD - positioned above bottom controls */
-.streetview-nav-hud {
-  position: absolute;
-  bottom: 76px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  padding: 6px 12px;
-  border-radius: var(--radius-full, 9999px);
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 15px rgba(2, 132, 199, 0.25);
-  user-select: none;
-  animation: fadeInUp 0.3s ease;
-  max-width: calc(100% - 24px);
+/* Floating Route Summary Card over main map */
+.route-summary-floating-card {
+  animation: fadeInDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.streetview-turn-btn {
-  background: rgba(56, 189, 248, 0.12) !important;
-  border-color: rgba(56, 189, 248, 0.3) !important;
-  color: #38bdf8 !important;
-}
-
-.streetview-turn-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
-  border-color: #38bdf8 !important;
-  color: #ffffff !important;
-}
-
-@media (max-width: 640px) {
-  .streetview-nav-hud {
-    bottom: 84px;
-    padding: 4px 8px;
-    gap: 4px;
-  }
-  .streetview-nav-hud .btn-label-desktop {
-    display: none;
+@media (max-width: 768px) {
+  .route-summary-floating-card {
+    top: 58px !important;
+    left: 8px !important;
+    width: calc(100vw - 16px) !important;
+    max-width: none !important;
+    padding: 12px !important;
   }
 }
 
-.streetview-nav-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: var(--radius-full, 9999px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.08);
-  color: #f1f5f9;
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.18s ease;
+.route-summary-floating-card.split-mode {
+  max-width: calc(100% - 32px) !important;
 }
 
-.streetview-nav-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  border-color: #38bdf8;
-  color: #ffffff;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
-}
-
-.streetview-nav-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  border-color: transparent;
-}
-
-.streetview-nav-btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.streetview-nav-badge {
-  font-size: 0.72rem;
-  color: #94a3b8;
-  padding: 0 4px;
-  font-weight: 500;
-  white-space: nowrap;
+.brand-pill {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  letter-spacing: -0.01em;
 }
 
 /* ==========================================================================

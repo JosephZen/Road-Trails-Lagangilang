@@ -45,9 +45,10 @@ export default function MapView({
   isSelectingAlignmentTarget = false,
   onSelectSequenceForAlignment,
   showMapillaryStreetview = false,
-  showMapillaryDots = false,
-  showMapillaryLines = false,
+  showMapillaryDots = true,
+  showMapillaryLines = true,
   excludedSequences = [],
+  excludedImageKeys = [],
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -230,13 +231,13 @@ export default function MapView({
           'visibility': 'none',
         },
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 3.5, 16, 6, 18, 8],
-          'circle-color': '#05cb63',
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 3, 14, 5.5, 17, 8],
+          'circle-color': '#10B981',
           'circle-stroke-width': 1.5,
           'circle-stroke-color': '#ffffff',
           'circle-opacity': 0.95,
         },
-        minzoom: 13,
+        minzoom: 11,
       });
 
       // Add source for direction cone (viewing direction indicator)
@@ -491,7 +492,9 @@ export default function MapView({
       // Properties.id on image point features
       const propId = feature.properties?.id;
       if (propId && String(propId).length >= 10 && /^\d+$/.test(String(propId))) {
-        return String(propId);
+        const idStr = String(propId);
+        if (streetviewAlignmentService.isImageExcluded(idStr)) return null;
+        return idStr;
       }
       return null;
     };
@@ -1017,16 +1020,16 @@ export default function MapView({
           source: 'mapillary',
           'source-layer': 'image',
           layout: {
-            'visibility': showMapillaryStreetview && showMapillaryDots ? 'visible' : 'none',
+            'visibility': showMapillaryStreetview && showMapillaryDots !== false ? 'visible' : 'none',
           },
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 3.5, 16, 6, 18, 8],
-            'circle-color': '#05cb63',
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 3, 14, 5.5, 17, 8],
+            'circle-color': '#10B981',
             'circle-stroke-width': 1.5,
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 0.95,
           },
-          minzoom: 13,
+          minzoom: 11,
         });
       }
 
@@ -1469,8 +1472,9 @@ export default function MapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const dotsVisibility = (showMapillaryStreetview && showMapillaryDots) ? 'visible' : 'none';
-    const linesVisibility = (showMapillaryStreetview && showMapillaryLines) ? 'visible' : 'none';
+    const isStreetviewOn = Boolean(showMapillaryStreetview);
+    const dotsVisibility = (isStreetviewOn && showMapillaryDots !== false) ? 'visible' : 'none';
+    const linesVisibility = (isStreetviewOn && showMapillaryLines !== false) ? 'visible' : 'none';
 
     if (map.getLayer('mapillary-images')) {
       map.setLayoutProperty('mapillary-images', 'visibility', dotsVisibility);
@@ -1483,26 +1487,29 @@ export default function MapView({
     }
   }, [showMapillaryStreetview, showMapillaryDots, showMapillaryLines]);
 
-  // Update excluded sequence filters on Mapillary vector layers
+  // Update excluded sequence & excluded image filters on Mapillary vector layers
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    const excludedIds = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
-    const seqFilter = excludedIds.length > 0
-      ? [
-          'all',
-          ['!in', ['to-string', ['get', 'id']], ['literal', excludedIds]],
-          ['!in', ['to-string', ['coalesce', ['get', 'sequence_id'], ['get', 'sequence'], '']], ['literal', excludedIds]]
-        ]
-      : null;
+    const excludedSeqIds = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
+    const excludedImgIds = Array.isArray(excludedImageKeys) ? excludedImageKeys.map(String) : [];
 
-    const imgFilter = excludedIds.length > 0
-      ? [
-          'all',
-          ['!in', ['to-string', ['coalesce', ['get', 'sequence_id'], ['get', 'sequence'], ['get', 'id'], '']], ['literal', excludedIds]]
-        ]
-      : null;
+    const seqFilterConditions = [];
+    if (excludedSeqIds.length > 0) {
+      seqFilterConditions.push(['!in', ['to-string', ['get', 'id']], ['literal', excludedSeqIds]]);
+      seqFilterConditions.push(['!in', ['to-string', ['coalesce', ['get', 'sequence_id'], ['get', 'sequence'], '']], ['literal', excludedSeqIds]]);
+    }
+    const seqFilter = seqFilterConditions.length > 0 ? ['all', ...seqFilterConditions] : null;
+
+    const imgFilterConditions = [];
+    if (excludedSeqIds.length > 0) {
+      imgFilterConditions.push(['!in', ['to-string', ['coalesce', ['get', 'sequence_id'], ['get', 'sequence'], '']], ['literal', excludedSeqIds]]);
+    }
+    if (excludedImgIds.length > 0) {
+      imgFilterConditions.push(['!in', ['to-string', ['coalesce', ['get', 'id'], '']], ['literal', excludedImgIds]]);
+    }
+    const imgFilter = imgFilterConditions.length > 0 ? ['all', ...imgFilterConditions] : null;
 
     if (map.getLayer('mapillary-sequences')) {
       map.setFilter('mapillary-sequences', seqFilter);
@@ -1513,7 +1520,7 @@ export default function MapView({
     if (map.getLayer('mapillary-images')) {
       map.setFilter('mapillary-images', imgFilter);
     }
-  }, [excludedSequences]);
+  }, [excludedSequences, excludedImageKeys]);
 
   // Update Aligned Streetview Lines GeoJSON source
   useEffect(() => {

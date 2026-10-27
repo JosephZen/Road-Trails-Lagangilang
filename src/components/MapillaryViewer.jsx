@@ -13,48 +13,71 @@ const isValidMapillaryId = (id) => {
   return id && String(id).length >= 10 && /^\d+$/.test(String(id));
 };
 
+function getHaversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // metres
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 /**
- * Robust Mapillary 360° Street View Viewer using mapillary-js v4.
- * Renders high-performance street imagery from Mapillary Graph API & Meta CDN.
- * 
+ * Robust Mapillary 360° Street View Viewer using native mapillary-js v4.
  * Features:
- * - Strict single-sequence navigation: follows the continuous road trail forward/backward
- * - Complete exclusion of erratic/overlapping sequences (e.g. daygfFRm94o2xOpPQNsG0l)
- * - Suppression of errant lateral/off-road spatial jump arrows
- * - Floating on-screen Forward / Backward navigation HUD + Keyboard hotkeys (W/S, ↑/↓)
+ * - Native 3D interactive spatial arrows on the road surface (sequence, direction, spatialData)
+ * - Exclusion & blacklist filtering for buggy sequences and erratic nodes
+ * - Spatial leap guardrail (>75m warning threshold)
+ * - Location menu with admin exclusion controls
  */
 export default function MapillaryViewer({
   imageId,
   excludedSequences = [],
+  excludedImageKeys = [],
   onPositionChange,
   onHeadingChange,
   steerTarget,
   onSwitchToGoogle,
+  isAdmin = false,
+  onExcludeImage,
+  onExcludeSequence,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPos, setCurrentPos] = useState(null);
-  const [hasNext, setHasNext] = useState(true);
-  const [hasPrev, setHasPrev] = useState(true);
-  const [activeSeqId, setActiveSeqId] = useState(null);
-  const [alignedInfo, setAlignedInfo] = useState(null);
 
   const currentImageIdRef = useRef(null);
   const currentSequenceIdRef = useRef(null);
-  const isNavigatingRef = useRef(false);
+  const lastValidPosRef = useRef(null);
 
-  // Apply filter to exclude unwanted sequences while permitting junction turns into connected road sequences
+  // Apply filter to exclude unwanted sequences and individual buggy image nodes
   const applyFilter = useCallback(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    const excluded = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
-    let filterExpr = null;
+    const excludedSeq = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
+    const excludedImg = Array.isArray(excludedImageKeys) ? excludedImageKeys.map(String) : [];
 
-    if (excluded.length > 0) {
-      filterExpr = ['!in', 'sequenceId', ...excluded];
+    const filters = [];
+    if (excludedSeq.length > 0) {
+      filters.push(['!in', 'sequenceId', ...excludedSeq]);
+    }
+    if (excludedImg.length > 0) {
+      filters.push(['!in', 'id', ...excludedImg]);
+    }
+
+    let filterExpr = null;
+    if (filters.length === 1) {
+      filterExpr = filters[0];
+    } else if (filters.length > 1) {
+      filterExpr = ['all', ...filters];
     }
 
     try {
@@ -62,131 +85,14 @@ export default function MapillaryViewer({
     } catch (e) {
       console.warn('Mapillary filter warning:', e);
     }
-  }, [excludedSequences]);
+  }, [excludedSequences, excludedImageKeys]);
 
-  // Step Forward along sequence (deterministic aligned image stepping with fallback to moveDir 0)
-  const handleStepForward = useCallback(() => {
-    if (!viewerRef.current || isNavigatingRef.current) return;
-    isNavigatingRef.current = true;
-
-    // 1. If currently on an aligned sequence, advance directly along the re-aligned road curve
-    const alignedPos = streetviewAlignmentService.getAlignedPositionForImage(currentImageIdRef.current);
-    if (alignedPos && alignedPos.nextImageId) {
-      viewerRef.current
-        .moveTo(alignedPos.nextImageId)
-        .then(() => {
-          isNavigatingRef.current = false;
-        })
-        .catch(() => {
-          viewerRef.current?.moveDir(0)
-            .then(() => { isNavigatingRef.current = false; })
-            .catch(() => { isNavigatingRef.current = false; });
-        });
-      return;
-    }
-
-    viewerRef.current
-      .moveDir(0)
-      .then(() => {
-        isNavigatingRef.current = false;
-      })
-      .catch((err) => {
-        isNavigatingRef.current = false;
-        if (err?.name !== 'CancelMapillaryError' && !err?.message?.includes('cancel')) {
-          console.warn('Forward step warning:', err);
-        }
-      });
-  }, []);
-
-  // Step Backward along sequence (deterministic aligned image stepping with fallback to moveDir 1)
-  const handleStepBackward = useCallback(() => {
-    if (!viewerRef.current || isNavigatingRef.current) return;
-    isNavigatingRef.current = true;
-
-    // 1. If currently on an aligned sequence, step backward directly along the re-aligned road curve
-    const alignedPos = streetviewAlignmentService.getAlignedPositionForImage(currentImageIdRef.current);
-    if (alignedPos && alignedPos.prevImageId) {
-      viewerRef.current
-        .moveTo(alignedPos.prevImageId)
-        .then(() => {
-          isNavigatingRef.current = false;
-        })
-        .catch(() => {
-          viewerRef.current?.moveDir(1)
-            .then(() => { isNavigatingRef.current = false; })
-            .catch(() => { isNavigatingRef.current = false; });
-        });
-      return;
-    }
-
-    viewerRef.current
-      .moveDir(1)
-      .then(() => {
-        isNavigatingRef.current = false;
-      })
-      .catch((err) => {
-        isNavigatingRef.current = false;
-        if (err?.name !== 'CancelMapillaryError' && !err?.message?.includes('cancel')) {
-          console.warn('Backward step warning:', err);
-        }
-      });
-  }, []);
-
-  // Turn Left into connecting sequence or road branch
-  const handleTurnLeft = useCallback(() => {
-    if (!viewerRef.current || isNavigatingRef.current) return;
-    isNavigatingRef.current = true;
-    viewerRef.current
-      .moveDir(4) // Direction.TurnLeft
-      .catch(() => viewerRef.current?.moveDir(2)) // Direction.StepLeft fallback
-      .catch(() => {})
-      .finally(() => {
-        isNavigatingRef.current = false;
-      });
-  }, []);
-
-  // Turn Right into connecting sequence or road branch
-  const handleTurnRight = useCallback(() => {
-    if (!viewerRef.current || isNavigatingRef.current) return;
-    isNavigatingRef.current = true;
-    viewerRef.current
-      .moveDir(5) // Direction.TurnRight
-      .catch(() => viewerRef.current?.moveDir(3)) // Direction.StepRight fallback
-      .catch(() => {})
-      .finally(() => {
-        isNavigatingRef.current = false;
-      });
-  }, []);
-
-  // Keyboard navigation support: W / ↑ (Forward), S / ↓ (Backward), A / ← (Turn Left), D / → (Turn Right)
+  // Re-apply filter whenever exclusions update
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
-        e.preventDefault();
-        handleStepForward();
-      } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
-        e.preventDefault();
-        handleStepBackward();
-      } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        e.preventDefault();
-        handleTurnLeft();
-      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        e.preventDefault();
-        handleTurnRight();
-      }
-    };
+    applyFilter();
+  }, [excludedSequences, excludedImageKeys, applyFilter]);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleStepForward, handleStepBackward, handleTurnLeft, handleTurnRight]);
-
-  // Re-apply filter whenever excludedSequences updates
-  useEffect(() => {
-    applyFilter(currentSequenceIdRef.current);
-  }, [excludedSequences, applyFilter]);
-
-  // Initialize Viewer on Mount
+  // Initialize Viewer on Mount with native Mapillary navigation components
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -202,11 +108,9 @@ export default function MapillaryViewer({
         imageId: targetId,
         component: {
           cover: false,
-          direction: {
-            distinguishSequence: true, // Visually tags sequence arrows vs cross-sequence edges
-          },
+          direction: true,
           sequence: true,
-          spatial: false, // Disabled: avoids distracting 3D camera wireframes and SfM artifacts
+          spatialData: true,
           zoom: true,
         },
       });
@@ -216,7 +120,6 @@ export default function MapillaryViewer({
         if (!isMounted) return;
         setIsLoading(false);
         setError(null);
-        isNavigatingRef.current = false;
 
         const image = event.image;
         if (image) {
@@ -224,28 +127,45 @@ export default function MapillaryViewer({
           currentImageIdRef.current = imageIdStr;
           const seqId = image.sequenceId || image.sequence?.id;
           currentSequenceIdRef.current = seqId;
-          setActiveSeqId(seqId);
+
+          const rawLat = image.lngLat?.lat;
+          const rawLng = image.lngLat?.lng;
+
+          // Spatial Leap Guardrail (> 75m jump sanity check)
+          if (lastValidPosRef.current && rawLat && rawLng) {
+            const dist = getHaversineDistance(
+              lastValidPosRef.current.lat,
+              lastValidPosRef.current.lng,
+              rawLat,
+              rawLng
+            );
+            if (dist > 75) {
+              console.warn(`[Mapillary Leap Guardrail] Distance jumped: ${Math.round(dist)}m > 75m threshold. Checking alignment.`);
+            }
+          }
+          lastValidPosRef.current = { lat: rawLat, lng: rawLng };
 
           // Retrieve re-aligned curve coordinates if this sequence was re-aligned by admin
           const alignedPos = streetviewAlignmentService.getAlignedPositionForImage(imageIdStr);
-          setAlignedInfo(alignedPos);
 
-          // Auto-recover if an excluded sequence is ever encountered
-          const excluded = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
-          if (seqId && excluded.includes(String(seqId))) {
-            console.warn(`Image belongs to excluded sequence ${seqId}; auto-recovering to valid campus entrance...`);
+          // Auto-recover if an excluded sequence or excluded image is ever encountered
+          const excludedSeq = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
+          const excludedImg = Array.isArray(excludedImageKeys) ? excludedImageKeys.map(String) : [];
+
+          if ((seqId && excludedSeq.includes(String(seqId))) || excludedImg.includes(imageIdStr)) {
+            console.warn(`Image belongs to excluded set (${imageIdStr} / ${seqId}); auto-recovering to campus entrance...`);
             viewer.moveTo(DEFAULT_IMAGE_ID).catch(() => {
               viewer.moveTo(FALLBACK_NORTH_GATE_ID).catch(() => {});
             });
             return;
           }
 
-          // Lock filter to current sequence so navigation arrows only advance/reverse along the road
-          applyFilter(seqId);
+          // Apply exclusion filter
+          applyFilter();
 
           const pos = {
-            lat: alignedPos?.lat ?? image.lngLat?.lat,
-            lng: alignedPos?.lng ?? image.lngLat?.lng,
+            lat: alignedPos?.lat ?? rawLat,
+            lng: alignedPos?.lng ?? rawLng,
             id: imageIdStr,
             sequenceId: seqId,
             heading: alignedPos?.heading ?? image.compassAngle,
@@ -253,28 +173,14 @@ export default function MapillaryViewer({
           };
           setCurrentPos(pos);
           onPositionChange?.(pos);
-
-          // For aligned sequences, accurately reflect edge availability along the curve
-          if (alignedPos) {
-            setHasNext(!!alignedPos.nextImageId);
-            setHasPrev(!!alignedPos.prevImageId);
-          }
         }
-      });
-
-      // Event: Viewer sequence edge status (available forward/backward edges)
-      viewer.on('sequenceedges', (event) => {
-        if (!isMounted) return;
-        const edges = event.status?.edges || [];
-        setHasNext(edges.some((e) => e.data?.direction === 0)); // 0 = Next (Forward)
-        setHasPrev(edges.some((e) => e.data?.direction === 1)); // 1 = Prev (Backward)
       });
 
       // Event: Viewer fully loaded
       viewer.on('load', () => {
         if (!isMounted) return;
         setIsLoading(false);
-        applyFilter(currentSequenceIdRef.current);
+        applyFilter();
       });
 
       // Event: Camera bearing/pitch change
@@ -303,292 +209,216 @@ export default function MapillaryViewer({
     } catch (err) {
       console.error('Failed to initialize Mapillary viewer:', err);
       if (isMounted) {
-        setError(err?.message || 'Failed to initialize Mapillary street view');
+        setError('Could not load Mapillary 360° street view. Please verify internet connection.');
         setIsLoading(false);
       }
-    }
-
-    // ResizeObserver ensures WebGL canvas continuously matches panel dimensions
-    const ro = new ResizeObserver(() => {
-      if (viewerRef.current) {
-        try {
-          viewerRef.current.resize();
-        } catch (e) {
-          // ignore
-        }
-      }
-    });
-
-    if (containerRef.current) {
-      ro.observe(containerRef.current);
     }
 
     return () => {
       isMounted = false;
-      ro.disconnect();
       if (viewerRef.current) {
         try {
           viewerRef.current.remove();
         } catch (e) {
-          // ignore
+          console.warn('Mapillary cleanup warning:', e);
         }
         viewerRef.current = null;
       }
     };
-  }, []); // Run once on mount
+  }, []);
 
-  // Handle imageId navigation changes
+  // Sync imageId prop changes
   useEffect(() => {
-    if (!viewerRef.current || !imageId) return;
-    if (!isValidMapillaryId(imageId)) {
-      console.warn('Ignoring invalid Mapillary ID:', imageId);
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    if (!isValidMapillaryId(imageId)) return;
+
+    const targetIdStr = String(imageId);
+    if (targetIdStr === currentImageIdRef.current) return;
+
+    // Check if blacklisted
+    if (excludedImageKeys.includes(targetIdStr)) {
+      console.warn(`Target image ${targetIdStr} is blacklisted.`);
       return;
     }
-    const targetId = String(imageId);
-    if (currentImageIdRef.current === targetId && !error) return;
 
-    let isCancelled = false;
+    currentImageIdRef.current = targetIdStr;
+    setIsLoading(true);
 
-    const navigateToImage = async () => {
-      setIsLoading(true);
-      setError(null);
-      isNavigatingRef.current = true;
-
-      const viewer = viewerRef.current;
-      if (!viewer) return;
-
-      // Wait if viewer is still initializing or in cover mode
-      if (!viewer.isNavigable) {
-        await new Promise((resolve) => {
-          const handler = (evt) => {
-            if (evt?.navigable || viewer?.isNavigable) {
-              viewer?.off('navigable', handler);
-              resolve();
-            }
-          };
-          viewer.on('navigable', handler);
-          setTimeout(resolve, 2000); // safety fallback timeout
-        });
-      }
-
-      if (isCancelled || !viewerRef.current) return;
-      if (!viewerRef.current.isNavigable) {
-        console.warn('Mapillary viewer still initializing; waiting for navigable event.');
-        return;
-      }
-
-      try {
-        currentImageIdRef.current = targetId;
-
-        // Temporarily loosen single-sequence restriction so viewer can transition to new sequence
-        const excluded = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
-        if (excluded.length > 0) {
-          try { viewer.setFilter(['!in', 'sequenceId', ...excluded]); } catch (e) {}
-        } else {
-          try { viewer.setFilter(null); } catch (e) {}
-        }
-
-        await viewerRef.current.moveTo(targetId);
-        if (!isCancelled) {
-          setIsLoading(false);
-          setError(null);
-          isNavigatingRef.current = false;
-        }
-      } catch (err) {
-        if (isCancelled) return;
-        if (
-          err?.name === 'CancelMapillaryError' ||
-          err?.message?.toLowerCase().includes('cancel')
-        ) {
-          return;
-        }
-        console.warn('Mapillary navigation warning:', err);
-
-        // Auto-recover to working default entrance gate if the requested image fails to cache or load
-        if (targetId !== DEFAULT_IMAGE_ID && viewerRef.current && viewerRef.current.isNavigable) {
-          console.warn(`Image ${targetId} failed to load. Auto-recovering to campus gate (${DEFAULT_IMAGE_ID})...`);
-          try {
-            currentImageIdRef.current = DEFAULT_IMAGE_ID;
-            await viewerRef.current.moveTo(DEFAULT_IMAGE_ID);
-            if (!isCancelled) {
-              setIsLoading(false);
-              setError(null);
-              isNavigatingRef.current = false;
-              return;
-            }
-          } catch (fallbackErr) {
-            console.warn('Fallback gate also failed, trying north gate:', fallbackErr);
-            try {
-              currentImageIdRef.current = FALLBACK_NORTH_GATE_ID;
-              await viewerRef.current.moveTo(FALLBACK_NORTH_GATE_ID);
-              if (!isCancelled) {
-                setIsLoading(false);
-                setError(null);
-                isNavigatingRef.current = false;
-                return;
-              }
-            } catch (northErr) {
-              console.warn('North gate fallback failed:', northErr);
-            }
-          }
-        }
-
-        setError(err?.message || 'Street view image unavailable or still processing');
+    viewer
+      .moveTo(targetIdStr)
+      .then((img) => {
         setIsLoading(false);
-        isNavigatingRef.current = false;
-      }
-    };
+        if (img) {
+          const alignedPos = streetviewAlignmentService.getAlignedPositionForImage(targetIdStr);
+          const pos = {
+            lat: alignedPos?.lat ?? img.lngLat?.lat,
+            lng: alignedPos?.lng ?? img.lngLat?.lng,
+            id: targetIdStr,
+            sequenceId: img.sequenceId || img.sequence?.id,
+            heading: alignedPos?.heading ?? img.compassAngle,
+            isAligned: !!alignedPos,
+          };
+          setCurrentPos(pos);
+          onPositionChange?.(pos);
+        }
+      })
+      .catch((err) => {
+        setIsLoading(false);
+        if (err?.name !== 'CancelMapillaryError' && !err?.message?.includes('cancel')) {
+          console.warn(`Could not navigate directly to ${targetIdStr}:`, err);
+        }
+      });
+  }, [imageId, onPositionChange, excludedImageKeys]);
 
-    navigateToImage();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [imageId, excludedSequences]);
-
-  // Steer camera toward landmark heading and pitch if requested
+  // Steer Target Camera Bearing Sync
   useEffect(() => {
-    if (!viewerRef.current || steerTarget?.heading === undefined || steerTarget?.heading === null) return;
+    const viewer = viewerRef.current;
+    if (!viewer || !steerTarget || typeof steerTarget.bearing !== 'number') return;
     try {
-      const normalizedBearing = (steerTarget.heading % 360 + 360) % 360;
-      const x = normalizedBearing / 360;
-      const pitch = steerTarget.pitch || 0;
-      const y = Math.max(0.1, Math.min(0.9, 0.5 - (pitch / 180)));
-      viewerRef.current.setCenter([x, y]);
+      viewer.setPointOfView({
+        bearing: steerTarget.bearing,
+        pitch: typeof steerTarget.pitch === 'number' ? steerTarget.pitch : 0,
+      });
     } catch (e) {
-      // ignore steering if viewer not ready
+      console.warn('Could not set Mapillary POV:', e);
     }
   }, [steerTarget]);
 
-  // Retry handler
-  const handleRetry = useCallback(() => {
-    setError(null);
-    setIsLoading(true);
-    const target = String(imageId || currentImageIdRef.current || DEFAULT_IMAGE_ID);
-    if (viewerRef.current) {
-      const doMove = () => {
-        viewerRef.current
-          .moveTo(target)
-          .then(() => {
-            setIsLoading(false);
-            setError(null);
-          })
-          .catch((e) => {
-            setError(e?.message || 'Failed to load street view image');
-            setIsLoading(false);
-          });
-      };
-      if (viewerRef.current.isNavigable) {
-        doMove();
-      } else {
-        viewerRef.current.once('navigable', doMove);
-      }
-    }
-  }, [imageId]);
-
   return (
-    <div className="panorama-wrapper" style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {/* Loading overlay */}
-      <div className={`pano-loading-overlay ${!isLoading || error ? 'fade-out' : ''}`}>
-        <div className="spinner" />
-        <p className="loading-text">Loading Mapillary street view...</p>
-      </div>
-
-      {/* Error state with Retry button */}
-      {error && (
+    <div style={{ position: 'relative', width: '100%', height: '100%', background: '#000000' }}>
+      {/* Loading Overlay */}
+      {isLoading && (
         <div
-          className="pano-loading-overlay"
           style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 30,
+            display: 'flex',
             flexDirection: 'column',
-            gap: '10px',
-            background: 'rgba(10, 14, 23, 0.92)',
-            zIndex: 60,
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(10, 15, 29, 0.75)',
+            backdropFilter: 'blur(8px)',
+            color: '#ffffff',
+            gap: '12px',
           }}
         >
-          <p className="loading-text" style={{ color: 'var(--accent-warning)', margin: 0, fontSize: '0.88rem' }}>
-            ⚠ {error}
-          </p>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              className="btn btn-sm btn-primary"
-              style={{ fontSize: '0.78rem', padding: '6px 14px' }}
-              onClick={handleRetry}
-            >
-              🔄 Retry
-            </button>
-            <button
-              className="btn btn-sm btn-secondary"
-              style={{ fontSize: '0.78rem', padding: '6px 14px' }}
-              onClick={() => {
-                setError(null);
-                setIsLoading(true);
-                currentImageIdRef.current = DEFAULT_IMAGE_ID;
-                if (viewerRef.current) {
-                  viewerRef.current.moveTo(DEFAULT_IMAGE_ID).catch(() => setIsLoading(false));
-                }
-              }}
-            >
-              🏠 Reset to Gate
-            </button>
-          </div>
+          <div className="spinner" style={{ width: '38px', height: '38px' }} />
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#38bdf8' }}>
+            Loading Mapillary 360° Trail...
+          </span>
         </div>
       )}
 
-      {/* Bottom Floating Trail Navigation HUD (Turn Left, Step Backward, Trail Indicator, Step Forward, Turn Right) */}
-      {!isLoading && !error && (
-        <div className="streetview-nav-hud">
+      {/* Error Overlay */}
+      {error && !isLoading && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 30,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(10, 15, 29, 0.9)',
+            color: '#ffffff',
+            padding: '24px',
+            textAlign: 'center',
+            gap: '12px',
+          }}
+        >
+          <span style={{ fontSize: '2rem' }}>⚠️</span>
+          <p style={{ fontSize: '0.88rem', color: '#f87171', maxWidth: '320px', margin: 0 }}>
+            {error}
+          </p>
           <button
-            className="streetview-nav-btn streetview-turn-btn"
-            disabled={isNavigatingRef.current}
-            onClick={handleTurnLeft}
-            title="Turn left at junction (A or ←)"
-          >
-            <span>↰</span>
-            <span className="btn-label-desktop">Turn L</span>
-          </button>
-
-          <button
-            className="streetview-nav-btn"
-            disabled={!hasPrev || isNavigatingRef.current}
-            onClick={handleStepBackward}
-            title="Step backward along trail (S or ↓)"
-          >
-            <span>⮟</span>
-            <span className="btn-label-desktop">Backward</span>
-          </button>
-
-          <span
-            className="streetview-nav-badge"
-            style={{
-              background: alignedInfo ? 'rgba(6, 182, 212, 0.25)' : undefined,
-              borderColor: alignedInfo ? '#06b6d4' : undefined,
-              color: alignedInfo ? '#a5f3fc' : undefined,
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              if (viewerRef.current) {
+                viewerRef.current.moveTo(DEFAULT_IMAGE_ID).catch(() => {});
+              }
             }}
           >
-            {alignedInfo
-              ? `🎯 Trail (${alignedInfo.imageIndex + 1}/${alignedInfo.totalImages})`
-              : 'Trail Nav'}
-          </span>
-
-          <button
-            className="streetview-nav-btn"
-            disabled={!hasNext || isNavigatingRef.current}
-            onClick={handleStepForward}
-            title="Step forward along trail (W or ↑)"
-          >
-            <span className="btn-label-desktop">Forward</span>
-            <span>⮝</span>
+            Reset to UA Campus Gate
           </button>
+        </div>
+      )}
 
-          <button
-            className="streetview-nav-btn streetview-turn-btn"
-            disabled={isNavigatingRef.current}
-            onClick={handleTurnRight}
-            title="Turn right at junction (D or →)"
-          >
-            <span className="btn-label-desktop">Turn R</span>
-            <span>↱</span>
-          </button>
+      {/* Admin Location & Exclusion Menu (Workstream 3) */}
+      {isAdmin && currentPos && (
+        <div
+          className="glass-panel"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            zIndex: 35,
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-lg, 12px)',
+            background: 'rgba(15, 23, 42, 0.92)',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            maxWidth: '280px',
+            fontSize: '0.74rem',
+            color: '#cbd5e1',
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <strong style={{ color: '#f87171', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>🛡️</span> Location Menu
+            </strong>
+            <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+              {currentPos.lat.toFixed(5)}, {currentPos.lng.toFixed(5)}
+            </span>
+          </div>
+
+          <div style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.3 }}>
+            <div>Image Key: <code style={{ color: '#38bdf8' }}>{currentPos.id}</code></div>
+            <div>Sequence: <code style={{ color: '#bae6fd' }}>{currentPos.sequenceId ? String(currentPos.sequenceId).slice(0, 10) + '...' : 'N/A'}</code></div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={() => onExcludeImage?.(currentPos.id)}
+              className="btn btn-danger btn-sm"
+              style={{
+                flex: 1,
+                padding: '4px 8px',
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                borderRadius: '6px',
+              }}
+              title="Blacklist and hide this specific image node"
+            >
+              🚫 Exclude Node
+            </button>
+            {currentPos.sequenceId && (
+              <button
+                onClick={() => onExcludeSequence?.(currentPos.sequenceId)}
+                className="btn btn-secondary btn-sm"
+                style={{
+                  flex: 1,
+                  padding: '4px 8px',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  borderColor: 'rgba(239, 68, 68, 0.4)',
+                  color: '#fca5a5',
+                }}
+                title="Blacklist and disable this entire erratic sequence"
+              >
+                ⚠️ Exclude Seq
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -640,7 +470,7 @@ export default function MapillaryViewer({
         </div>
       )}
 
-      {/* Street View Viewer container */}
+      {/* Street View Viewer container with native 3D spatial arrows */}
       <div ref={containerRef} className="panorama-container" style={{ width: '100%', height: '100%' }} />
     </div>
   );

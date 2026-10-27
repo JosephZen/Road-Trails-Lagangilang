@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 const STORAGE_ADMIN_PASSWORD_KEY = 'lagangilang_admin_password';
-const DEFAULT_PASSWORDS = ['admin123', 'lagangilang2026', 'admin'];
+const DEFAULT_ADMIN_PASSWORD = 'touristspot2026';
 
 /**
- * Validate entered password against custom stored password or default fallback passwords.
+ * Validate entered password against custom stored password or default system password.
  */
 export const checkAdminPassword = (entered) => {
   if (!entered) return false;
@@ -13,7 +13,7 @@ export const checkAdminPassword = (entered) => {
   if (custom && custom.trim()) {
     return trimmed === custom.trim();
   }
-  return DEFAULT_PASSWORDS.includes(trimmed);
+  return trimmed === DEFAULT_ADMIN_PASSWORD;
 };
 
 /**
@@ -249,9 +249,6 @@ export default function AdminPasswordModal({
                   {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
-              <p style={{ margin: '6px 0 0', fontSize: '0.72rem', color: '#64748b' }}>
-                Default password: <code style={{ color: '#38bdf8' }}>admin123</code>
-              </p>
             </div>
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>

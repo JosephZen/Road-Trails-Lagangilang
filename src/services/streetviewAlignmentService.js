@@ -6,6 +6,7 @@
 
 const STORAGE_KEY = 'mapillary_aligned_sequences_v1';
 const EXCLUDED_STORAGE_KEY = 'mapillary_excluded_sequences_v1';
+const EXCLUDED_IMAGES_STORAGE_KEY = 'mapillary_excluded_images_v1';
 const NEON_URL_KEY = 'lagangilang_neon_db_url';
 const DEFAULT_NEON_URL =
   'postgresql://neondb_owner:npg_NCe0hgVyZ7qx@ep-shy-art-aoq0wgaf-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
@@ -19,6 +20,7 @@ class StreetviewAlignmentService {
   constructor() {
     this.alignedSequences = this.loadLocal();
     this.excludedSequences = this.loadExcludedLocal();
+    this.excludedImages = this.loadExcludedImagesLocal();
 
     // Auto-scrub default excluded sequences from locally cached aligned sequences
     let scrubbed = false;
@@ -77,6 +79,56 @@ class StreetviewAlignmentService {
     } catch (e) {
       console.warn('Failed to save excluded sequences to localStorage:', e);
     }
+  }
+
+  loadExcludedImagesLocal() {
+    try {
+      const data = localStorage.getItem(EXCLUDED_IMAGES_STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      }
+      return new Set();
+    } catch (e) {
+      console.warn('Failed to load excluded images from localStorage:', e);
+      return new Set();
+    }
+  }
+
+  saveExcludedImagesLocal() {
+    try {
+      localStorage.setItem(
+        EXCLUDED_IMAGES_STORAGE_KEY,
+        JSON.stringify(Array.from(this.excludedImages))
+      );
+    } catch (e) {
+      console.warn('Failed to save excluded images to localStorage:', e);
+    }
+  }
+
+  getExcludedImages() {
+    return Array.from(this.excludedImages);
+  }
+
+  isImageExcluded(imageId) {
+    if (!imageId) return false;
+    return this.excludedImages.has(String(imageId));
+  }
+
+  excludeImage(imageId) {
+    if (!imageId) return;
+    const strId = String(imageId);
+    this.excludedImages.add(strId);
+    this.saveExcludedImagesLocal();
+    return this.getExcludedImages();
+  }
+
+  restoreImage(imageId) {
+    if (!imageId) return;
+    const strId = String(imageId);
+    this.excludedImages.delete(strId);
+    this.saveExcludedImagesLocal();
+    return this.getExcludedImages();
   }
 
   getExcludedSequences() {
@@ -588,6 +640,7 @@ class StreetviewAlignmentService {
   getAlignedPositionForImage(imageId) {
     if (!imageId) return null;
     const strId = String(imageId);
+    if (this.isImageExcluded(strId)) return null;
     for (const [seqId, aligned] of Object.entries(this.alignedSequences)) {
       if (this.isSequenceExcluded(seqId)) continue;
       if (!Array.isArray(aligned.images)) continue;

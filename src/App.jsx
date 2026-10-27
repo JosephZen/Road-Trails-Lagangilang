@@ -17,6 +17,7 @@ import {
 } from './utils/streetViewJunctions';
 import RoutePlanner from './components/RoutePlanner';
 import NavigationView from './components/NavigationView';
+import RouteSummaryCard from './components/RouteSummaryCard';
 import { getRoute } from './services/routingService';
 import { streetviewAlignmentService } from './services/streetviewAlignmentService';
 import StreetviewLineAligner from './components/StreetviewLineAligner';
@@ -334,10 +335,12 @@ export default function App() {
     showToast('↺ Restored line to raw Mapillary GPS capture points');
   }, [aligningSequence, showToast]);
 
-  // Excluded Streetview Sequences State
+  // Excluded Streetview Sequences & Buggy Images State
   const [excludedSequences, setExcludedSequences] = useState(() => streetviewAlignmentService.getExcludedSequences());
+  const [excludedImageKeys, setExcludedImageKeys] = useState(() => streetviewAlignmentService.getExcludedImages());
   const [showExcludedModal, setShowExcludedModal] = useState(false);
   const [manualExcludeInput, setManualExcludeInput] = useState('');
+  const [manualExcludeImageInput, setManualExcludeImageInput] = useState('');
 
   const handleDeleteAlignment = useCallback(async (sequenceId) => {
     if (!isAdmin) return;
@@ -366,6 +369,21 @@ export default function App() {
       showToast(`🚫 Sequence ${sequenceId.slice(0, 8)}... excluded and removed from map`);
     }
   }, [isAdmin, aligningSequence, showToast]);
+
+  const handleToggleExcludeImage = useCallback((imageId) => {
+    if (!isAdmin) return;
+    if (streetviewAlignmentService.isImageExcluded(imageId)) {
+      const updated = streetviewAlignmentService.restoreImage(imageId);
+      setExcludedImageKeys(updated);
+      setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+      showToast(`👁️ Image node ${imageId.slice(0, 8)}... restored`);
+    } else {
+      const updated = streetviewAlignmentService.excludeImage(imageId);
+      setExcludedImageKeys(updated);
+      setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+      showToast(`🚫 Image node ${imageId.slice(0, 8)}... excluded`);
+    }
+  }, [isAdmin, showToast]);
 
   // Automatically calculate route when both Point A and Point B are chosen
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
@@ -829,18 +847,6 @@ export default function App() {
 
   const stagedCount = touristSpots.filter((s) => s.sync_status === 'staged_local').length;
 
-  if (isNavigating && routeData && !isNavMinimized) {
-    return (
-      <NavigationView
-        routeData={routeData}
-        onExit={handleExitNavigation}
-        theme={mapTheme}
-        isMinimized={false}
-        onToggleMinimize={() => setIsNavMinimized(true)}
-      />
-    );
-  }
-
   return (
     <div className="app-container">
       {/* ===== Map Panel ===== */}
@@ -848,14 +854,23 @@ export default function App() {
         className={`panel-map ${!viewerOpen ? 'expanded' : ''} ${viewerOpen && viewerLayout === 'split' ? 'split-active' : ''} ${viewerOpen && viewerLayout === 'fullscreen' ? 'fullscreen-collapsed' : ''} ${isAdmin ? 'admin-mode' : ''}`}
         style={viewerOpen && viewerLayout === 'split' ? { flex: `0 0 ${mapWidth}%` } : {}}
       >
-        {/* Minimized Floating Turn-by-Turn Navigation HUD over 2D Map */}
-        {isNavigating && routeData && isNavMinimized && (
-          <NavigationView
+        {/* Floating Route Summary Card over 2D Map (streamlined on-map route navigation) */}
+        {routeData && (
+          <RouteSummaryCard
             routeData={routeData}
-            onExit={handleExitNavigation}
-            theme={mapTheme}
-            isMinimized={true}
-            onToggleMinimize={() => setIsNavMinimized(false)}
+            routeOrigin={routeOrigin}
+            routeDestination={routeDestination}
+            routingProfile={routingProfile}
+            touristSpots={touristSpots}
+            isSplitView={viewerOpen && viewerLayout === 'split'}
+            onReverseRoute={handleSwapPoints}
+            onClearRoute={handleClearRoute}
+            onStartStreetViewRoute={() => {
+              if (routeOrigin) {
+                handleMapClick(routeOrigin[1], routeOrigin[0]);
+                showToast('📷 Opening 360° Street View at route start');
+              }
+            }}
           />
         )}
         {/* 2D MapView (Base layer rendered first in DOM order) */}
@@ -894,22 +909,58 @@ export default function App() {
           showMapillaryDots={showMapillaryDots}
           showMapillaryLines={showMapillaryLines}
           excludedSequences={excludedSequences}
+          excludedImageKeys={excludedImageKeys}
         />
 
         {/* Map top controls */}
         <div className="map-overlay-top">
           {/* Horizontally scrollable/dynamic action bar across all aspect ratios */}
           <div className="nav-scroll-container">
-            {/* Role Indicator Badge */}
+            {/* Tourism Brand Header Pill */}
             <div
-              className={`role-indicator ${isAdmin ? 'admin' : 'tourist'}`}
-              onClick={handleRoleToggle}
-              title={isAdmin ? 'Switch to Tourist Explorer' : 'Switch to Admin Panel (Password Required)'}
+              className="brand-pill"
+              style={{
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-full)',
+                background: 'rgba(15, 23, 42, 0.85)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#f8fafc',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                backdropFilter: 'blur(8px)',
+              }}
             >
-              <span className="role-indicator-dot" />
-              <span>{isAdmin ? '🛡️ Admin' : '🌴 Tourist'}</span>
-              <span className="btn-label-text">{isAdmin ? ' Panel' : ' Explorer'}</span>
+              <span>🌲</span>
+              <span>Lagangilang Trails</span>
             </div>
+
+            {/* Explore Spots Drawer Toggle */}
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setSidebarTab('spots');
+                setSidebarOpen(true);
+              }}
+              title="Explore Spots & Landmarks"
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              <span>📍</span>
+              <span className="btn-label-text">Spots</span>
+            </button>
 
             {/* Live Weather Forecast & Trail Advisory Pill */}
             <WeatherWidget isCompact={viewerOpen && viewerLayout === 'split'} />
@@ -960,31 +1011,6 @@ export default function App() {
               <span className="btn-label-text">Offline</span>
             </button>
 
-            {/* Theme Selector Dropdown */}
-            <div className="theme-dropdown-custom" title="Map Theme">
-              <span className="theme-dropdown-icon">
-                {mapTheme === 'dark' ? '🌙' : mapTheme === 'light' ? '☀️' : mapTheme === 'beige' ? '📜' : '🛰️'}
-              </span>
-              <select
-                id="map-theme-dropdown"
-                className="theme-dropdown-select"
-                value={mapTheme}
-                onChange={(e) => {
-                  const t = e.target.value;
-                  setMapTheme(t);
-                  localStorage.setItem('lagangilang_map_theme', t);
-                  showToast(`Map theme: ${t.charAt(0).toUpperCase() + t.slice(1)}`);
-                }}
-                aria-label="Map theme dropdown"
-              >
-                <option value="light">☀️ Light</option>
-                <option value="dark">🌙 Dark</option>
-                <option value="beige">📜 Beige</option>
-                <option value="satellite">🛰️ Satellite</option>
-              </select>
-              <span className="theme-dropdown-chevron">▼</span>
-            </div>
-
             {/* Route Button (Tourist prominent) */}
             <button
               className="btn btn-primary"
@@ -1010,46 +1036,88 @@ export default function App() {
               <span className="btn-label-text">Route</span>
             </button>
 
-            {/* Admin-only controls */}
+            {/* Toggle 360° Street View & Trails (Public for all users) */}
+            <button
+              className={`btn ${showMapillaryStreetview ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => {
+                const next = !showMapillaryStreetview;
+                setShowMapillaryStreetview(next);
+                setShowMapillaryDots(next);
+                setShowMapillaryLines(next);
+                showToast(
+                  next
+                    ? '🟢 360° Trail coverage visible on map'
+                    : '⚪ 360° Trail coverage hidden'
+                );
+              }}
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                background: showMapillaryStreetview
+                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                  : undefined,
+                color: showMapillaryStreetview ? '#ffffff' : undefined,
+                border: showMapillaryStreetview ? 'none' : undefined,
+              }}
+              title={
+                showMapillaryStreetview
+                  ? 'Hide 360° Trail lines & photo points'
+                  : 'Display 360° Trail lines & photo points across Lagangilang'
+              }
+            >
+              <span>📷</span>
+              <span className="btn-label-text">
+                {showMapillaryStreetview ? 'Trails: ON' : '360° Trails'}
+              </span>
+            </button>
+
+            {/* Theme Selector Dropdown */}
+            <div className="theme-dropdown-custom" title="Map Theme">
+              <span className="theme-dropdown-icon">
+                {mapTheme === 'dark' ? '🌙' : mapTheme === 'light' ? '☀️' : mapTheme === 'beige' ? '📜' : '🛰️'}
+              </span>
+              <select
+                id="map-theme-dropdown"
+                className="theme-dropdown-select"
+                value={mapTheme}
+                onChange={(e) => {
+                  const t = e.target.value;
+                  setMapTheme(t);
+                  localStorage.setItem('lagangilang_map_theme', t);
+                  showToast(`Map theme: ${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                }}
+                aria-label="Map theme dropdown"
+              >
+                <option value="light">☀️ Light</option>
+                <option value="dark">🌙 Dark</option>
+                <option value="beige">📜 Beige</option>
+                <option value="satellite">🛰️ Satellite</option>
+              </select>
+              <span className="theme-dropdown-chevron">▼</span>
+            </div>
+
+            {/* Admin-only controls & Status (Only shown when Admin is logged in) */}
             {isAdmin && (
               <>
                 <div className="controls-separator" />
 
-                {/* Toggle Mapillary Streetview (Green lines & dots) - Admin only */}
-                <button
-                  className={`btn ${showMapillaryStreetview ? 'btn-secondary' : 'btn-ghost'}`}
-                  onClick={() => {
-                    const next = !showMapillaryStreetview;
-                    setShowMapillaryStreetview(next);
-                    setShowMapillaryDots(next);
-                    setShowMapillaryLines(next);
-                    showToast(
-                      next
-                        ? '🟢 Mapillary streetview (lines & dots) visible'
-                        : '⚪ Mapillary streetview hidden (cyan line remains visible)'
-                    );
-                  }}
-                  style={{
-                    fontSize: '0.8rem',
-                    padding: '6px 12px',
-                    borderRadius: 'var(--radius-full)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}
-                  title={
-                    showMapillaryStreetview
-                      ? 'Hide raw Mapillary streetview (green lines & dots)'
-                      : 'Show raw Mapillary streetview (green lines & dots)'
-                  }
+                {/* Role Indicator Badge (Admin Logout) */}
+                <div
+                  className="role-indicator admin"
+                  onClick={handleRoleToggle}
+                  title="Click to logout from Admin mode"
+                  style={{ cursor: 'pointer' }}
                 >
-                  <span>{showMapillaryStreetview ? '🟢' : '⚪'}</span>
-                  <span className="btn-label-text">
-                    {showMapillaryStreetview ? 'Street: ON' : 'Street: OFF'}
-                  </span>
-                </button>
+                  <span className="role-indicator-dot" />
+                  <span>🛡️ Admin</span>
+                  <span className="btn-label-text"> (Logout)</span>
+                </div>
                 {/* Bend / Align Streetview Line Button (Admin only) */}
                 <button
                   className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
@@ -1993,19 +2061,46 @@ export default function App() {
                 </div>
               ) : (
                 <div style={{
-                  padding: '14px',
+                  padding: '16px',
                   borderRadius: 'var(--radius-md)',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  background: 'rgba(15, 23, 42, 0.65)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
                   fontSize: '0.82rem',
                   color: 'var(--text-secondary)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px',
+                  gap: '10px',
                   marginTop: '6px',
                 }}>
-                  <span style={{ fontWeight: 600, color: '#93c5fd' }}>💡 Want to edit or add landmarks?</span>
-                  <span>Tap <strong>Switch to Admin</strong> above to enter your admin password and unlock pin repositioning, streetview alignment, and custom spot creation.</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.1rem' }}>🛡️</span>
+                    <span style={{ fontWeight: 700, color: '#f8fafc' }}>Administrative Portal</span>
+                  </div>
+                  <span style={{ color: '#94a3b8', fontSize: '0.78rem', lineHeight: '1.4' }}>
+                    Authorized municipal tourism staff can authenticate to add attractions, reposition pins, re-align street view trails, and manage excluded nodes.
+                  </span>
+                  <button
+                    className="btn btn-secondary btn-block"
+                    onClick={() => {
+                      setIsChangePasswordMode(false);
+                      setShowAdminPasswordModal(true);
+                      setSidebarOpen(false);
+                    }}
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      border: '1px solid rgba(59, 130, 246, 0.35)',
+                      color: '#93c5fd',
+                      fontWeight: 600,
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span>🔐</span>
+                    <span>Admin Login</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -2283,6 +2378,10 @@ export default function App() {
               <MapillaryViewer
                 imageId={mapillaryImageId || MAPILLARY_CAMPUS_GATE_IMAGE_ID}
                 excludedSequences={excludedSequences}
+                excludedImageKeys={excludedImageKeys}
+                isAdmin={isAdmin}
+                onExcludeImage={handleToggleExcludeImage}
+                onExcludeSequence={handleToggleExcludeSequence}
                 onPositionChange={(pos) => {
                   setMapillaryImageId(pos.id);
                   setStreetViewPos(pos);
@@ -2609,15 +2708,18 @@ export default function App() {
             style={{ maxWidth: '540px' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem' }}>🚫 Excluded Streetview Lines</h2>
+              <h2 style={{ margin: 0, fontSize: '1.25rem' }}>🚫 Excluded Trails & Nodes Manager</h2>
               <button className="btn btn-ghost" onClick={() => setShowExcludedModal(false)}>✕</button>
             </div>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              Sequences listed here are completely excluded and removed from the map display (both aligned curves and raw Mapillary lines/dots).
+              Sequences and buggy photo nodes listed here are filtered out from street view traversal and map rendering.
             </p>
 
+            <h4 style={{ fontSize: '0.9rem', marginBottom: '8px', color: '#60a5fa' }}>
+              Excluded Sequences ({excludedSequences.length})
+            </h4>
             {/* Manual sequence exclude input */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
               <input
                 type="text"
                 className="input-field"
@@ -2641,13 +2743,13 @@ export default function App() {
               </button>
             </div>
 
-            {/* Excluded list */}
+            {/* Excluded sequences list */}
             {excludedSequences.length === 0 ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                No sequences are currently excluded.
+              <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', marginBottom: '16px' }}>
+                No sequences currently excluded.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto', marginBottom: '16px' }}>
                 {excludedSequences.map((seqId) => (
                   <div
                     key={seqId}
@@ -2662,16 +2764,78 @@ export default function App() {
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fca5a5' }}>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fca5a5' }}>
                         Sequence: <code>{seqId}</code>
-                      </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        Excluded from streetview &amp; map
                       </div>
                     </div>
                     <button
                       className="btn btn-sm btn-secondary"
                       onClick={() => handleToggleExcludeSequence(seqId)}
+                      style={{ fontSize: '0.75rem', padding: '4px 10px', color: '#34d399', borderColor: '#34d399' }}
+                    >
+                      👁️ Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <h4 style={{ fontSize: '0.9rem', marginBottom: '8px', color: '#fbbf24' }}>
+              Excluded Photo Nodes / Image Keys ({excludedImageKeys.length})
+            </h4>
+            {/* Manual image exclude input */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Paste Mapillary image ID to exclude..."
+                value={manualExcludeImageInput}
+                onChange={(e) => setManualExcludeImageInput(e.target.value.trim())}
+                style={{ flex: 1, fontSize: '0.85rem' }}
+              />
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  if (manualExcludeImageInput) {
+                    handleToggleExcludeImage(manualExcludeImageInput);
+                    setManualExcludeImageInput('');
+                  }
+                }}
+                disabled={!manualExcludeImageInput}
+                style={{ fontSize: '0.85rem', padding: '6px 14px' }}
+              >
+                + Exclude
+              </button>
+            </div>
+
+            {/* Excluded images list */}
+            {excludedImageKeys.length === 0 ? (
+              <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                No individual image nodes excluded.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto' }}>
+                {excludedImageKeys.map((imgId) => (
+                  <div
+                    key={imgId}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      background: 'rgba(245, 158, 11, 0.1)',
+                      border: '1px solid rgba(245, 158, 11, 0.25)',
+                      borderRadius: 'var(--radius-md)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#fde68a' }}>
+                        Image Node: <code>{imgId}</code>
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => handleToggleExcludeImage(imgId)}
                       style={{ fontSize: '0.75rem', padding: '4px 10px', color: '#34d399', borderColor: '#34d399' }}
                     >
                       👁️ Restore
