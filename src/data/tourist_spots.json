@@ -29,7 +29,15 @@
     "synced_at": "2026-10-24T15:57:50.066Z",
     "updated_at": "2026-10-26T13:39:38.624Z",
     "cardVisualIcon": null,
-    "address": "Ugiao River, Barangay Pawa, Lagangilang, Abra"
+    "address": "Ugiao River, Barangay Pawa, Lagangilang, Abra",
+    "trail_difficulty": "Moderate",
+    "trail_condition": "Passable - Clear Riverbanks",
+    "operating_hours": "6:00 AM - 5:30 PM daily",
+    "estimated_travel_time": {
+      "foot": "25-35 mins",
+      "vehicle": "8-12 mins"
+    },
+    "safety_guidelines": "Watch out for slippery river stones. Avoid swimming during sudden mountain rainfalls."
   },
   {
     "id": "poi_quirsodan_dam",
@@ -61,7 +69,15 @@
     "synced_at": "2026-10-26T23:26:03.810Z",
     "updated_at": "2026-10-26T23:37:00.539Z",
     "cardVisualIcon": null,
-    "address": "Sitio Quirsodan, Barangay San Isidro, Lagangilang, Abra"
+    "address": "Sitio Quirsodan, Barangay San Isidro, Lagangilang, Abra",
+    "trail_difficulty": "Moderate",
+    "trail_condition": "Open - Concrete & Gravel Road",
+    "operating_hours": "6:00 AM - 6:00 PM daily",
+    "estimated_travel_time": {
+      "foot": "35-45 mins",
+      "vehicle": "10-15 mins"
+    },
+    "safety_guidelines": "Stay clear of spillway edge during high water releases."
   },
   {
     "id": "poi_holy_cross_parish",
@@ -88,7 +104,15 @@
     },
     "sync_status": "synced_cloud",
     "lat": 17.608422,
-    "lng": 120.734823
+    "lng": 120.734823,
+    "trail_difficulty": "Easy",
+    "trail_condition": "Paved Road - Fully Accessible",
+    "operating_hours": "5:30 AM - 7:00 PM daily",
+    "estimated_travel_time": {
+      "foot": "5-10 mins",
+      "vehicle": "2 mins"
+    },
+    "safety_guidelines": "Observe sacred church silence and proper attire."
   },
   {
     "id": "poi_galangugong_rocks",
@@ -114,7 +138,15 @@
     },
     "sync_status": "synced_cloud",
     "lat": 17.666497,
-    "lng": 120.799143
+    "lng": 120.799143,
+    "trail_difficulty": "Challenging",
+    "trail_condition": "Caution - Rocky Mountain Trail",
+    "operating_hours": "6:00 AM - 5:00 PM (Daylight only)",
+    "estimated_travel_time": {
+      "foot": "30-45 mins",
+      "vehicle": "10 mins"
+    },
+    "safety_guidelines": "Wear rugged trekking shoes with good grip. Do not climb wet cliff edges."
   },
   {
     "id": "poi_banat_caves",
@@ -140,7 +172,15 @@
     },
     "sync_status": "synced_cloud",
     "lat": 17.657574,
-    "lng": 120.788181
+    "lng": 120.788181,
+    "trail_difficulty": "Challenging",
+    "trail_condition": "Caution - Cave Interior Wet & Slippery",
+    "operating_hours": "7:00 AM - 4:30 PM (Local Guide Recommended)",
+    "estimated_travel_time": {
+      "foot": "40-50 mins",
+      "vehicle": "12 mins"
+    },
+    "safety_guidelines": "Bring headlamps or flashlights. Register with Barangay Bacooc desk before entry."
   },
   {
     "id": "poi_ua_main_campus",
@@ -165,7 +205,15 @@
       "heading": 180,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "trail_difficulty": "Easy",
+    "trail_condition": "Paved Campus Boulevard - Fully Accessible",
+    "operating_hours": "7:00 AM - 7:00 PM daily",
+    "estimated_travel_time": {
+      "foot": "0-5 mins",
+      "vehicle": "1 min"
+    },
+    "safety_guidelines": "Follow university vehicle speed limit (15 km/h)."
   },
   {
     "id": "poi_ua_fish_pond",
@@ -197,7 +245,15 @@
     "synced_at": "2026-10-26T16:54:40.413Z",
     "updated_at": "2026-10-26T23:36:25.878Z",
     "cardVisualIcon": null,
-    "address": "Aquaculture Research Center, UA Main Campus, Lagangilang, Abra"
+    "address": "Aquaculture Research Center, UA Main Campus, Lagangilang, Abra",
+    "trail_difficulty": "Easy",
+    "trail_condition": "Open - Scenic Earthen Dike Path",
+    "operating_hours": "6:30 AM - 5:30 PM",
+    "estimated_travel_time": {
+      "foot": "5-10 mins",
+      "vehicle": "2 mins"
+    },
+    "safety_guidelines": "Keep away from muddy pond edges."
   },
   {
     "id": "poi_ua_tamarind_farm",
@@ -223,7 +279,15 @@
     },
     "sync_status": "synced_cloud",
     "lat": 17.606408,
-    "lng": 120.738791
+    "lng": 120.738791,
+    "trail_difficulty": "Easy",
+    "trail_condition": "Open - Farm Trail Passable",
+    "operating_hours": "7:00 AM - 5:00 PM",
+    "estimated_travel_time": {
+      "foot": "10-15 mins",
+      "vehicle": "3 mins"
+    },
+    "safety_guidelines": "Do not harvest tamarind pods without staff permission."
   },
   {
     "id": "poi_ua_cacao_garden",
@@ -248,7 +312,15 @@
       "heading": 154,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "trail_difficulty": "Easy",
+    "trail_condition": "Open - Shaded Agro-Forestry Walkway",
+    "operating_hours": "7:00 AM - 5:00 PM",
+    "estimated_travel_time": {
+      "foot": "8-12 mins",
+      "vehicle": "3 mins"
+    },
+    "safety_guidelines": "Stay on designated farm walkways."
   },
   {
     "id": "poi_dj_farm",
@@ -274,7 +346,15 @@
     },
     "sync_status": "synced_cloud",
     "lat": 17.591696,
-    "lng": 120.743929
+    "lng": 120.743929,
+    "trail_difficulty": "Easy",
+    "trail_condition": "Open - Countryside Barangay Road",
+    "operating_hours": "8:00 AM - 5:00 PM",
+    "estimated_travel_time": {
+      "foot": "20-25 mins",
+      "vehicle": "6-8 mins"
+    },
+    "safety_guidelines": "Family-friendly destination with fruit-bearing trees."
   },
   {
     "id": "poi_rizalista_cave",
@@ -298,7 +378,15 @@
       "heading": 161,
       "pitch": 0
     },
-    "sync_status": "synced_cloud"
+    "sync_status": "synced_cloud",
+    "trail_difficulty": "Moderate",
+    "trail_condition": "Caution - Mountain Foothill Trail",
+    "operating_hours": "7:00 AM - 5:00 PM",
+    "estimated_travel_time": {
+      "foot": "25-35 mins",
+      "vehicle": "8-10 mins"
+    },
+    "safety_guidelines": "Respect sacred religious artifacts and historical cave inscriptions."
   },
   {
     "id": "poi_lagangilang_municipal_hall",
@@ -325,6 +413,14 @@
     },
     "sync_status": "synced_cloud",
     "lat": 17.612711,
-    "lng": 120.733756
+    "lng": 120.733756,
+    "trail_difficulty": "Easy",
+    "trail_condition": "Paved Town Center - Fully Accessible",
+    "operating_hours": "8:00 AM - 5:00 PM Mon-Fri (Emergency 24/7)",
+    "estimated_travel_time": {
+      "foot": "5-8 mins",
+      "vehicle": "2 mins"
+    },
+    "safety_guidelines": "Municipal help desk, tourism brochures, and emergency response office on site."
   }
 ]

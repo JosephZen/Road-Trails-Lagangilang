@@ -45,24 +45,16 @@ export default function MapillaryViewer({
   const currentSequenceIdRef = useRef(null);
   const isNavigatingRef = useRef(false);
 
-  // Apply filter to exclude unwanted sequences and lock onto the current sequence trail
-  const applyFilter = useCallback((seqId = null) => {
+  // Apply filter to exclude unwanted sequences while permitting junction turns into connected road sequences
+  const applyFilter = useCallback(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
 
     const excluded = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
     let filterExpr = null;
 
-    if (excluded.length > 0 && seqId) {
-      filterExpr = [
-        'all',
-        ['!in', 'sequenceId', ...excluded],
-        ['==', 'sequenceId', String(seqId)],
-      ];
-    } else if (excluded.length > 0) {
+    if (excluded.length > 0) {
       filterExpr = ['!in', 'sequenceId', ...excluded];
-    } else if (seqId) {
-      filterExpr = ['==', 'sequenceId', String(seqId)];
     }
 
     try {
@@ -140,7 +132,33 @@ export default function MapillaryViewer({
       });
   }, []);
 
-  // Keyboard navigation support: W / ↑ (Forward) and S / ↓ (Backward)
+  // Turn Left into connecting sequence or road branch
+  const handleTurnLeft = useCallback(() => {
+    if (!viewerRef.current || isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    viewerRef.current
+      .moveDir(4) // Direction.TurnLeft
+      .catch(() => viewerRef.current?.moveDir(2)) // Direction.StepLeft fallback
+      .catch(() => {})
+      .finally(() => {
+        isNavigatingRef.current = false;
+      });
+  }, []);
+
+  // Turn Right into connecting sequence or road branch
+  const handleTurnRight = useCallback(() => {
+    if (!viewerRef.current || isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    viewerRef.current
+      .moveDir(5) // Direction.TurnRight
+      .catch(() => viewerRef.current?.moveDir(3)) // Direction.StepRight fallback
+      .catch(() => {})
+      .finally(() => {
+        isNavigatingRef.current = false;
+      });
+  }, []);
+
+  // Keyboard navigation support: W / ↑ (Forward), S / ↓ (Backward), A / ← (Turn Left), D / → (Turn Right)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
@@ -150,12 +168,18 @@ export default function MapillaryViewer({
       } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
         e.preventDefault();
         handleStepBackward();
+      } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        handleTurnLeft();
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        handleTurnRight();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleStepForward, handleStepBackward]);
+  }, [handleStepForward, handleStepBackward, handleTurnLeft, handleTurnRight]);
 
   // Re-apply filter whenever excludedSequences updates
   useEffect(() => {
@@ -510,9 +534,19 @@ export default function MapillaryViewer({
         </div>
       )}
 
-      {/* Bottom-Center Floating Trail Navigation HUD (Strict Forward & Backward along the sequence road) */}
+      {/* Bottom Floating Trail Navigation HUD (Turn Left, Step Backward, Trail Indicator, Step Forward, Turn Right) */}
       {!isLoading && !error && (
         <div className="streetview-nav-hud">
+          <button
+            className="streetview-nav-btn streetview-turn-btn"
+            disabled={isNavigatingRef.current}
+            onClick={handleTurnLeft}
+            title="Turn left at junction (A or ←)"
+          >
+            <span>↰</span>
+            <span className="btn-label-desktop">Turn L</span>
+          </button>
+
           <button
             className="streetview-nav-btn"
             disabled={!hasPrev || isNavigatingRef.current}
@@ -520,7 +554,7 @@ export default function MapillaryViewer({
             title="Step backward along trail (S or ↓)"
           >
             <span>⮟</span>
-            <span>Backward</span>
+            <span className="btn-label-desktop">Backward</span>
           </button>
 
           <span
@@ -532,8 +566,8 @@ export default function MapillaryViewer({
             }}
           >
             {alignedInfo
-              ? `🎯 Aligned Trail (${alignedInfo.imageIndex + 1}/${alignedInfo.totalImages})`
-              : 'Trail Navigation'}
+              ? `🎯 Trail (${alignedInfo.imageIndex + 1}/${alignedInfo.totalImages})`
+              : 'Trail Nav'}
           </span>
 
           <button
@@ -542,8 +576,18 @@ export default function MapillaryViewer({
             onClick={handleStepForward}
             title="Step forward along trail (W or ↑)"
           >
-            <span>Forward</span>
+            <span className="btn-label-desktop">Forward</span>
             <span>⮝</span>
+          </button>
+
+          <button
+            className="streetview-nav-btn streetview-turn-btn"
+            disabled={isNavigatingRef.current}
+            onClick={handleTurnRight}
+            title="Turn right at junction (D or →)"
+          >
+            <span className="btn-label-desktop">Turn R</span>
+            <span>↱</span>
           </button>
         </div>
       )}

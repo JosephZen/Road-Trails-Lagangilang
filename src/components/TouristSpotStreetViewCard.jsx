@@ -347,6 +347,86 @@ export default function TouristSpotStreetViewCard({
         </div>
       )}
 
+      {/* Trail Difficulty, Passability & Travel Time Info */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '4px',
+          margin: '6px 0',
+          alignItems: 'center',
+        }}
+      >
+        {/* Difficulty Pill */}
+        {spot.trail_difficulty && (
+          <span
+            style={{
+              fontSize: '0.62rem',
+              fontWeight: 700,
+              padding: '2px 6px',
+              borderRadius: '4px',
+              background:
+                spot.trail_difficulty === 'Easy'
+                  ? 'rgba(16, 185, 129, 0.2)'
+                  : spot.trail_difficulty === 'Moderate'
+                  ? 'rgba(245, 158, 11, 0.2)'
+                  : 'rgba(239, 68, 68, 0.2)',
+              color:
+                spot.trail_difficulty === 'Easy'
+                  ? '#34d399'
+                  : spot.trail_difficulty === 'Moderate'
+                  ? '#fbbf24'
+                  : '#f87171',
+              border:
+                spot.trail_difficulty === 'Easy'
+                  ? '1px solid rgba(16, 185, 129, 0.4)'
+                  : spot.trail_difficulty === 'Moderate'
+                  ? '1px solid rgba(245, 158, 11, 0.4)'
+                  : '1px solid rgba(239, 68, 68, 0.4)',
+            }}
+            title="Trail Difficulty"
+          >
+            {spot.trail_difficulty === 'Easy' ? '🟢 Easy' : spot.trail_difficulty === 'Moderate' ? '🟠 Moderate' : '🔴 Challenging'}
+          </span>
+        )}
+
+        {/* Trail Condition */}
+        {spot.trail_condition && (
+          <span
+            style={{
+              fontSize: '0.62rem',
+              fontWeight: 600,
+              padding: '2px 6px',
+              borderRadius: '4px',
+              background: 'rgba(56, 189, 248, 0.15)',
+              color: '#7dd3fc',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+            }}
+            title="Real-time trail & road passability"
+          >
+            🧭 {spot.trail_condition}
+          </span>
+        )}
+
+        {/* Estimated Travel Time */}
+        {spot.estimated_travel_time && (
+          <span
+            style={{
+              fontSize: '0.62rem',
+              fontWeight: 500,
+              padding: '2px 6px',
+              borderRadius: '4px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: '#cbd5e1',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+            }}
+            title="Estimated Travel Time"
+          >
+            ⏱️ {spot.estimated_travel_time.foot} walk • {spot.estimated_travel_time.vehicle} drive
+          </span>
+        )}
+      </div>
+
       {/* Interactive Description Box */}
       <div
         onClick={handleDescriptionClick}

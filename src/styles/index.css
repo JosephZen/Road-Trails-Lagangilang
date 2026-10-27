@@ -2921,43 +2921,61 @@ body {
    Mapillary Street View Navigation & Trail Controls
    ========================================================================== */
 
-/* Suppress errant cross-sequence lateral arrows and restrict navigation to the sequence trail */
-.mapillary-direction-circle:not(.mapillary-direction-circle-sequence) {
-  display: none !important;
-  pointer-events: none !important;
+/* Make sequence trail navigation arrows and road junction turn arrows stand out clearly */
+.mapillary-direction-circle,
+.mapillary-direction-turn-circle {
+  transition: transform 0.18s ease, filter 0.18s ease;
+  cursor: pointer !important;
 }
-.mapillary-direction-turn-circle:not(.mapillary-direction-turn-circle-sequence) {
-  display: none !important;
-  pointer-events: none !important;
-}
-
-/* Make sequence trail navigation arrows stand out clearly with high-contrast road chevrons */
-.mapillary-direction-circle-sequence {
-  transition: transform 0.15s ease, filter 0.15s ease;
-}
-.mapillary-direction-circle-sequence:hover {
-  filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.8)) !important;
+.mapillary-direction-circle:hover,
+.mapillary-direction-turn-circle:hover {
+  filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.9)) !important;
+  transform: scale(1.12);
 }
 
-/* Floating interactive street view trail navigation HUD */
+/* Floating interactive street view trail navigation HUD - positioned above bottom controls */
 .streetview-nav-hud {
   position: absolute;
-  bottom: 24px;
+  bottom: 76px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 40;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  padding: 6px 14px;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 6px 12px;
   border-radius: var(--radius-full, 9999px);
   border: 1px solid rgba(56, 189, 248, 0.4);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 15px rgba(2, 132, 199, 0.2);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 15px rgba(2, 132, 199, 0.25);
   user-select: none;
   animation: fadeInUp 0.3s ease;
+  max-width: calc(100% - 24px);
+}
+
+.streetview-turn-btn {
+  background: rgba(56, 189, 248, 0.12) !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+  color: #38bdf8 !important;
+}
+
+.streetview-turn-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  border-color: #38bdf8 !important;
+  color: #ffffff !important;
+}
+
+@media (max-width: 640px) {
+  .streetview-nav-hud {
+    bottom: 84px;
+    padding: 4px 8px;
+    gap: 4px;
+  }
+  .streetview-nav-hud .btn-label-desktop {
+    display: none;
+  }
 }
 
 .streetview-nav-btn {
@@ -3000,6 +3018,148 @@ body {
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* ==========================================================================
+   Split View & Mobile Compact Top Bar Layout
+   Prevents tools from getting cut off when 50/50 streetview is active
+   ========================================================================== */
+
+.panel-map.split-active .btn-label-text,
+.panel-map:not(.expanded) .btn-label-text {
+  display: none !important;
+}
+
+.panel-map.split-active .nav-scroll-container,
+.panel-map:not(.expanded) .nav-scroll-container {
+  gap: 4px !important;
+}
+
+.panel-map.split-active .btn,
+.panel-map:not(.expanded) .btn {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  font-size: 0.78rem !important;
+}
+
+.panel-map.split-active .theme-dropdown-select,
+.panel-map:not(.expanded) .theme-dropdown-select {
+  max-width: 76px;
+  padding-right: 14px;
+}
+
+@media (max-width: 768px) {
+  .btn-label-text {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   Turn-by-Turn Navigation Minimized HUD & Theme Cohesion
+   ========================================================================== */
+
+.nav-minimized-hud {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: var(--radius-xl, 16px);
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(59, 130, 246, 0.45);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), 0 0 15px rgba(59, 130, 246, 0.25);
+  max-width: min(540px, calc(100% - 32px));
+  width: 100%;
+  animation: fadeInDown 0.25s ease-out;
+}
+
+.nav-minimized-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.maneuver-icon-mini {
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.nav-minimized-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.nav-minimized-instruction {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.nav-minimized-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.nav-minimized-stats .stat-highlight {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.nav-minimized-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.nav-actions-group {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-minimize-btn {
+  padding: 8px 16px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  transition: all 0.18s ease;
+}
+
+.nav-minimize-btn:hover {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+}
+
 
 
 

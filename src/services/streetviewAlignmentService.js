@@ -132,8 +132,20 @@ class StreetviewAlignmentService {
       if (staticRes.ok) {
         const staticData = await staticRes.json();
         if (staticData && typeof staticData === 'object') {
-          this.alignedSequences = { ...staticData, ...this.alignedSequences };
-          this.saveLocal();
+          let updated = false;
+          for (const [seqId, sRecord] of Object.entries(staticData)) {
+            if (this.excludedSequences.has(seqId)) continue;
+            const localRecord = this.alignedSequences[seqId];
+            const localTime = localRecord?.updatedAt || 0;
+            const staticTime = sRecord?.updatedAt || 1;
+            if (!localRecord || staticTime >= localTime) {
+              this.alignedSequences[seqId] = sRecord;
+              updated = true;
+            }
+          }
+          if (updated) {
+            this.saveLocal();
+          }
         }
       }
     } catch (err) {

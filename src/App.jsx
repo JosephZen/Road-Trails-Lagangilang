@@ -21,6 +21,10 @@ import { getRoute } from './services/routingService';
 import { streetviewAlignmentService } from './services/streetviewAlignmentService';
 import StreetviewLineAligner from './components/StreetviewLineAligner';
 import AdminPasswordModal from './components/AdminPasswordModal';
+import EmergencyModal from './components/EmergencyModal';
+import WeatherWidget from './components/WeatherWidget';
+import OfflineGuideModal from './components/OfflineGuideModal';
+import offlineCacheService from './services/offlineCacheService';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -56,6 +60,10 @@ export default function App() {
   const [routeDestination, setRouteDestination] = useState(null);
   const [routeData, setRouteData] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isNavMinimized, setIsNavMinimized] = useState(false);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [showOfflineModal, setShowOfflineModal] = useState(false);
+  const [difficultyFilter, setDifficultyFilter] = useState('all'); // 'all' | 'Easy' | 'Moderate' | 'Challenging'
   const [showCustomOSM, setShowCustomOSM] = useState(true);
 
   // Right-click context menu state: { lat, lng, x, y } | null
@@ -478,16 +486,17 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // Filter spots by Tourist Attraction vs Service/POI and Barangay
+  // Filter spots by Tourist Attraction vs Service/POI, Barangay, and Trail Difficulty
   const displayedSpots = useMemo(() => {
     return touristSpots.filter((s) => {
       const isPoi = (s.spotType || s.type) === 'poi';
       if (spotFilter === 'tourist_spot' && isPoi) return false;
       if (spotFilter === 'poi' && !isPoi) return false;
       if (barangayFilter !== 'all' && s.barangay !== barangayFilter) return false;
+      if (difficultyFilter !== 'all' && s.trail_difficulty !== difficultyFilter) return false;
       return true;
     });
-  }, [touristSpots, spotFilter, barangayFilter]);
+  }, [touristSpots, spotFilter, barangayFilter, difficultyFilter]);
 
   useEffect(() => {
     loadTouristSpots();
@@ -820,17 +829,35 @@ export default function App() {
 
   const stagedCount = touristSpots.filter((s) => s.sync_status === 'staged_local').length;
 
-  if (isNavigating && routeData) {
-    return <NavigationView routeData={routeData} onExit={handleExitNavigation} />;
+  if (isNavigating && routeData && !isNavMinimized) {
+    return (
+      <NavigationView
+        routeData={routeData}
+        onExit={handleExitNavigation}
+        theme={mapTheme}
+        isMinimized={false}
+        onToggleMinimize={() => setIsNavMinimized(true)}
+      />
+    );
   }
 
   return (
     <div className="app-container">
       {/* ===== Map Panel ===== */}
       <div
-        className={`panel-map ${!viewerOpen ? 'expanded' : ''} ${viewerOpen && viewerLayout === 'fullscreen' ? 'fullscreen-collapsed' : ''} ${isAdmin ? 'admin-mode' : ''}`}
+        className={`panel-map ${!viewerOpen ? 'expanded' : ''} ${viewerOpen && viewerLayout === 'split' ? 'split-active' : ''} ${viewerOpen && viewerLayout === 'fullscreen' ? 'fullscreen-collapsed' : ''} ${isAdmin ? 'admin-mode' : ''}`}
         style={viewerOpen && viewerLayout === 'split' ? { flex: `0 0 ${mapWidth}%` } : {}}
       >
+        {/* Minimized Floating Turn-by-Turn Navigation HUD over 2D Map */}
+        {isNavigating && routeData && isNavMinimized && (
+          <NavigationView
+            routeData={routeData}
+            onExit={handleExitNavigation}
+            theme={mapTheme}
+            isMinimized={true}
+            onToggleMinimize={() => setIsNavMinimized(false)}
+          />
+        )}
         {/* 2D MapView (Base layer rendered first in DOM order) */}
         <MapView
           theme={mapTheme}
@@ -880,8 +907,58 @@ export default function App() {
               title={isAdmin ? 'Switch to Tourist Explorer' : 'Switch to Admin Panel (Password Required)'}
             >
               <span className="role-indicator-dot" />
-              <span>{isAdmin ? '🛡️ Admin Panel' : '🌴 Tourist Explorer'}</span>
+              <span>{isAdmin ? '🛡️ Admin' : '🌴 Tourist'}</span>
+              <span className="btn-label-text">{isAdmin ? ' Panel' : ' Explorer'}</span>
             </div>
+
+            {/* Live Weather Forecast & Trail Advisory Pill */}
+            <WeatherWidget isCompact={viewerOpen && viewerLayout === 'split'} />
+
+            {/* Emergency Hotlines & Safety Button */}
+            <button
+              className="btn btn-secondary btn-emergency-top"
+              onClick={() => setShowEmergencyModal(true)}
+              title="Official Lagangilang LGU Emergency Hotlines & Trail Safety Guidelines"
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                background: 'rgba(239, 68, 68, 0.18)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                color: '#fca5a5',
+              }}
+            >
+              <span>🚨</span>
+              <span className="btn-label-text">Hotlines</span>
+            </button>
+
+            {/* Offline Guide & Data Saver Button */}
+            <button
+              className="btn btn-secondary btn-offline-top"
+              onClick={() => setShowOfflineModal(true)}
+              title="Download maps & trail guide for zero-signal areas / Low-Data Mode"
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                background: 'rgba(16, 185, 129, 0.16)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                color: '#6ee7b7',
+              }}
+            >
+              <span>📥</span>
+              <span className="btn-label-text">Offline</span>
+            </button>
 
             {/* Theme Selector Dropdown */}
             <div className="theme-dropdown-custom" title="Map Theme">
@@ -924,9 +1001,13 @@ export default function App() {
                 color: '#fff',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
               }}
             >
-              🧭 Route
+              <span>🧭</span>
+              <span className="btn-label-text">Route</span>
             </button>
 
             {/* Admin-only controls */}
@@ -964,7 +1045,10 @@ export default function App() {
                       : 'Show raw Mapillary streetview (green lines & dots)'
                   }
                 >
-                  {showMapillaryStreetview ? '🟢 Streetview: ON' : '⚪ Streetview: OFF'}
+                  <span>{showMapillaryStreetview ? '🟢' : '⚪'}</span>
+                  <span className="btn-label-text">
+                    {showMapillaryStreetview ? 'Street: ON' : 'Street: OFF'}
+                  </span>
                 </button>
                 {/* Bend / Align Streetview Line Button (Admin only) */}
                 <button
@@ -996,7 +1080,10 @@ export default function App() {
                   }}
                   title="Bend and re-align Mapillary streetview lines onto road curves (Admin only)"
                 >
-                  📐 {aligningSequence ? 'Exit Align' : isSelectingAlignmentTarget ? 'Cancel Select' : 'Align Line'}
+                  <span>📐</span>
+                  <span className="btn-label-text">
+                    {aligningSequence ? 'Exit Align' : isSelectingAlignmentTarget ? 'Cancel' : 'Align Line'}
+                  </span>
                 </button>
                 {/* Custom OSM Overlay Toggle */}
                 <button
@@ -1014,9 +1101,13 @@ export default function App() {
                     color: '#ffffff',
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
                   }}
                 >
-                  🗺️ Custom Map
+                  <span>🗺️</span>
+                  <span className="btn-label-text">Custom Map</span>
                 </button>
 
                 {/* Add Tourist Spot Button */}
@@ -1037,9 +1128,13 @@ export default function App() {
                     border: 'none',
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
                   }}
                 >
-                  ⭐ + Add Spot
+                  <span>⭐</span>
+                  <span className="btn-label-text">+ Add Spot</span>
                 </button>
 
                 {/* Pin Repositioning Lock / Unlock Button */}
@@ -1073,12 +1168,13 @@ export default function App() {
                     fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '4px',
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
                   }}
                 >
-                  <span>{pinsDraggable ? '🔓 Reposition ON' : '🔒 Pins Locked'}</span>
+                  <span>{pinsDraggable ? '🔓' : '🔒'}</span>
+                  <span className="btn-label-text">{pinsDraggable ? 'Reposition ON' : 'Pins Locked'}</span>
                 </button>
 
                 {/* Online/Offline indicator & DB configuration */}
@@ -1429,6 +1525,22 @@ export default function App() {
                     ))}
                   </select>
                 </div>
+
+                {/* Trail Difficulty Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Difficulty:</span>
+                  <select
+                    value={difficultyFilter}
+                    onChange={(e) => setDifficultyFilter(e.target.value)}
+                    className="input-field"
+                    style={{ flex: 1, fontSize: '0.75rem', padding: '3px 8px' }}
+                  >
+                    <option value="all">All Trail Difficulties</option>
+                    <option value="Easy">🟢 Easy (Gentle / Accessible)</option>
+                    <option value="Moderate">🟠 Moderate (Gravel & Riverbank)</option>
+                    <option value="Challenging">🔴 Challenging (Caves & Rocks)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Spots List */}
@@ -1626,6 +1738,70 @@ export default function App() {
                   }}
                 >
                   🧭 Open Route Planner
+                </button>
+              </div>
+
+              {/* Emergency & Municipal Services Hub */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f87171' }}>
+                  Safety & Emergency Services
+                </span>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowEmergencyModal(true);
+                    setSidebarOpen(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    color: '#fca5a5',
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🚨</span>
+                    <span>Emergency Hotlines & Guidelines</span>
+                  </span>
+                  <span>➔</span>
+                </button>
+              </div>
+
+              {/* Offline Maps & Data Saver Mode */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#34d399' }}>
+                  Offline Access & Data Saver
+                </span>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowOfflineModal(true);
+                    setSidebarOpen(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                    color: '#6ee7b7',
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📥</span>
+                    <span>Download Offline Guide & Low-Data</span>
+                  </span>
+                  <span>➔</span>
                 </button>
               </div>
 
@@ -2572,6 +2748,21 @@ export default function App() {
         onClose={() => setShowAdminPasswordModal(false)}
         onSuccess={handleAdminAuthSuccess}
         isChangePassword={isChangePasswordMode}
+        showToast={showToast}
+      />
+
+      {/* ===== Emergency Contacts & Trail Safety Modal ===== */}
+      <EmergencyModal
+        isOpen={showEmergencyModal}
+        onClose={() => setShowEmergencyModal(false)}
+      />
+
+      {/* ===== Offline Guide & Data Saver Modal ===== */}
+      <OfflineGuideModal
+        isOpen={showOfflineModal}
+        onClose={() => setShowOfflineModal(false)}
+        touristSpots={touristSpots}
+        customGeoJSON={null}
         showToast={showToast}
       />
 

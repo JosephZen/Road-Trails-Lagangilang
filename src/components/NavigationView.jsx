@@ -12,7 +12,13 @@ setWorkerUrl(maplibreWorkerUrl);
  * Integrates MapLibre GL JS for rendering, with hooks ready for Ferrostar's Rust/WASM Core TripState.
  * Currently uses Simulated GPS movement along the OSRM route for development.
  */
-export default function NavigationView({ routeData, onExit }) {
+export default function NavigationView({
+  routeData,
+  onExit,
+  theme = 'light',
+  isMinimized = false,
+  onToggleMinimize,
+}) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const animationRef = useRef(null);
@@ -29,14 +35,48 @@ export default function NavigationView({ routeData, onExit }) {
   const steps = routeData?.legs?.flatMap(leg => leg.steps) || [];
   const currentStep = steps[currentStepIndex] || null;
 
+  // Resolve tile style according to active app theme
+  const getStyleObj = (t) => {
+    switch (t) {
+      case 'light': return 'https://tiles.openfreemap.org/styles/liberty';
+      case 'beige': return 'https://tiles.openfreemap.org/styles/positron';
+      case 'satellite': return {
+        version: 8,
+        sources: {
+          'esri-satellite': {
+            type: 'raster',
+            tiles: [
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            ],
+            tileSize: 256,
+            attribution: '© Esri',
+          },
+        },
+        layers: [
+          {
+            id: 'esri-satellite-layer',
+            type: 'raster',
+            source: 'esri-satellite',
+            minzoom: 0,
+            maxzoom: 19,
+          },
+        ],
+      };
+      case 'dark':
+      default:
+        return 'https://tiles.openfreemap.org/styles/dark';
+    }
+  };
+
   useEffect(() => {
+    if (isMinimized) return; // Do not initialize heavy 3D map when running in minimized banner mode
     if (!mapContainerRef.current || mapRef.current) return;
 
     const startCoord = routeCoords[0] || [120.738083, 17.60825];
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: 'https://tiles.openfreemap.org/styles/dark',
+      style: getStyleObj(theme),
       center: startCoord,
       zoom: 17,
       pitch: 50,
@@ -206,8 +246,54 @@ export default function NavigationView({ routeData, onExit }) {
     return (toDeg(Math.atan2(y, x)) + 360) % 360;
   }
 
+  if (isMinimized) {
+    return (
+      <div className="nav-minimized-hud glass-panel">
+        <div className="nav-minimized-left">
+          <span className="maneuver-icon-mini">
+            {getManeuverIcon(currentStep?.maneuver?.type, currentStep?.maneuver?.modifier)}
+          </span>
+          <div className="nav-minimized-text">
+            <div className="nav-minimized-instruction">
+              {currentStep?.name
+                ? `${currentStep.maneuver?.modifier ? `Turn ${currentStep.maneuver.modifier} onto` : 'Continue on'} ${currentStep.name}`
+                : (currentStep?.maneuver?.type === 'arrive' ? '🏁 Arrived at destination!' : 'Follow route')}
+            </div>
+            <div className="nav-minimized-stats">
+              <span className="stat-highlight">{formatDistance(remainingDistance)}</span>
+              <span>•</span>
+              <span className="stat-highlight">{formatDuration(remainingDuration)} ETA</span>
+              <span>•</span>
+              <span>{Math.round(simulationProgress * 100)}%</span>
+            </div>
+          </div>
+        </div>
+        <div className="nav-minimized-actions">
+          {onToggleMinimize && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={onToggleMinimize}
+              title="Expand to full 3D Navigation Cockpit"
+              style={{ padding: '6px 12px', fontSize: '0.76rem', fontWeight: 700 }}
+            >
+              ⤢ 3D View
+            </button>
+          )}
+          <button
+            className="btn btn-danger btn-sm"
+            onClick={onExit}
+            title="End Navigation"
+            style={{ padding: '6px 10px', fontSize: '0.76rem' }}
+          >
+            ✕ Exit
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="navigation-view">
+    <div className={`navigation-view theme-${theme}`}>
       {/* Map */}
       <div ref={mapContainerRef} className="navigation-map" />
 
@@ -246,14 +332,26 @@ export default function NavigationView({ routeData, onExit }) {
         </div>
       </div>
 
-      {/* Exit Button */}
-      <button className="nav-exit-btn" onClick={onExit}>
-        ✕ Exit Navigation
-      </button>
+      {/* Action Buttons (Minimize to main map / Exit) */}
+      <div className="nav-actions-group">
+        {onToggleMinimize && (
+          <button
+            className="nav-minimize-btn"
+            onClick={onToggleMinimize}
+            title="Minimize to top card and explore on main map"
+          >
+            ⤡ Show Main Map
+          </button>
+        )}
+        <button className="nav-exit-btn" onClick={onExit} title="End Navigation">
+          ✕ Exit Navigation
+        </button>
+      </div>
 
       {/* Simulation Badge */}
       <div className="nav-sim-badge">
-        🔬 Simulated GPS
+        <span>🔬</span>
+        <span>Simulated GPS</span>
       </div>
     </div>
   );
