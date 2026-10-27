@@ -275,12 +275,31 @@ export const touristSpotsService = {
         // Ensure newly seeded spots are present ONLY if not deleted by the user
         if (Array.isArray(seedSpots)) {
           for (const seed of seedSpots) {
-            if (!existingIds.has(seed.id) && !deletedIds.has(seed.id) && !isObsoleteSpot(seed)) {
+            const alreadyHas = cleaned.some(
+              (s) =>
+                s.id === seed.id ||
+                (s.name && seed.name && s.name.trim().toLowerCase() === seed.name.trim().toLowerCase())
+            );
+            if (!alreadyHas && !deletedIds.has(seed.id) && !isObsoleteSpot(seed)) {
               cleaned.push(seed);
               changed = true;
             }
           }
         }
+
+        // Deduplicate any duplicate names in cleaned (e.g. duplicate Rizalista Cave)
+        const dedupedCleaned = [];
+        const seenNames = new Set();
+        for (const spot of cleaned) {
+          const normName = spot.name ? spot.name.trim().toLowerCase() : spot.id;
+          if (!seenNames.has(normName)) {
+            seenNames.add(normName);
+            dedupedCleaned.push(spot);
+          } else {
+            changed = true;
+          }
+        }
+        cleaned = dedupedCleaned;
 
         // Normalize legacy typos, categories, and icons
         cleaned.forEach((s) => {
@@ -521,6 +540,9 @@ export const touristSpotsService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newSpot),
     }).catch((err) => console.warn('Background mirror to server omitted:', err));
+
+    // Also auto-sync to Neon Cloud so any device on Vercel immediately sees this new spot
+    this.syncToNeonCloud(newSpot.id).catch((err) => console.warn('Auto Neon sync on draft save:', err));
 
     return newSpot;
   },
@@ -810,15 +832,34 @@ export const touristSpotsService = {
           }
         }
 
-        // Retain any genuine local custom spots not yet in cloud
+        // Retain any genuine local custom spots not yet in cloud (deduplicating by name)
         for (const ls of local) {
           if (!seenIds.has(ls.id) && !deletedIds.has(ls.id) && !isObsoleteSpot(ls)) {
-            finalSpots.push(ls);
+            const isDuplicate = finalSpots.some(
+              (fs) =>
+                fs.name &&
+                ls.name &&
+                fs.name.trim().toLowerCase() === ls.name.trim().toLowerCase()
+            );
+            if (!isDuplicate) {
+              finalSpots.push(ls);
+            }
           }
         }
 
-        this.saveAllSpots(finalSpots, false);
-        return finalSpots;
+        // Final deduplication pass by normalized name to guarantee 100% clean list across all devices
+        const dedupedFinal = [];
+        const finalSeenNames = new Set();
+        for (const spot of finalSpots) {
+          const norm = spot.name ? spot.name.trim().toLowerCase() : spot.id;
+          if (!finalSeenNames.has(norm)) {
+            finalSeenNames.add(norm);
+            dedupedFinal.push(spot);
+          }
+        }
+
+        this.saveAllSpots(dedupedFinal, false);
+        return dedupedFinal;
       }
     } catch (err) {
       console.warn('Neon Cloud fetch error, using local buffer:', err.message);

@@ -91,6 +91,32 @@
     "lng": 120.734823
   },
   {
+    "id": "poi_talinawen_spring",
+    "name": "Talinawen Spring",
+    "spotType": "tourist_spot",
+    "category": "Nature & Eco-Tourism",
+    "categoryIcon": "💧",
+    "barangay": "Paganao",
+    "location": {
+      "lat": 17.606224,
+      "lng": 120.732113,
+      "address": "Talinawen Natural Spring, Lagangilang, Abra"
+    },
+    "description": "Famous natural freshwater spring pool bubbling from limestone aquifers, celebrated for its refreshing cool waters, swimming basins, and lush tropical canopy.",
+    "image": null,
+    "isPseudoImage": true,
+    "pseudoTheme": "cyan",
+    "connected360": {
+      "type": "mapillary",
+      "targetId": "1458052846269748",
+      "heading": 150,
+      "pitch": 0
+    },
+    "sync_status": "synced_cloud",
+    "lat": 17.606224,
+    "lng": 120.732113
+  },
+  {
     "id": "poi_galangugong_rocks",
     "name": "Galangugong Rock Formation",
     "spotType": "tourist_spot",
