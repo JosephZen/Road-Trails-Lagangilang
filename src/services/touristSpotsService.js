@@ -22,6 +22,7 @@ const OBSOLETE_SPOT_IDS = new Set([
   'poi_paganao_bamboo',
   'poi_la_paz_lookout',
   'poi_abra_river_poblacion',
+  'poi_talinawen_spring',
 ]);
 
 // Official categories with clean display names and default icons
@@ -671,10 +672,12 @@ export const touristSpotsService = {
       method: 'DELETE',
     }).catch(() => {});
 
-    // Asynchronously delete from Neon Cloud DB
-    this.executeNeonQuery((sql) =>
-      sql`DELETE FROM public.tourist_spots WHERE id = ${spotId}`
-    ).catch((err) => console.warn('Neon direct delete error:', err));
+    // Asynchronously delete from Neon Cloud DB & record tombstone so other devices purge it too
+    this.executeNeonQuery(async (sql) => {
+      await sql`CREATE TABLE IF NOT EXISTS public.deleted_spots (id VARCHAR(255) PRIMARY KEY, deleted_at TIMESTAMPTZ DEFAULT NOW())`;
+      await sql`INSERT INTO public.deleted_spots (id) VALUES (${spotId}) ON CONFLICT (id) DO NOTHING`;
+      await sql`DELETE FROM public.tourist_spots WHERE id = ${spotId}`;
+    }).catch((err) => console.warn('Neon direct delete error:', err));
 
     return filtered;
   },
@@ -744,17 +747,30 @@ export const touristSpotsService = {
    */
   async fetchFromCloud() {
     try {
-      const rows = await this.executeNeonQuery(async (sql) => {
-        return await sql`
+      const [rows, deletedRows] = await this.executeNeonQuery(async (sql) => {
+        const spotsPromise = sql`
           SELECT ts.*, p.id as registered_pano_id
           FROM public.tourist_spots ts
           LEFT JOIN public.panoramas p ON (ts.primary_pano_id = p.id OR ('pano_' || ts.primary_pano_id) = p.id)
           ORDER BY ts.created_at ASC
         `;
+        const deletedPromise = sql`
+          SELECT id FROM public.deleted_spots
+        `.catch(() => []);
+        return await Promise.all([spotsPromise, deletedPromise]);
       });
 
       if (Array.isArray(rows) && rows.length > 0) {
         const deletedIds = this.getDeletedSpotIds();
+        if (Array.isArray(deletedRows)) {
+          for (const dr of deletedRows) {
+            if (dr?.id) {
+              deletedIds.add(dr.id);
+              this.markSpotDeleted(dr.id);
+            }
+          }
+        }
+
         const cloudSpots = rows
           .filter((r) => !deletedIds.has(r.id) && !isObsoleteSpot(r))
           .map((r) => {
@@ -800,7 +816,7 @@ export const touristSpotsService = {
             };
           });
 
-        const local = this.getAllSpots().filter((s) => !isObsoleteSpot(s));
+        const local = this.getAllSpots().filter((s) => !isObsoleteSpot(s) && !deletedIds.has(s.id));
         const localMap = new Map(local.map((s) => [s.id, s]));
         const finalSpots = [];
         const seenIds = new Set();
@@ -832,8 +848,16 @@ export const touristSpotsService = {
           }
         }
 
-        // Retain any genuine local custom spots not yet in cloud (deduplicating by name)
+        // Retain only genuine local custom spots not yet in cloud (deduplicating by name)
         for (const ls of local) {
+          // If this spot was previously synced to cloud (or was a known seed spot) but is absent from cloud,
+          // it was deleted in the cloud database! Purge it from this device.
+          const wasCloudOrSeed = ls.sync_status === 'synced_cloud' || (Array.isArray(seedSpots) && seedSpots.some((seed) => seed.id === ls.id));
+          if (wasCloudOrSeed && !seenIds.has(ls.id)) {
+            this.markSpotDeleted(ls.id);
+            continue;
+          }
+
           if (!seenIds.has(ls.id) && !deletedIds.has(ls.id) && !isObsoleteSpot(ls)) {
             const isDuplicate = finalSpots.some(
               (fs) =>

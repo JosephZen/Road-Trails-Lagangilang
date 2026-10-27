@@ -51,12 +51,6 @@ INSERT INTO public.tourist_spots (
   NOW(), NOW(), NOW()
 ),
 (
-  'poi_talinawen_spring', 'Talinawen Spring', 'cat_nature', 'Paganao', 17.606224, 120.732113, 'Barangay Paganao, Lagangilang, Abra',
-  'Natural cold water spring and ecological recreation site surrounded by lush greenery.', NULL, true, 'emerald',
-  '1458052846269748', 0, 0, 'synced_cloud',
-  NOW(), NOW(), NOW()
-),
-(
   'poi_galangugong_rocks', 'Galangugong Rock Formation', 'cat_nature', 'Bacooc', 17.666497, 120.799143, 'Barangay Bacooc, Lagangilang, Abra',
   'Distinctive limestone rock formations and geological landmark with scenic mountain views.', NULL, true, 'rose',
   '1778693856687129', 0, 0, 'synced_cloud',
