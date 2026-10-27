@@ -227,13 +227,15 @@ export default function MapillaryViewer({
     };
   }, [imageId]);
 
-  // Steer camera toward landmark heading if requested
+  // Steer camera toward landmark heading and pitch if requested
   useEffect(() => {
-    if (!viewerRef.current || !steerTarget?.heading) return;
+    if (!viewerRef.current || steerTarget?.heading === undefined || steerTarget?.heading === null) return;
     try {
       const normalizedBearing = (steerTarget.heading % 360 + 360) % 360;
       const x = normalizedBearing / 360;
-      viewerRef.current.setCenter([x, 0.5]);
+      const pitch = steerTarget.pitch || 0;
+      const y = Math.max(0.1, Math.min(0.9, 0.5 - (pitch / 180)));
+      viewerRef.current.setCenter([x, y]);
     } catch (e) {
       // ignore steering if viewer not ready
     }

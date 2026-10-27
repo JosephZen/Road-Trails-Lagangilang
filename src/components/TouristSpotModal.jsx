@@ -34,13 +34,13 @@ export const POI_CATEGORIES = [
 
 export const PRESET_ICONS = [
   // Spiritual & Heritage
-  '⛪', '🏛️', '⛰️', '🎓', '🕌', '🏰',
-  // Nature & Trail
-  '🏞️', '🌊', '💧', '🪨', '🦇', '🌳', '🌄', '🌉', '🧗',
+  '⛪', '🏛️', '⛰️', '🎓', '🕌',
+  // Nature & Trail & Recreation
+  '🏞️', '🌊', '💧', '🪨', '🦇', '🌳', '🌄', '🌉', '🧗', '🏀', '🏋️',
   // Agriculture & Products
   '🌾', '🐟', '🍫', '🌴', '🌻',
-  // Services & POI
-  '⛽', '🏪', '🍽️', '🍲', '☕', '🏨', '💊', '🏧', '🚌', '🏥', '🚨', '🛒',
+  // Services & POI & Dining
+  '⛽', '🏪', '🍽️', '🍲', '☕', '🥤', '🏨', '💊', '🏧', '🚌', '🏥', '🚨', '🛒',
   // Markers & Highlights
   '⭐', '📍', '✨', '🎯'
 ];
@@ -1150,32 +1150,155 @@ export default function TouristSpotModal({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Camera Initial Heading (°)</label>
-                <input
-                  type="number"
-                  name="heading"
-                  min="0"
-                  max="360"
-                  value={formData.heading}
-                  onChange={handleChange}
-                  className="input-field"
-                  style={{ width: '100%' }}
-                  placeholder="0-360°"
-                />
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    name="heading"
+                    value={formData.heading}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '' || /^\d*$/.test(raw)) {
+                        setFormData((prev) => ({ ...prev, heading: raw }));
+                      }
+                    }}
+                    onBlur={() => {
+                      let num = parseInt(formData.heading, 10);
+                      if (isNaN(num)) num = 0;
+                      num = ((num % 360) + 360) % 360;
+                      setFormData((prev) => ({ ...prev, heading: String(num) }));
+                    }}
+                    className="input-field"
+                    style={{ flex: 1 }}
+                    placeholder="0 - 360°"
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
+                      onClick={() => {
+                        const cur = parseInt(formData.heading, 10) || 0;
+                        setFormData((prev) => ({ ...prev, heading: String((cur + 5) % 360) }));
+                      }}
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
+                      onClick={() => {
+                        const cur = parseInt(formData.heading, 10) || 0;
+                        setFormData((prev) => ({ ...prev, heading: String(((cur - 5) % 360 + 360) % 360) }));
+                      }}
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+                {/* Quick compass buttons */}
+                <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                  {[
+                    { label: '0° N', val: 0 },
+                    { label: '90° E', val: 90 },
+                    { label: '180° S', val: 180 },
+                    { label: '270° W', val: 270 },
+                  ].map((d) => (
+                    <button
+                      key={d.val}
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setFormData((prev) => ({ ...prev, heading: String(d.val) }))}
+                      style={{
+                        fontSize: '0.65rem',
+                        padding: '2px 5px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: String(formData.heading) === String(d.val) ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.06)',
+                        border: String(formData.heading) === String(d.val) ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
+                        color: String(formData.heading) === String(d.val) ? '#93c5fd' : 'var(--text-muted)',
+                      }}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
                 <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Camera Initial Pitch (°)</label>
-                <input
-                  type="number"
-                  name="pitch"
-                  min="-90"
-                  max="90"
-                  value={formData.pitch}
-                  onChange={handleChange}
-                  className="input-field"
-                  style={{ width: '100%' }}
-                  placeholder="-90 to +90°"
-                />
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    name="pitch"
+                    value={formData.pitch}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '' || raw === '-' || /^-?\d*$/.test(raw)) {
+                        setFormData((prev) => ({ ...prev, pitch: raw }));
+                      }
+                    }}
+                    onBlur={() => {
+                      let num = parseInt(formData.pitch, 10);
+                      if (isNaN(num)) num = 0;
+                      num = Math.max(-90, Math.min(90, num));
+                      setFormData((prev) => ({ ...prev, pitch: String(num) }));
+                    }}
+                    className="input-field"
+                    style={{ flex: 1 }}
+                    placeholder="-90° to +90°"
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
+                      onClick={() => {
+                        const cur = parseInt(formData.pitch, 10) || 0;
+                        setFormData((prev) => ({ ...prev, pitch: String(Math.min(90, cur + 5)) }));
+                      }}
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
+                      onClick={() => {
+                        const cur = parseInt(formData.pitch, 10) || 0;
+                        setFormData((prev) => ({ ...prev, pitch: String(Math.max(-90, cur - 5)) }));
+                      }}
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+                {/* Quick pitch presets */}
+                <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                  {[
+                    { label: 'Level (0°)', val: 0 },
+                    { label: 'Up (+15°)', val: 15 },
+                    { label: 'Down (-15°)', val: -15 },
+                  ].map((p) => (
+                    <button
+                      key={p.val}
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => setFormData((prev) => ({ ...prev, pitch: String(p.val) }))}
+                      style={{
+                        fontSize: '0.65rem',
+                        padding: '2px 5px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: String(formData.pitch) === String(p.val) ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.06)',
+                        border: String(formData.pitch) === String(p.val) ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
+                        color: String(formData.pitch) === String(p.val) ? '#93c5fd' : 'var(--text-muted)',
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

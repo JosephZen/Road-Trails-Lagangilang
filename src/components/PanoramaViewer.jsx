@@ -124,7 +124,7 @@ export default function PanoramaViewer({
         } catch (e) {}
       }
 
-      createViewer(finalImageUrl, [], panorama.heading || 0, viewerHeading);
+      createViewer(finalImageUrl, [], panorama.heading || 0, panorama.heading !== undefined ? panorama.heading : viewerHeading);
       currentPanoRef.current = panoTextureKey;
     }
 
@@ -165,9 +165,13 @@ export default function PanoramaViewer({
 
     setIsLoading(true);
 
-    const initialYaw = currentAbsoluteHeading !== undefined 
-      ? (currentAbsoluteHeading - (heading || 0)) 
+    const initialYaw = steerTarget?.heading !== undefined 
+      ? (steerTarget.heading - (heading || 0)) 
       : 0;
+
+    const initialPitch = steerTarget?.pitch !== undefined
+      ? steerTarget.pitch
+      : (panorama?.pitch || 0);
 
     const isBlobOrData = String(imageUrl).startsWith('blob:') || String(imageUrl).startsWith('data:');
 
@@ -182,6 +186,7 @@ export default function PanoramaViewer({
       showFullscreenCtrl: false,
       compass: false,
       yaw: initialYaw,
+      pitch: initialPitch,
       northOffset: heading || 0,
       hfov: 100,
       minHfov: 50,

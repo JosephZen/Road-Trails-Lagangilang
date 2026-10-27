@@ -9,6 +9,8 @@ export default function StreetviewLineAligner({
   onSave,
   onResetOriginal,
   onCancel,
+  onDeleteAlignment,
+  onExcludeSequence,
   isSaving = false,
   showMapillaryStreetview = false,
   showMapillaryDots = false,
@@ -19,7 +21,7 @@ export default function StreetviewLineAligner({
 }) {
   if (!aligningSequence) return null;
 
-  const { sequenceId, images = [], controlPoints = [] } = aligningSequence;
+  const { sequenceId, images = [], controlPoints = [], isAlreadyAligned } = aligningSequence;
 
   return (
     <div className="streetview-aligner-panel glass-panel">
@@ -94,6 +96,51 @@ export default function StreetviewLineAligner({
         >
           ↺ Reset GPS
         </button>
+
+        {isAlreadyAligned && onDeleteAlignment && (
+          <button
+            className="btn-danger aligner-btn-delete"
+            onClick={() => {
+              if (window.confirm(`Delete alignment for sequence ${sequenceId.slice(0, 8)}... and revert to raw GPS?`)) {
+                onDeleteAlignment(sequenceId);
+              }
+            }}
+            title="Delete custom aligned curve and revert to raw GPS"
+            style={{
+              background: 'rgba(239, 68, 68, 0.2)',
+              border: '1px solid #ef4444',
+              color: '#fca5a5',
+              fontSize: '0.8rem',
+              padding: '6px 10px',
+              borderRadius: 'var(--radius-md)',
+            }}
+          >
+            🗑️ Delete Alignment
+          </button>
+        )}
+
+        {onExcludeSequence && (
+          <button
+            className="btn-danger aligner-btn-exclude"
+            onClick={() => {
+              if (window.confirm(`Exclude and remove sequence ${sequenceId.slice(0, 8)}... from the map completely?`)) {
+                onExcludeSequence(sequenceId);
+              }
+            }}
+            title="Exclude and completely remove this sequence from display on the map"
+            style={{
+              background: '#b91c1c',
+              border: '1px solid #ef4444',
+              color: '#ffffff',
+              fontSize: '0.8rem',
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-md)',
+              fontWeight: 600,
+            }}
+          >
+            🚫 Exclude & Remove Line
+          </button>
+        )}
 
         <button
           className="btn-ghost aligner-btn-done"

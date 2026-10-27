@@ -47,6 +47,7 @@ export default function MapView({
   showMapillaryStreetview = false,
   showMapillaryDots = false,
   showMapillaryLines = false,
+  excludedSequences = [],
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -663,24 +664,36 @@ export default function MapView({
           }
         }
       }
-      // Query features under right-click to extract exact sequence ID
+      // Query features under right-click to extract exact sequence ID and Mapillary image key
       let clickedSequenceId = null;
+      let clickedImageId = null;
       try {
         const hitBox = [
-          [e.point.x - 24, e.point.y - 24],
-          [e.point.x + 24, e.point.y + 24],
+          [e.point.x - 28, e.point.y - 28],
+          [e.point.x + 28, e.point.y + 28],
         ];
+        // 1. Check mapillary-images first for exact photo ID / Image Key
+        const imgFeatures = map.queryRenderedFeatures(hitBox, {
+          layers: ['mapillary-images'],
+        });
+        if (imgFeatures.length > 0) {
+          clickedImageId = extractMapillaryImageId(imgFeatures[0]);
+          clickedSequenceId = extractMapillarySequenceId(imgFeatures[0]);
+        }
+
+        // 2. Also check sequences and aligned layers
         const seqFeatures = map.queryRenderedFeatures(hitBox, {
-          layers: ['mapillary-sequences', 'mapillary-images', 'aligned-streetview-layer'],
+          layers: ['mapillary-sequences', 'aligned-streetview-layer'],
         });
         if (seqFeatures.length > 0) {
-          clickedSequenceId = extractMapillarySequenceId(seqFeatures[0]);
+          if (!clickedSequenceId) clickedSequenceId = extractMapillarySequenceId(seqFeatures[0]);
+          if (!clickedImageId) clickedImageId = extractMapillaryImageId(seqFeatures[0]);
         }
       } catch (_) {}
 
       const screenX = e.originalEvent?.clientX ?? 0;
       const screenY = e.originalEvent?.clientY ?? 0;
-      onMapContextMenuRef.current?.(e.lngLat.lat, e.lngLat.lng, screenX, screenY, clickedSequenceId);
+      onMapContextMenuRef.current?.(e.lngLat.lat, e.lngLat.lng, screenX, screenY, clickedSequenceId, clickedImageId);
     });
 
     // ========== Touchscreen Long-Press Gesture (Right-Click on Touch) ==========
@@ -744,28 +757,39 @@ export default function MapView({
           } catch (_) {}
         }
 
-        // Check touch target for streetview sequence
+        // Check touch target for streetview sequence and image key
         let touchSequenceId = null;
+        let touchImageId = null;
         try {
           const hitBox = [
             [touchStartPoint.x - 30, touchStartPoint.y - 30],
             [touchStartPoint.x + 30, touchStartPoint.y + 30],
           ];
+          const imgFeatures = map.queryRenderedFeatures(hitBox, {
+            layers: ['mapillary-images'],
+          });
+          if (imgFeatures.length > 0) {
+            touchImageId = extractMapillaryImageId(imgFeatures[0]);
+            touchSequenceId = extractMapillarySequenceId(imgFeatures[0]);
+          }
+
           const seqFeatures = map.queryRenderedFeatures(hitBox, {
-            layers: ['mapillary-sequences', 'mapillary-images', 'aligned-streetview-layer'],
+            layers: ['mapillary-sequences', 'aligned-streetview-layer'],
           });
           if (seqFeatures.length > 0) {
-            touchSequenceId = extractMapillarySequenceId(seqFeatures[0]);
+            if (!touchSequenceId) touchSequenceId = extractMapillarySequenceId(seqFeatures[0]);
+            if (!touchImageId) touchImageId = extractMapillaryImageId(seqFeatures[0]);
           }
         } catch (_) {}
 
-        // Trigger context menu with touch coordinates and sequence ID
+        // Trigger context menu with touch coordinates, sequence ID, and image key
         onMapContextMenuRef.current?.(
           touchStartLngLat.lat,
           touchStartLngLat.lng,
           touchScreenX,
           touchScreenY,
-          touchSequenceId
+          touchSequenceId,
+          touchImageId
         );
       }, 500);
     });
@@ -1439,6 +1463,38 @@ export default function MapView({
       map.setLayoutProperty('mapillary-sequences-casing', 'visibility', linesVisibility);
     }
   }, [showMapillaryStreetview, showMapillaryDots, showMapillaryLines]);
+
+  // Update excluded sequence filters on Mapillary vector layers
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const excludedIds = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
+    const seqFilter = excludedIds.length > 0
+      ? [
+          'all',
+          ['!in', ['to-string', ['get', 'id']], ['literal', excludedIds]],
+          ['!in', ['to-string', ['coalesce', ['get', 'sequence_id'], ['get', 'sequence'], '']], ['literal', excludedIds]]
+        ]
+      : null;
+
+    const imgFilter = excludedIds.length > 0
+      ? [
+          'all',
+          ['!in', ['to-string', ['coalesce', ['get', 'sequence_id'], ['get', 'sequence'], ['get', 'id'], '']], ['literal', excludedIds]]
+        ]
+      : null;
+
+    if (map.getLayer('mapillary-sequences')) {
+      map.setFilter('mapillary-sequences', seqFilter);
+    }
+    if (map.getLayer('mapillary-sequences-casing')) {
+      map.setFilter('mapillary-sequences-casing', seqFilter);
+    }
+    if (map.getLayer('mapillary-images')) {
+      map.setFilter('mapillary-images', imgFilter);
+    }
+  }, [excludedSequences]);
 
   // Update Aligned Streetview Lines GeoJSON source
   useEffect(() => {

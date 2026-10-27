@@ -5,12 +5,17 @@
  */
 
 const STORAGE_KEY = 'mapillary_aligned_sequences_v1';
+const EXCLUDED_STORAGE_KEY = 'mapillary_excluded_sequences_v1';
 const MAPILLARY_GRAPH_API = 'https://graph.mapillary.com';
 const ACCESS_TOKEN = 'MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9';
+
+// Default excluded sequences (e.g. erratic/unwanted traces like the school-pond campus line)
+const DEFAULT_EXCLUDED_SEQUENCES = ['daygfFRm94o2xOpPQNsG0l', '6ILqHDUO8mdl7iJNbfezgn'];
 
 class StreetviewAlignmentService {
   constructor() {
     this.alignedSequences = this.loadLocal();
+    this.excludedSequences = this.loadExcludedLocal();
     this.syncWithBackend();
   }
 
@@ -30,6 +35,62 @@ class StreetviewAlignmentService {
     } catch (e) {
       console.warn('Failed to save aligned sequences to localStorage:', e);
     }
+  }
+
+  loadExcludedLocal() {
+    try {
+      const data = localStorage.getItem(EXCLUDED_STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      }
+      return new Set(DEFAULT_EXCLUDED_SEQUENCES);
+    } catch (e) {
+      console.warn('Failed to load excluded sequences from localStorage:', e);
+      return new Set(DEFAULT_EXCLUDED_SEQUENCES);
+    }
+  }
+
+  saveExcludedLocal() {
+    try {
+      localStorage.setItem(
+        EXCLUDED_STORAGE_KEY,
+        JSON.stringify(Array.from(this.excludedSequences))
+      );
+    } catch (e) {
+      console.warn('Failed to save excluded sequences to localStorage:', e);
+    }
+  }
+
+  getExcludedSequences() {
+    return Array.from(this.excludedSequences);
+  }
+
+  isSequenceExcluded(sequenceId) {
+    if (!sequenceId) return false;
+    return this.excludedSequences.has(String(sequenceId));
+  }
+
+  excludeSequence(sequenceId) {
+    if (!sequenceId) return;
+    const strId = String(sequenceId);
+    this.excludedSequences.add(strId);
+    this.saveExcludedLocal();
+
+    // If it was aligned, also remove from aligned sequences
+    if (this.alignedSequences[strId]) {
+      delete this.alignedSequences[strId];
+      this.saveLocal();
+    }
+    return this.getExcludedSequences();
+  }
+
+  restoreSequence(sequenceId) {
+    if (!sequenceId) return;
+    const strId = String(sequenceId);
+    this.excludedSequences.delete(strId);
+    this.saveExcludedLocal();
+    return this.getExcludedSequences();
   }
 
   async syncWithBackend() {
@@ -111,6 +172,7 @@ class StreetviewAlignmentService {
   toGeoJSON() {
     const features = [];
     for (const [seqId, data] of Object.entries(this.alignedSequences)) {
+      if (this.isSequenceExcluded(seqId)) continue;
       if (!data.coordinates || data.coordinates.length < 2) continue;
       features.push({
         type: 'Feature',

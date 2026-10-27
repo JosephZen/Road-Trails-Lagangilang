@@ -184,6 +184,7 @@ export default function App() {
 
   // Copy coordinates handler with fallback & instant visual feedback
   const [copiedCoords, setCopiedCoords] = useState(false);
+  const [copiedImageKey, setCopiedImageKey] = useState(false);
   const handleCopyCoordinates = useCallback(async (lat, lng) => {
     const text = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
     let ok = false;
@@ -320,6 +321,39 @@ export default function App() {
     showToast('↺ Restored line to raw Mapillary GPS capture points');
   }, [aligningSequence, showToast]);
 
+  // Excluded Streetview Sequences State
+  const [excludedSequences, setExcludedSequences] = useState(() => streetviewAlignmentService.getExcludedSequences());
+  const [showExcludedModal, setShowExcludedModal] = useState(false);
+  const [manualExcludeInput, setManualExcludeInput] = useState('');
+
+  const handleDeleteAlignment = useCallback(async (sequenceId) => {
+    if (!isAdmin) return;
+    await streetviewAlignmentService.deleteAlignedSequence(sequenceId);
+    setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+    if (aligningSequence?.sequenceId === sequenceId) {
+      setAligningSequence(null);
+    }
+    showToast(`🗑️ Alignment deleted for sequence ${sequenceId.slice(0, 8)}... (reverted to raw)`);
+  }, [isAdmin, aligningSequence, showToast]);
+
+  const handleToggleExcludeSequence = useCallback((sequenceId) => {
+    if (!isAdmin) return;
+    if (streetviewAlignmentService.isSequenceExcluded(sequenceId)) {
+      const updated = streetviewAlignmentService.restoreSequence(sequenceId);
+      setExcludedSequences(updated);
+      setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+      showToast(`👁️ Sequence ${sequenceId.slice(0, 8)}... restored to map`);
+    } else {
+      const updated = streetviewAlignmentService.excludeSequence(sequenceId);
+      setExcludedSequences(updated);
+      setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+      if (aligningSequence?.sequenceId === sequenceId) {
+        setAligningSequence(null);
+      }
+      showToast(`🚫 Sequence ${sequenceId.slice(0, 8)}... excluded and removed from map`);
+    }
+  }, [isAdmin, aligningSequence, showToast]);
+
   // Automatically calculate route when both Point A and Point B are chosen
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   useEffect(() => {
@@ -352,9 +386,41 @@ export default function App() {
 
   // Right-click / Touchscreen Long-Press context menu handler
   const lastContextMenuTime = useRef(0);
-  const handleMapContextMenu = useCallback((lat, lng, screenX, screenY, sequenceId = null) => {
+  const handleMapContextMenu = useCallback((lat, lng, screenX, screenY, sequenceId = null, imageId = null) => {
     lastContextMenuTime.current = Date.now();
-    setContextMenu({ lat, lng, x: screenX, y: screenY, sequenceId });
+    setContextMenu({ lat, lng, x: screenX, y: screenY, sequenceId, imageId });
+
+    // If imageId wasn't already resolved from vector tile, perform quick lookup from Mapillary Graph API
+    if (!imageId) {
+      const delta = 0.002;
+      fetch(
+        `https://graph.mapillary.com/images?access_token=MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9&fields=id,sequence,geometry&bbox=${lng - delta},${lat - delta},${lng + delta},${lat + delta}&limit=5`
+      )
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.data?.length > 0) {
+            const closest = data.data.reduce((best, curr) => {
+              if (!curr.geometry?.coordinates) return best;
+              const d = Math.hypot(curr.geometry.coordinates[0] - lng, curr.geometry.coordinates[1] - lat);
+              if (!best || d < best.d) return { ...curr, d };
+              return best;
+            }, null);
+
+            if (closest && closest.d < 0.0015) { // within ~150 meters
+              setContextMenu((prev) =>
+                prev && prev.lat === lat && prev.lng === lng
+                  ? {
+                      ...prev,
+                      imageId: String(closest.id),
+                      sequenceId: prev.sequenceId || (closest.sequence ? String(closest.sequence) : null),
+                    }
+                  : prev
+              );
+            }
+          }
+        })
+        .catch((err) => console.warn('Mapillary nearest image key lookup notice:', err));
+    }
   }, []);
 
   // Dismiss context menu on click or Escape key (ignoring synthetic clicks right after long-press)
@@ -473,9 +539,12 @@ export default function App() {
 
       // 3. Orient the 360 viewer toward the landmark's heading
       if (spot.connected360?.heading !== undefined) {
+        const spotHeading = parseFloat(spot.connected360.heading) || 0;
+        const spotPitch = parseFloat(spot.connected360.pitch) || 0;
+        setViewerHeading(spotHeading);
         setSteerTarget({
-          heading: spot.connected360.heading,
-          pitch: spot.connected360.pitch || 0,
+          heading: spotHeading,
+          pitch: spotPitch,
           key: Date.now(),
         });
       }
@@ -732,272 +801,323 @@ export default function App() {
       >
         {/* Map top controls */}
         <div className="map-overlay-top">
-          {/* Role Indicator Badge */}
-          <div
-            className={`role-indicator ${isAdmin ? 'admin' : 'tourist'}`}
-            onClick={() => {
-              const next = !isAdmin;
-              setIsAdmin(next);
-              showToast(
-                next
-                  ? '🛡️ Admin Panel active — Marker dragging & location marking enabled'
-                  : '🌴 Tourist Explorer active — Explore map & navigate 360 street views'
-              );
-            }}
-            title={isAdmin ? 'Switch to Tourist Explorer' : 'Switch to Admin Panel'}
-          >
-            <span className="role-indicator-dot" />
-            <span>{isAdmin ? '🛡️ Admin Panel' : '🌴 Tourist Explorer'}</span>
-          </div>
+          {/* Horizontally scrollable/dynamic action bar across all aspect ratios */}
+          <div className="nav-scroll-container">
+            {/* Role Indicator Badge */}
+            <div
+              className={`role-indicator ${isAdmin ? 'admin' : 'tourist'}`}
+              onClick={() => {
+                const next = !isAdmin;
+                setIsAdmin(next);
+                showToast(
+                  next
+                    ? '🛡️ Admin Panel active — Marker dragging & location marking enabled'
+                    : '🌴 Tourist Explorer active — Explore map & navigate 360 street views'
+                );
+              }}
+              title={isAdmin ? 'Switch to Tourist Explorer' : 'Switch to Admin Panel'}
+            >
+              <span className="role-indicator-dot" />
+              <span>{isAdmin ? '🛡️ Admin Panel' : '🌴 Tourist Explorer'}</span>
+            </div>
 
-          {/* Theme Selector */}
-          <div
-            className="theme-toggle"
-            style={{
-              display: 'flex',
-              gap: '4px',
-              background: 'rgba(0,0,0,0.6)',
-              padding: '4px',
-              borderRadius: 'var(--radius-full)',
-              backdropFilter: 'blur(10px)',
-            }}
-          >
-            {['dark', 'light', 'beige', 'satellite'].map((t) => (
-              <button
-                key={t}
-                className={`mode-toggle-btn ${mapTheme === t ? 'active' : ''}`}
-                onClick={() => {
+            {/* Theme Selector Dropdown */}
+            <div className="theme-dropdown-custom" title="Map Theme">
+              <span className="theme-dropdown-icon">
+                {mapTheme === 'dark' ? '🌙' : mapTheme === 'light' ? '☀️' : mapTheme === 'beige' ? '📜' : '🛰️'}
+              </span>
+              <select
+                id="map-theme-dropdown"
+                className="theme-dropdown-select"
+                value={mapTheme}
+                onChange={(e) => {
+                  const t = e.target.value;
                   setMapTheme(t);
                   localStorage.setItem('lagangilang_map_theme', t);
+                  showToast(`Map theme: ${t.charAt(0).toUpperCase() + t.slice(1)}`);
                 }}
-                style={{ textTransform: 'capitalize', fontSize: '0.8rem', padding: '4px 8px' }}
+                aria-label="Map theme dropdown"
               >
-                {t}
-              </button>
-            ))}
+                <option value="light">☀️ Light</option>
+                <option value="dark">🌙 Dark</option>
+                <option value="beige">📜 Beige</option>
+                <option value="satellite">🛰️ Satellite</option>
+              </select>
+              <span className="theme-dropdown-chevron">▼</span>
+            </div>
+
+            {/* Route Button (Tourist prominent) */}
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setSidebarTab('routing');
+                setSidebarOpen(true);
+              }}
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-full)',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                border: 'none',
+                color: '#fff',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              🧭 Route
+            </button>
+
+            {/* Admin-only controls */}
+            {isAdmin && (
+              <>
+                <div className="controls-separator" />
+
+                {/* Toggle Mapillary Streetview (Green lines & dots) - Admin only */}
+                <button
+                  className={`btn ${showMapillaryStreetview ? 'btn-secondary' : 'btn-ghost'}`}
+                  onClick={() => {
+                    const next = !showMapillaryStreetview;
+                    setShowMapillaryStreetview(next);
+                    setShowMapillaryDots(next);
+                    setShowMapillaryLines(next);
+                    showToast(
+                      next
+                        ? '🟢 Mapillary streetview (lines & dots) visible'
+                        : '⚪ Mapillary streetview hidden (cyan line remains visible)'
+                    );
+                  }}
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-full)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                  title={
+                    showMapillaryStreetview
+                      ? 'Hide raw Mapillary streetview (green lines & dots)'
+                      : 'Show raw Mapillary streetview (green lines & dots)'
+                  }
+                >
+                  {showMapillaryStreetview ? '🟢 Streetview: ON' : '⚪ Streetview: OFF'}
+                </button>
+                {/* Bend / Align Streetview Line Button (Admin only) */}
+                <button
+                  className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    if (aligningSequence) {
+                      setAligningSequence(null);
+                      setIsSelectingAlignmentTarget(false);
+                    } else if (isSelectingAlignmentTarget) {
+                      setIsSelectingAlignmentTarget(false);
+                      showToast('Line selection cancelled');
+                    } else {
+                      setIsSelectingAlignmentTarget(true);
+                      showToast('🎯 Click directly on the green streetview line you want to bend & re-align!');
+                    }
+                  }}
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '6px 14px',
+                    borderRadius: 'var(--radius-full)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    background: aligningSequence || isSelectingAlignmentTarget
+                      ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                      : undefined,
+                  }}
+                  title="Bend and re-align Mapillary streetview lines onto road curves (Admin only)"
+                >
+                  📐 {aligningSequence ? 'Exit Align' : isSelectingAlignmentTarget ? 'Cancel Select' : 'Align Line'}
+                </button>
+                {/* Custom OSM Overlay Toggle */}
+                <button
+                  className={`btn btn-sm ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setShowCustomOSM(!showCustomOSM)}
+                  title="Toggle Custom OSM Map Overlay"
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '6px 10px',
+                    borderRadius: 'var(--radius-full)',
+                    background: showCustomOSM
+                      ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                      : 'rgba(0,0,0,0.6)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    color: '#ffffff',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  🗺️ Custom Map
+                </button>
+
+                {/* Add Tourist Spot Button */}
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setEditingSpot(null);
+                    setShowSpotModal(true);
+                  }}
+                  title="Add Location (POI or Attraction) to System"
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-full)',
+                    background: 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
+                    color: '#1a1a2e',
+                    fontWeight: 700,
+                    border: 'none',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  ⭐ + Add Spot
+                </button>
+
+                {/* Pin Repositioning Lock / Unlock Button */}
+                <button
+                  className={`btn btn-sm ${pinsDraggable ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    const nextState = !pinsDraggable;
+                    setPinsDraggable(nextState);
+                    showToast(
+                      nextState
+                        ? '🔓 Pin repositioning unlocked: Drag landmarks or POIs to adjust coordinates.'
+                        : '🔒 Pin repositioning locked: Marker positions are secured.'
+                    );
+                  }}
+                  title={
+                    pinsDraggable
+                      ? 'Pins are UNLOCKED for dragging. Click to lock against movement.'
+                      : 'Pins are LOCKED against accidental movement. Click to unlock repositioning.'
+                  }
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-full)',
+                    background: pinsDraggable
+                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                      : 'rgba(0,0,0,0.6)',
+                    border: pinsDraggable
+                      ? '1px solid #34d399'
+                      : '1px solid rgba(255,255,255,0.15)',
+                    color: '#ffffff',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span>{pinsDraggable ? '🔓 Reposition ON' : '🔒 Pins Locked'}</span>
+                </button>
+
+                {/* Online/Offline indicator & DB configuration */}
+                <div
+                  onClick={handleConfigureNeonUrl}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 10px',
+                    borderRadius: 'var(--radius-full)',
+                    background: 'rgba(0,0,0,0.6)',
+                    backdropFilter: 'blur(8px)',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: isOnline ? '#10b981' : '#f59e0b',
+                    border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.4)'}`,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                  title={isOnline ? 'Online • Neon PostgreSQL connected (Click to change DB URL)' : 'Offline • Field staging buffer active (Click to change DB URL)'}
+                >
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: isOnline ? '#10b981' : '#f59e0b',
+                      boxShadow: `0 0 6px ${isOnline ? '#10b981' : '#f59e0b'}`,
+                    }}
+                  />
+                  <span>{isOnline ? 'Online ⚙️' : 'Offline ⚙️'}</span>
+                </div>
+
+                {/* Staged Drafts Indicator & Queue Opener (Always accessible for Admin) */}
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setSidebarTab('staging');
+                    setSidebarOpen(true);
+                  }}
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-full)',
+                    border: stagedCount > 0 ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.2)',
+                    color: stagedCount > 0 ? '#fbbf24' : '#e2e8f0',
+                    background: stagedCount > 0 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(0,0,0,0.5)',
+                    animation: stagedCount > 0 ? 'pulse 2s infinite' : 'none',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                  title={stagedCount > 0 ? `${stagedCount} locally staged draft(s) pending sync` : 'Open Staging Queue'}
+                >
+                  🟡 {stagedCount > 0 ? `${stagedCount} Staged` : 'Staging'}
+                </button>
+
+                {/* Excluded Sequences Manager Button */}
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowExcludedModal(true)}
+                  title="Manage excluded streetview sequences"
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-full)',
+                    border: excludedSequences.length > 0 ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.2)',
+                    color: excludedSequences.length > 0 ? '#fca5a5' : '#cbd5e1',
+                    background: excludedSequences.length > 0 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span>🚫 Excluded</span>
+                  {excludedSequences.length > 0 && (
+                    <span style={{
+                      background: '#ef4444',
+                      color: '#fff',
+                      borderRadius: 'var(--radius-full)',
+                      padding: '1px 6px',
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                    }}>
+                      {excludedSequences.length}
+                    </span>
+                  )}
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Route Button (Tourist prominent) */}
+          {/* Sidebar toggle - Guaranteed visible & pinned on the far right across all aspect ratios */}
           <button
-            className="btn btn-primary"
-            onClick={() => {
-              setSidebarTab('routing');
-              setSidebarOpen(true);
-            }}
-            style={{
-              fontSize: '0.8rem',
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-full)',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              border: 'none',
-              color: '#fff',
-            }}
-          >
-            🧭 Route
-          </button>
-
-          {/* Admin-only controls */}
-          {isAdmin && (
-            <>
-              <div className="controls-separator" />
-
-              {/* Toggle Mapillary Streetview (Green lines & dots) - Admin only */}
-              <button
-                className={`btn ${showMapillaryStreetview ? 'btn-secondary' : 'btn-ghost'}`}
-                onClick={() => {
-                  const next = !showMapillaryStreetview;
-                  setShowMapillaryStreetview(next);
-                  setShowMapillaryDots(next);
-                  setShowMapillaryLines(next);
-                  showToast(
-                    next
-                      ? '🟢 Mapillary streetview (lines & dots) visible'
-                      : '⚪ Mapillary streetview hidden (cyan line remains visible)'
-                  );
-                }}
-                style={{
-                  fontSize: '0.8rem',
-                  padding: '6px 12px',
-                  borderRadius: 'var(--radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-                title={
-                  showMapillaryStreetview
-                    ? 'Hide raw Mapillary streetview (green lines & dots)'
-                    : 'Show raw Mapillary streetview (green lines & dots)'
-                }
-              >
-                {showMapillaryStreetview ? '🟢 Streetview: ON' : '⚪ Streetview: OFF'}
-              </button>
-              {/* Bend / Align Streetview Line Button (Admin only) */}
-              <button
-                className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => {
-                  if (aligningSequence) {
-                    setAligningSequence(null);
-                    setIsSelectingAlignmentTarget(false);
-                  } else if (isSelectingAlignmentTarget) {
-                    setIsSelectingAlignmentTarget(false);
-                    showToast('Line selection cancelled');
-                  } else {
-                    setIsSelectingAlignmentTarget(true);
-                    showToast('🎯 Click directly on the green streetview line you want to bend & re-align!');
-                  }
-                }}
-                style={{
-                  fontSize: '0.8rem',
-                  padding: '6px 14px',
-                  borderRadius: 'var(--radius-full)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  background: aligningSequence || isSelectingAlignmentTarget
-                    ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
-                    : undefined,
-                }}
-                title="Bend and re-align Mapillary streetview lines onto road curves (Admin only)"
-              >
-                📐 {aligningSequence ? 'Exit Align' : isSelectingAlignmentTarget ? 'Cancel Select' : 'Align Line'}
-              </button>
-              {/* Custom OSM Overlay Toggle */}
-              <button
-                className={`btn btn-sm ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setShowCustomOSM(!showCustomOSM)}
-                title="Toggle Custom OSM Map Overlay"
-                style={{
-                  fontSize: '0.8rem',
-                  padding: '6px 10px',
-                  borderRadius: 'var(--radius-full)',
-                  background: showCustomOSM
-                    ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-                    : 'rgba(0,0,0,0.6)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  color: '#ffffff',
-                }}
-              >
-                🗺️ Custom Map
-              </button>
-
-              {/* Add Tourist Spot Button */}
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  setEditingSpot(null);
-                  setShowSpotModal(true);
-                }}
-                title="Add Location (POI or Attraction) to System"
-                style={{
-                  fontSize: '0.8rem',
-                  padding: '6px 12px',
-                  borderRadius: 'var(--radius-full)',
-                  background: 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
-                  color: '#1a1a2e',
-                  fontWeight: 700,
-                  border: 'none',
-                }}
-              >
-                ⭐ + Add Spot
-              </button>
-
-              {/* Pin Repositioning Lock / Unlock Button */}
-              <button
-                className={`btn btn-sm ${pinsDraggable ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => {
-                  const nextState = !pinsDraggable;
-                  setPinsDraggable(nextState);
-                  showToast(
-                    nextState
-                      ? '🔓 Pin repositioning unlocked: Drag landmarks or POIs to adjust coordinates.'
-                      : '🔒 Pin repositioning locked: Marker positions are secured.'
-                  );
-                }}
-                title={
-                  pinsDraggable
-                    ? 'Pins are UNLOCKED for dragging. Click to lock against movement.'
-                    : 'Pins are LOCKED against accidental movement. Click to unlock repositioning.'
-                }
-                style={{
-                  fontSize: '0.8rem',
-                  padding: '6px 12px',
-                  borderRadius: 'var(--radius-full)',
-                  background: pinsDraggable
-                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                    : 'rgba(0,0,0,0.6)',
-                  border: pinsDraggable
-                    ? '1px solid #34d399'
-                    : '1px solid rgba(255,255,255,0.15)',
-                  color: '#ffffff',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <span>{pinsDraggable ? '🔓 Reposition ON' : '🔒 Pins Locked'}</span>
-              </button>
-
-              {/* Online/Offline indicator & DB configuration */}
-              <div
-                onClick={handleConfigureNeonUrl}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '5px 10px',
-                  borderRadius: 'var(--radius-full)',
-                  background: 'rgba(0,0,0,0.6)',
-                  backdropFilter: 'blur(8px)',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  color: isOnline ? '#10b981' : '#f59e0b',
-                  border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.4)'}`,
-                  cursor: 'pointer',
-                }}
-                title={isOnline ? 'Online • Neon PostgreSQL connected (Click to change DB URL)' : 'Offline • Field staging buffer active (Click to change DB URL)'}
-              >
-                <span
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: isOnline ? '#10b981' : '#f59e0b',
-                    boxShadow: `0 0 6px ${isOnline ? '#10b981' : '#f59e0b'}`,
-                  }}
-                />
-                <span>{isOnline ? 'Online ⚙️' : 'Offline ⚙️'}</span>
-              </div>
-
-              {/* Staged Drafts Indicator & Queue Opener (Always accessible for Admin) */}
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setSidebarTab('staging');
-                  setSidebarOpen(true);
-                }}
-                style={{
-                  fontSize: '0.75rem',
-                  padding: '4px 10px',
-                  borderRadius: 'var(--radius-full)',
-                  border: stagedCount > 0 ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.2)',
-                  color: stagedCount > 0 ? '#fbbf24' : '#e2e8f0',
-                  background: stagedCount > 0 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(0,0,0,0.5)',
-                  animation: stagedCount > 0 ? 'pulse 2s infinite' : 'none',
-                }}
-                title={stagedCount > 0 ? `${stagedCount} locally staged draft(s) pending sync` : 'Open Staging Queue'}
-              >
-                🟡 {stagedCount > 0 ? `${stagedCount} Staged` : 'Staging'}
-              </button>
-            </>
-          )}
-
-          {/* Sidebar toggle (always visible) */}
-          <button
-            className="btn btn-secondary btn-icon"
+            className="btn btn-secondary btn-icon nav-hamburger-btn"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            title="Explore Tourist Spots & Route Planner"
-            style={{ marginLeft: 'auto' }}
+            title="Explore Tourist Spots, Staging & Route Planner"
+            aria-label="Toggle navigation drawer"
           >
             ☰
           </button>
@@ -1049,6 +1169,8 @@ export default function App() {
             onSave={handleSaveAlignment}
             onResetOriginal={handleResetAlignmentOriginal}
             onCancel={() => setAligningSequence(null)}
+            onDeleteAlignment={handleDeleteAlignment}
+            onExcludeSequence={handleToggleExcludeSequence}
             isSaving={isSavingAlignment}
             showMapillaryStreetview={showMapillaryStreetview}
             showMapillaryDots={showMapillaryDots}
@@ -1099,6 +1221,7 @@ export default function App() {
           showMapillaryStreetview={showMapillaryStreetview}
           showMapillaryDots={showMapillaryDots}
           showMapillaryLines={showMapillaryLines}
+          excludedSequences={excludedSequences}
         />
 
         {/* Resize handle */}
@@ -1112,62 +1235,75 @@ export default function App() {
         {/* Sidebar - Tabs: Tourist Spots, Staging Queue, Routing */}
         <div className={`sidebar glass-panel ${sidebarOpen ? 'open' : ''}`}>
           <div className="sidebar-header">
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <div className="sidebar-tabs-group" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button
+                className={`sidebar-tab-btn ${sidebarTab === 'spots' ? 'active' : ''}`}
                 onClick={() => setSidebarTab('spots')}
                 style={{
                   background: sidebarTab === 'spots' ? 'var(--accent-primary)' : 'transparent',
                   color: sidebarTab === 'spots' ? '#fff' : 'var(--text-secondary)',
-                  border: 'none',
-                  padding: '4px 8px',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '0.8rem',
+                  border: sidebarTab === 'spots' ? 'none' : '1px solid var(--border-subtle)',
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  fontSize: '0.82rem',
                   fontWeight: 600,
                   cursor: 'pointer',
+                  transition: 'all 0.2s ease',
                 }}
               >
                 ⭐ Spots ({touristSpots.length})
               </button>
               {isAdmin && (
                 <button
+                  className={`sidebar-tab-btn tab-staging ${sidebarTab === 'staging' ? 'active' : ''}`}
                   onClick={() => setSidebarTab('staging')}
                   style={{
                     background: sidebarTab === 'staging' ? '#f59e0b' : 'rgba(245,158,11,0.2)',
                     color: sidebarTab === 'staging' ? '#1a1a2e' : '#fbbf24',
-                    border: 'none',
-                    padding: '4px 8px',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '0.8rem',
+                    border: '1px solid rgba(245,158,11,0.4)',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-full)',
+                    fontSize: '0.82rem',
                     fontWeight: 700,
                     cursor: 'pointer',
+                    transition: 'all 0.2s ease',
                   }}
+                  title="Staging Queue (Offline field captures)"
                 >
                   🟡 Staging {stagedCount > 0 ? `(${stagedCount})` : ''}
                 </button>
               )}
               <button
+                className={`sidebar-tab-btn ${sidebarTab === 'routing' ? 'active' : ''}`}
                 onClick={() => setSidebarTab('routing')}
                 style={{
                   background: sidebarTab === 'routing' ? 'var(--accent-primary)' : 'transparent',
                   color: sidebarTab === 'routing' ? '#fff' : 'var(--text-secondary)',
-                  border: 'none',
-                  padding: '4px 8px',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '0.8rem',
+                  border: sidebarTab === 'routing' ? 'none' : '1px solid var(--border-subtle)',
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  fontSize: '0.82rem',
                   fontWeight: 600,
                   cursor: 'pointer',
+                  transition: 'all 0.2s ease',
                 }}
               >
                 🧭 Routing
               </button>
             </div>
 
-            <button className="btn btn-ghost" onClick={() => setSidebarOpen(false)}>
+            <button
+              className="btn btn-ghost sidebar-close-btn"
+              onClick={() => setSidebarOpen(false)}
+              title="Close drawer"
+              aria-label="Close drawer"
+            >
               ✕
             </button>
           </div>
 
-          {/* Tab 1: Tourist Spots & POIs */}
+          <div className="sidebar-body">
+            {/* Tab 1: Tourist Spots & POIs */}
           {sidebarTab === 'spots' && (
             <div>
               {/* Tourist Welcome */}
@@ -1471,6 +1607,7 @@ export default function App() {
               onRoute={handleRouteToSpot}
             />
           )}
+          </div>
         </div>
       </div>
 
@@ -1628,8 +1765,8 @@ export default function App() {
               <GoogleStreetViewViewer
                 lat={activeTouristSpot?.location?.lat ?? activeTouristSpot?.lat ?? streetViewPos?.lat ?? 17.612749}
                 lng={activeTouristSpot?.location?.lng ?? activeTouristSpot?.lng ?? streetViewPos?.lng ?? 120.733755}
-                heading={activeTouristSpot?.connected360?.heading || viewerHeading || 0}
-                pitch={activeTouristSpot?.connected360?.pitch || 0}
+                heading={activeTouristSpot?.connected360?.heading !== undefined ? Number(activeTouristSpot.connected360.heading) : (viewerHeading || 0)}
+                pitch={activeTouristSpot?.connected360?.pitch !== undefined ? Number(activeTouristSpot.connected360.pitch) : 0}
                 title={activeTouristSpot?.name || 'Lagangilang, Abra'}
                 onClose={handleCloseViewer}
                 hasDedicatedCard={!!activeTouristSpot}
@@ -1752,6 +1889,72 @@ export default function App() {
               {copiedCoords ? '✓ Copied!' : '📋 Copy'}
             </button>
           </div>
+
+          {/* Mapillary Image Key Badge & Copy Button (Admin Accessible) */}
+          {contextMenu.imageId && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                padding: '6px 10px',
+                marginTop: '6px',
+                background: 'rgba(16, 185, 129, 0.16)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                borderRadius: 'var(--radius-sm)',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+                <span style={{ fontSize: '0.68rem', color: '#6ee7b7', fontWeight: 600 }}>
+                  📸 Mapillary Image Key:
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.82rem',
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    userSelect: 'all',
+                  }}
+                  title="Click to copy Mapillary 64-bit Image Key"
+                  onClick={() => {
+                    navigator.clipboard.writeText(contextMenu.imageId);
+                    setCopiedImageKey(true);
+                    showToast(`📸 Mapillary Image Key ${contextMenu.imageId} copied!`);
+                    setTimeout(() => setCopiedImageKey(false), 2000);
+                  }}
+                >
+                  {contextMenu.imageId}
+                </span>
+              </div>
+              <button
+                type="button"
+                className={`ctx-copy-btn ${copiedImageKey ? 'copied' : ''}`}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '0.72rem',
+                  borderRadius: 'var(--radius-sm)',
+                  background: copiedImageKey ? '#10b981' : 'rgba(255,255,255,0.12)',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  fontWeight: 600,
+                }}
+                onClick={() => {
+                  navigator.clipboard.writeText(contextMenu.imageId);
+                  setCopiedImageKey(true);
+                  showToast(`📸 Mapillary Image Key ${contextMenu.imageId} copied!`);
+                  setTimeout(() => setCopiedImageKey(false), 2000);
+                }}
+                title="Copy Image Key to clipboard"
+              >
+                {copiedImageKey ? '✓ Copied' : '📋 Copy Key'}
+              </button>
+            </div>
+          )}
+
           <hr />
           <button onClick={() => { setRouteOrigin([contextMenu.lng, contextMenu.lat]); setRouteData(null); setContextMenu(null); }}>
             🟢 Mark as Point A (Start)
@@ -1770,6 +1973,20 @@ export default function App() {
           >
             🌐 View in Google Street View
           </button>
+          {contextMenu.imageId && (
+            <button
+              onClick={() => {
+                setActiveTouristSpot(null);
+                setMapillaryImageId(contextMenu.imageId);
+                setStreetViewPos({ lat: contextMenu.lat, lng: contextMenu.lng, id: contextMenu.imageId });
+                setViewerPanoMode('mapillary');
+                setViewerOpen(true);
+                setContextMenu(null);
+              }}
+            >
+              🟢 View Mapillary 360 Photo ({contextMenu.imageId.slice(0, 8)}...)
+            </button>
+          )}
           <button
             onClick={() => {
               handleStartAligningAtCoord(contextMenu.lat, contextMenu.lng, contextMenu.sequenceId);
@@ -1778,25 +1995,163 @@ export default function App() {
           >
             📐 Bend / Re-align Streetview Line {contextMenu.sequenceId ? `(${contextMenu.sequenceId.slice(0, 8)}...)` : ''}
           </button>
+          {isAdmin && contextMenu.sequenceId && (
+            <>
+              {streetviewAlignmentService.getAlignedSequence(contextMenu.sequenceId) && (
+                <button
+                  onClick={() => {
+                    handleDeleteAlignment(contextMenu.sequenceId);
+                    setContextMenu(null);
+                  }}
+                  style={{ color: '#fca5a5' }}
+                >
+                  🗑️ Delete Aligned Line ({contextMenu.sequenceId.slice(0, 8)}...)
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  handleToggleExcludeSequence(contextMenu.sequenceId);
+                  setContextMenu(null);
+                }}
+                style={{
+                  color: streetviewAlignmentService.isSequenceExcluded(contextMenu.sequenceId)
+                    ? '#6ee7b7'
+                    : '#f87171',
+                }}
+              >
+                {streetviewAlignmentService.isSequenceExcluded(contextMenu.sequenceId)
+                  ? `👁️ Restore Sequence (${contextMenu.sequenceId.slice(0, 8)}...)`
+                  : `🚫 Exclude & Remove Sequence (${contextMenu.sequenceId.slice(0, 8)}...)`}
+              </button>
+            </>
+          )}
           {isAdmin && (
             <>
               <hr />
               <button onClick={() => {
-                setEditingSpot({ spotType: 'tourist_spot', location: { lat: contextMenu.lat, lng: contextMenu.lng, address: '' } });
+                setEditingSpot({
+                  spotType: 'tourist_spot',
+                  location: { lat: contextMenu.lat, lng: contextMenu.lng, address: '' },
+                  connected360: contextMenu.imageId ? {
+                    type: 'mapillary',
+                    targetId: contextMenu.imageId,
+                    heading: 0,
+                    pitch: 0,
+                  } : undefined,
+                });
                 setShowSpotModal(true);
                 setContextMenu(null);
               }}>
-                ⭐ Add Tourist Spot here
+                ⭐ Add Tourist Spot here {contextMenu.imageId ? '📸 (Auto-Linked to Image)' : ''}
               </button>
               <button onClick={() => {
-                setEditingSpot({ spotType: 'poi', location: { lat: contextMenu.lat, lng: contextMenu.lng, address: '' } });
+                setEditingSpot({
+                  spotType: 'poi',
+                  location: { lat: contextMenu.lat, lng: contextMenu.lng, address: '' },
+                  connected360: contextMenu.imageId ? {
+                    type: 'mapillary',
+                    targetId: contextMenu.imageId,
+                    heading: 0,
+                    pitch: 0,
+                  } : undefined,
+                });
                 setShowSpotModal(true);
                 setContextMenu(null);
               }}>
-                📌 Add Point of Interest here
+                📌 Add Point of Interest here {contextMenu.imageId ? '📸 (Auto-Linked to Image)' : ''}
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {/* ===== Excluded Sequences Modal (Admin) ===== */}
+      {showExcludedModal && (
+        <div className="modal-overlay" onClick={() => setShowExcludedModal(false)}>
+          <div
+            className="upload-modal glass-panel"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '540px' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem' }}>🚫 Excluded Streetview Lines</h2>
+              <button className="btn btn-ghost" onClick={() => setShowExcludedModal(false)}>✕</button>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Sequences listed here are completely excluded and removed from the map display (both aligned curves and raw Mapillary lines/dots).
+            </p>
+
+            {/* Manual sequence exclude input */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <input
+                type="text"
+                className="input-field"
+                placeholder="Paste sequence ID to exclude..."
+                value={manualExcludeInput}
+                onChange={(e) => setManualExcludeInput(e.target.value.trim())}
+                style={{ flex: 1, fontSize: '0.85rem' }}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  if (manualExcludeInput) {
+                    handleToggleExcludeSequence(manualExcludeInput);
+                    setManualExcludeInput('');
+                  }
+                }}
+                disabled={!manualExcludeInput}
+                style={{ fontSize: '0.85rem', padding: '6px 14px' }}
+              >
+                + Exclude
+              </button>
+            </div>
+
+            {/* Excluded list */}
+            {excludedSequences.length === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                No sequences are currently excluded.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+                {excludedSequences.map((seqId) => (
+                  <div
+                    key={seqId}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.25)',
+                      borderRadius: 'var(--radius-md)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fca5a5' }}>
+                        Sequence: <code>{seqId}</code>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        Excluded from streetview &amp; map
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => handleToggleExcludeSequence(seqId)}
+                      style={{ fontSize: '0.75rem', padding: '4px 10px', color: '#34d399', borderColor: '#34d399' }}
+                    >
+                      👁️ Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setShowExcludedModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
