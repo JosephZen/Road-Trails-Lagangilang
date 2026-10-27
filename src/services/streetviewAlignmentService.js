@@ -9,11 +9,26 @@ const EXCLUDED_STORAGE_KEY = 'mapillary_excluded_sequences_v1';
 const EXCLUDED_IMAGES_STORAGE_KEY = 'mapillary_excluded_images_v1';
 const NODE_OVERRIDES_STORAGE_KEY = 'mapillary_node_overrides_v1';
 const INTERSECTION_LINKS_STORAGE_KEY = 'mapillary_intersection_links_v1';
+const SEQUENCE_BRIDGES_STORAGE_KEY = 'mapillary_sequence_bridges_v1';
 const NEON_URL_KEY = 'lagangilang_neon_db_url';
 const DEFAULT_NEON_URL =
   'postgresql://neondb_owner:npg_NCe0hgVyZ7qx@ep-shy-art-aoq0wgaf-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
 const MAPILLARY_GRAPH_API = 'https://graph.mapillary.com';
 const ACCESS_TOKEN = 'MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9';
+
+function getHaversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // meters
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 // Default excluded sequences (e.g. erratic/unwanted traces like the school-pond campus line)
 const DEFAULT_EXCLUDED_SEQUENCES = ['daygfFRm94o2xOpPQNsG0l', '6ILqHDUO8mdl7iJNbfezgn'];
@@ -25,6 +40,7 @@ class StreetviewAlignmentService {
     this.excludedImages = this.loadExcludedImagesLocal();
     this.nodeOverrides = this.loadNodeOverridesLocal();
     this.intersectionLinks = this.loadIntersectionLinksLocal();
+    this.sequenceBridges = this.loadSequenceBridgesLocal();
 
     // Auto-scrub default excluded sequences from locally cached aligned sequences
     let scrubbed = false;
@@ -231,6 +247,196 @@ class StreetviewAlignmentService {
     const strId = String(imageId);
     delete this.intersectionLinks[strId];
     this.saveIntersectionLinksLocal();
+  }
+
+  loadSequenceBridgesLocal() {
+    try {
+      const data = localStorage.getItem(SEQUENCE_BRIDGES_STORAGE_KEY);
+      return data ? JSON.parse(data) : {};
+    } catch (e) {
+      console.warn('Failed to load sequence bridges from localStorage:', e);
+      return {};
+    }
+  }
+
+  saveSequenceBridgesLocal() {
+    try {
+      localStorage.setItem(
+        SEQUENCE_BRIDGES_STORAGE_KEY,
+        JSON.stringify(this.sequenceBridges)
+      );
+    } catch (e) {
+      console.warn('Failed to save sequence bridges to localStorage:', e);
+    }
+  }
+
+  bridgeNodes(nodeA, nodeB, label = '') {
+    if (!nodeA || !nodeB) return;
+    const strA = String(nodeA);
+    const strB = String(nodeB);
+    if (strA === strB) return;
+
+    if (!this.sequenceBridges[strA]) this.sequenceBridges[strA] = [];
+    if (!this.sequenceBridges[strB]) this.sequenceBridges[strB] = [];
+
+    // Add reciprocal bridges if not already present
+    if (!this.sequenceBridges[strA].some((b) => b.targetKey === strB)) {
+      this.sequenceBridges[strA].push({
+        targetKey: strB,
+        label: label || 'Bridged Trail',
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    if (!this.sequenceBridges[strB].some((b) => b.targetKey === strA)) {
+      this.sequenceBridges[strB].push({
+        targetKey: strA,
+        label: label ? `Return: ${label}` : 'Bridged Trail',
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    this.saveSequenceBridgesLocal();
+    return this.sequenceBridges;
+  }
+
+  removeBridge(nodeA, nodeB) {
+    if (!nodeA || !nodeB) return;
+    const strA = String(nodeA);
+    const strB = String(nodeB);
+
+    if (this.sequenceBridges[strA]) {
+      this.sequenceBridges[strA] = this.sequenceBridges[strA].filter((b) => b.targetKey !== strB);
+      if (this.sequenceBridges[strA].length === 0) delete this.sequenceBridges[strA];
+    }
+
+    if (this.sequenceBridges[strB]) {
+      this.sequenceBridges[strB] = this.sequenceBridges[strB].filter((b) => b.targetKey !== strA);
+      if (this.sequenceBridges[strB].length === 0) delete this.sequenceBridges[strB];
+    }
+
+    this.saveSequenceBridgesLocal();
+    return this.sequenceBridges;
+  }
+
+  getAllBridges() {
+    return { ...this.sequenceBridges };
+  }
+
+  getManualBridgesForNode(nodeId) {
+    if (!nodeId) return [];
+    return this.sequenceBridges[String(nodeId)] || [];
+  }
+
+  /**
+   * Find both manual and automatic proximity bridges between the active image
+   * and nearby sequence nodes within maxDistanceMeters (default 25m).
+   */
+  findProximityBridges(currentImageId, maxDistanceMeters = 25) {
+    if (!currentImageId) return [];
+    const strId = String(currentImageId);
+
+    const currentPos = this.getAlignedPositionForImage(strId);
+    if (!currentPos || typeof currentPos.lat !== 'number' || typeof currentPos.lng !== 'number') {
+      const manual = this.getManualBridgesForNode(strId);
+      return manual.map((m) => ({
+        targetImageId: m.targetKey,
+        targetSequenceId: null,
+        targetName: m.label || 'Bridged Sequence',
+        distance: null,
+        bearing: null,
+        isManual: true,
+        label: m.label || 'Bridged Sequence',
+      }));
+    }
+
+    const bridges = [];
+    const seenTargetIds = new Set();
+
+    // 1. Manual sequence bridges
+    const manualBridges = this.getManualBridgesForNode(strId);
+    for (const mb of manualBridges) {
+      if (!mb.targetKey || seenTargetIds.has(mb.targetKey)) continue;
+      seenTargetIds.add(mb.targetKey);
+
+      const targetPos = this.getAlignedPositionForImage(mb.targetKey);
+      let dist = null;
+      let bearing = null;
+      if (targetPos && typeof targetPos.lat === 'number') {
+        dist = Math.round(getHaversineDistance(currentPos.lat, currentPos.lng, targetPos.lat, targetPos.lng));
+        bearing = this.calculateBearing(currentPos.lat, currentPos.lng, targetPos.lat, targetPos.lng);
+      }
+
+      bridges.push({
+        targetImageId: mb.targetKey,
+        targetSequenceId: targetPos?.sequenceId || null,
+        targetName: mb.label || 'Manual Bridge',
+        distance: dist,
+        bearing: bearing,
+        isManual: true,
+        label: mb.label || 'Bridged Trail',
+      });
+    }
+
+    // 2. Spatial proximity scan across other sequences
+    for (const [seqId, aligned] of Object.entries(this.alignedSequences)) {
+      if (this.isSequenceExcluded(seqId)) continue;
+      if (seqId === currentPos.sequenceId) continue;
+      if (!Array.isArray(aligned.images)) continue;
+
+      for (const img of aligned.images) {
+        const imgIdStr = String(img.id);
+        if (imgIdStr === strId || seenTargetIds.has(imgIdStr)) continue;
+        if (this.isImageExcluded(imgIdStr)) continue;
+
+        const dist = getHaversineDistance(currentPos.lat, currentPos.lng, img.lat, img.lng);
+        if (dist <= maxDistanceMeters) {
+          seenTargetIds.add(imgIdStr);
+          const bearing = this.calculateBearing(currentPos.lat, currentPos.lng, img.lat, img.lng);
+          bridges.push({
+            targetImageId: imgIdStr,
+            targetSequenceId: seqId,
+            targetName: aligned.name || `Sequence ${seqId.slice(0, 6)}`,
+            distance: Math.round(dist),
+            bearing: bearing,
+            isManual: false,
+            label: `${aligned.name || 'Adjacent Trail'} (${Math.round(dist)}m)`,
+          });
+        }
+      }
+    }
+
+    return bridges.sort((a, b) => (a.distance ?? 999) - (b.distance ?? 999));
+  }
+
+  /**
+   * Find closest Mapillary image across all active sequences to any clicked coordinate.
+   * Ensures clicking any sequence dot on the 2D map immediately synchronizes the viewer.
+   */
+  findClosestImageAcrossAll(lat, lng, maxDistanceMeters = 35) {
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    let closest = null;
+    let minD = Infinity;
+
+    for (const [seqId, aligned] of Object.entries(this.alignedSequences)) {
+      if (this.isSequenceExcluded(seqId)) continue;
+      if (!Array.isArray(aligned.images)) continue;
+
+      for (const img of aligned.images) {
+        if (this.isImageExcluded(img.id)) continue;
+        const d = getHaversineDistance(lat, lng, img.lat, img.lng);
+        if (d < minD && d <= maxDistanceMeters) {
+          minD = d;
+          closest = {
+            image: img,
+            sequenceId: seqId,
+            distance: Math.round(d),
+          };
+        }
+      }
+    }
+
+    return closest;
   }
 
   getExcludedSequences() {

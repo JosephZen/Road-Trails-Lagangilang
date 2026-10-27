@@ -29,6 +29,10 @@ export default function StreetViewAdminWidget({
   const [branchRightNodeId, setBranchRightNodeId] = useState('');
   const [branchNote, setBranchNote] = useState('');
 
+  // Inter-Sequence Bridging state (Workstream 8.2)
+  const [bridgeTargetId, setBridgeTargetId] = useState('');
+  const [activeNodeBridges, setActiveNodeBridges] = useState([]);
+
   // Load existing links and overrides for active node
   useEffect(() => {
     if (!currentPos?.id) return;
@@ -44,6 +48,8 @@ export default function StreetViewAdminWidget({
       setBranchRightNodeId('');
       setBranchNote('');
     }
+
+    setActiveNodeBridges(streetviewAlignmentService.getManualBridgesForNode(currentPos.id));
   }, [currentPos?.id]);
 
   // Strict role guard: only render for authenticated admin
@@ -76,6 +82,21 @@ export default function StreetViewAdminWidget({
     setBranchRightNodeId('');
     setBranchNote('');
     showToast?.('🗑️ Branch links cleared for this node');
+  };
+
+  const handleCreateSequenceBridge = () => {
+    if (!currentPos?.id || !bridgeTargetId) return;
+    streetviewAlignmentService.bridgeNodes(currentPos.id, bridgeTargetId, 'Inter-Sequence Trail');
+    setActiveNodeBridges(streetviewAlignmentService.getManualBridgesForNode(currentPos.id));
+    setBridgeTargetId('');
+    showToast?.(`🔗 Sequence bridge created to node ${bridgeTargetId.slice(0, 8)}...`);
+  };
+
+  const handleRemoveBridge = (targetKey) => {
+    if (!currentPos?.id || !targetKey) return;
+    streetviewAlignmentService.removeBridge(currentPos.id, targetKey);
+    setActiveNodeBridges(streetviewAlignmentService.getManualBridgesForNode(currentPos.id));
+    showToast?.('Bridge link removed');
   };
 
   const truncatedKey = currentPos.id ? `${String(currentPos.id).slice(0, 10)}...` : 'N/A';
@@ -455,6 +476,85 @@ export default function StreetViewAdminWidget({
               >
                 ✕ Clear
               </button>
+            )}
+          </div>
+
+          {/* Inter-Sequence Bridge Stitcher (Workstream 8.2) */}
+          <div style={{ marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px' }}>
+            <span style={{ fontSize: '0.68rem', color: '#a78bfa', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>🔗</span> Bridge to Another Sequence:
+            </span>
+            <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+              <input
+                type="text"
+                placeholder="Target sequence node ID..."
+                value={bridgeTargetId}
+                onChange={(e) => setBridgeTargetId(e.target.value.trim())}
+                style={{
+                  flex: 1,
+                  fontSize: '0.7rem',
+                  padding: '4px 6px',
+                  borderRadius: '6px',
+                  background: 'rgba(0,0,0,0.5)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#f8fafc',
+                }}
+              />
+              <button
+                onClick={handleCreateSequenceBridge}
+                disabled={!bridgeTargetId}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                  border: 'none',
+                  color: '#fff',
+                  cursor: bridgeTargetId ? 'pointer' : 'not-allowed',
+                  opacity: bridgeTargetId ? 1 : 0.5,
+                }}
+              >
+                + Bridge
+              </button>
+            </div>
+
+            {/* List existing bridges for this node */}
+            {activeNodeBridges.length > 0 && (
+              <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Stitched Bridges ({activeNodeBridges.length}):</span>
+                {activeNodeBridges.map((b) => (
+                  <div
+                    key={b.targetKey}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'rgba(139, 92, 246, 0.15)',
+                      padding: '3px 6px',
+                      borderRadius: '4px',
+                      fontSize: '0.68rem',
+                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                    }}
+                  >
+                    <span style={{ color: '#c4b5fd' }}>↔ {b.targetKey.slice(0, 10)}...</span>
+                    <button
+                      onClick={() => handleRemoveBridge(b.targetKey)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#f87171',
+                        cursor: 'pointer',
+                        padding: '0 2px',
+                        fontSize: '0.7rem',
+                      }}
+                      title="Remove bridge link"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>

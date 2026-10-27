@@ -634,6 +634,12 @@ export default function MapView({
           }
         }
 
+        // 3. Unrestricted Proximity Fallback (Workstream 8.3): Check if clicked point is near ANY loaded image
+        const closestAny = streetviewAlignmentService.findClosestImageAcrossAll(e.lngLat.lat, e.lngLat.lng, 35);
+        if (closestAny && closestAny.image) {
+          onMapClickRef.current?.(closestAny.image.lat, closestAny.image.lng, String(closestAny.image.id), true);
+          return;
+        }
 
       } catch (err) {
         console.warn('Map feature query warning:', err);

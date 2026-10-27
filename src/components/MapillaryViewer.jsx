@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Viewer } from 'mapillary-js';
 import 'mapillary-js/dist/mapillary.css';
 import { isNearCampusJunction, UA_HIGHWAY_JUNCTION } from '../utils/streetViewJunctions';
@@ -119,6 +119,24 @@ export default function MapillaryViewer({
       showToast?.(`⚠️ Could not branch to node ${String(targetNodeId).slice(0, 8)}`);
     });
   }, [showToast]);
+
+  // Proximity bridges across sequences (Workstream 8.1 & 8.2)
+  const proximityBridges = useMemo(() => {
+    if (!currentPos?.id) return [];
+    return streetviewAlignmentService.findProximityBridges(currentPos.id, 25);
+  }, [currentPos?.id, currentPos?.lat, currentPos?.lng]);
+
+  const getBranchDirection = useCallback((targetBearing, currentBearing) => {
+    if (typeof targetBearing !== 'number' || typeof currentBearing !== 'number') {
+      return { icon: '⮝', text: 'Bridge' };
+    }
+    let diff = (targetBearing - currentBearing + 360) % 360;
+    if (diff > 180) diff -= 360;
+    if (diff >= -35 && diff <= 35) return { icon: '⮝', text: 'Straight Ahead' };
+    if (diff < -35 && diff >= -145) return { icon: '↰', text: 'Turn Left' };
+    if (diff > 35 && diff <= 145) return { icon: '↱', text: 'Turn Right' };
+    return { icon: '⮟', text: 'Behind' };
+  }, []);
 
   // Apply filter to exclude unwanted sequences and individual buggy image nodes
   const applyFilter = useCallback(() => {
@@ -424,10 +442,13 @@ export default function MapillaryViewer({
         showToast={showToast}
       />
 
-      {/* Intersection Branch Chevrons (Workstream 6.3 - for forks like Screenshot 005359) */}
+      {/* Synthetic Inter-Sequence Bridges & Intersection Chevrons (Workstreams 6.3 & 8.1 - Screenshot 015245) */}
       {(() => {
         const branchLink = currentPos?.id ? streetviewAlignmentService.getIntersectionLink(currentPos.id) : null;
-        if (!branchLink || (!branchLink.branchLeftNodeId && !branchLink.forwardNodeId && !branchLink.branchRightNodeId)) {
+        const hasCalibratedBranches = Boolean(branchLink && (branchLink.branchLeftNodeId || branchLink.forwardNodeId || branchLink.branchRightNodeId));
+        const hasProximityBridges = proximityBridges.length > 0;
+
+        if (!hasCalibratedBranches && !hasProximityBridges) {
           return null;
         }
 
@@ -441,17 +462,21 @@ export default function MapillaryViewer({
               transform: 'translateX(-50%)',
               zIndex: 34,
               display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
               gap: '8px',
-              background: 'rgba(15, 23, 42, 0.92)',
+              background: 'rgba(15, 23, 42, 0.94)',
               padding: '6px 14px',
               borderRadius: 'var(--radius-full, 9999px)',
               border: '1.5px solid #10b981',
               boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
               backdropFilter: 'blur(12px)',
               animation: 'fadeInUp 0.3s ease',
+              maxWidth: 'calc(100% - 32px)',
             }}
           >
-            {branchLink.branchLeftNodeId && (
+            {/* Calibrated Branch Links (Workstream 6.3) */}
+            {branchLink?.branchLeftNodeId && (
               <button
                 onClick={() => handleNavigateToNode(branchLink.branchLeftNodeId)}
                 className="btn btn-sm"
@@ -475,7 +500,7 @@ export default function MapillaryViewer({
               </button>
             )}
 
-            {branchLink.forwardNodeId && (
+            {branchLink?.forwardNodeId && (
               <button
                 onClick={() => handleNavigateToNode(branchLink.forwardNodeId)}
                 className="btn btn-sm"
@@ -499,7 +524,7 @@ export default function MapillaryViewer({
               </button>
             )}
 
-            {branchLink.branchRightNodeId && (
+            {branchLink?.branchRightNodeId && (
               <button
                 onClick={() => handleNavigateToNode(branchLink.branchRightNodeId)}
                 className="btn btn-sm"
@@ -522,6 +547,41 @@ export default function MapillaryViewer({
                 <span>Right Branch</span>
               </button>
             )}
+
+            {/* Synthetic Inter-Sequence Proximity Bridges (Workstream 8.1 - Screenshot 015245) */}
+            {proximityBridges.map((br) => {
+              const dir = getBranchDirection(br.bearing, currentPos?.heading);
+              return (
+                <button
+                  key={br.targetImageId}
+                  onClick={() => handleNavigateToNode(br.targetImageId)}
+                  className="btn btn-sm"
+                  style={{
+                    background: br.isManual
+                      ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
+                      : 'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '9999px',
+                    padding: '5px 12px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                  }}
+                  title={`Bridge across sequences to node ${br.targetImageId} (${br.distance !== null ? br.distance + 'm away' : ''})`}
+                >
+                  <span>{dir.icon}</span>
+                  <span>{br.label || `${dir.text} Trail`}</span>
+                  {br.distance !== null && (
+                    <span style={{ opacity: 0.85, fontSize: '0.68rem' }}>({br.distance}m)</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         );
       })()}
