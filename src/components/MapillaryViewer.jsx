@@ -51,6 +51,8 @@ export default function MapillaryViewer({
   isPinDraggable = false,
   onTogglePinDraggable,
   showToast,
+  viewerLayout = 'split',
+  mapWidth = 50,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
@@ -254,6 +256,13 @@ export default function MapillaryViewer({
           };
           setCurrentPos(pos);
           onPositionChange?.(pos);
+
+          // Guarantee WebGL canvas adapts to current container dimensions upon loading image
+          setTimeout(() => {
+            if (isMounted && viewerRef.current) {
+              try { viewerRef.current.resize(); } catch (e) {}
+            }
+          }, 60);
         }
       });
 
@@ -262,6 +271,7 @@ export default function MapillaryViewer({
         if (!isMounted) return;
         setIsLoading(false);
         applyFilter();
+        try { viewer.resize(); } catch (e) {}
       });
 
       // Event: Camera bearing/pitch change
@@ -279,13 +289,19 @@ export default function MapillaryViewer({
         if (isMounted && viewerRef.current) {
           try { viewerRef.current.resize(); } catch (e) { /* ignore */ }
         }
-      }, 100);
+      }, 80);
 
       setTimeout(() => {
         if (isMounted && viewerRef.current) {
           try { viewerRef.current.resize(); } catch (e) { /* ignore */ }
         }
-      }, 500);
+      }, 300);
+
+      setTimeout(() => {
+        if (isMounted && viewerRef.current) {
+          try { viewerRef.current.resize(); } catch (e) { /* ignore */ }
+        }
+      }, 600);
 
     } catch (err) {
       console.error('Failed to initialize Mapillary viewer:', err);
@@ -307,6 +323,65 @@ export default function MapillaryViewer({
       }
     };
   }, []);
+
+  // Automatic container & viewport resizing via ResizeObserver + window listeners (mobile, tablet, desktop)
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const triggerResize = () => {
+      if (viewerRef.current) {
+        try {
+          viewerRef.current.resize();
+        } catch (e) {
+          // ignore transient resize calls
+        }
+      }
+    };
+
+    let resizeTimer = null;
+    const ro = new ResizeObserver(() => {
+      triggerResize();
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(triggerResize, 80);
+    });
+
+    ro.observe(containerRef.current);
+
+    window.addEventListener('resize', triggerResize);
+    window.addEventListener('orientationchange', triggerResize);
+
+    return () => {
+      ro.disconnect();
+      if (resizeTimer) clearTimeout(resizeTimer);
+      window.removeEventListener('resize', triggerResize);
+      window.removeEventListener('orientationchange', triggerResize);
+    };
+  }, []);
+
+  // Reactive staggered resizes when layout changes (split <-> fullscreen) or split width moves
+  useEffect(() => {
+    const triggerResize = () => {
+      if (viewerRef.current) {
+        try {
+          viewerRef.current.resize();
+        } catch (e) {}
+      }
+    };
+
+    // Staggered triggers accommodate CSS flex transitions (e.g., transition: flex 0.3s)
+    triggerResize();
+    const t1 = setTimeout(triggerResize, 50);
+    const t2 = setTimeout(triggerResize, 150);
+    const t3 = setTimeout(triggerResize, 350);
+    const t4 = setTimeout(triggerResize, 600);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
+  }, [viewerLayout, mapWidth]);
 
   // Sync imageId prop changes
   useEffect(() => {
@@ -368,7 +443,7 @@ export default function MapillaryViewer({
   }, [steerTarget]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', background: '#000000' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', background: '#000000', overflow: 'hidden', minWidth: 0, minHeight: 0 }}>
       {/* Loading Overlay */}
       {isLoading && (
         <div

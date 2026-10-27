@@ -2363,6 +2363,7 @@ export default function App() {
             {/* 360 Viewer: Dedicated Uploaded Panorama (Pannellum), Mapillary or Google Street View */}
             {activeTouristSpot && spotHasDedicatedPano(activeTouristSpot) && viewerPanoMode === 'dedicated' ? (
               <PanoramaViewer
+                viewerLayout={viewerLayout}
                 panorama={{
                   id: activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || activeTouristSpot.id,
                   filename: `${activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || activeTouristSpot.id}.jpg`,
@@ -2395,6 +2396,8 @@ export default function App() {
                 isPinDraggable={pinsDraggable}
                 onTogglePinDraggable={() => setPinsDraggable(!pinsDraggable)}
                 showToast={showToast}
+                viewerLayout={viewerLayout}
+                mapWidth={mapWidth}
                 onPositionChange={(pos) => {
                   setMapillaryImageId(pos.id);
                   setStreetViewPos(pos);
@@ -2432,8 +2435,8 @@ export default function App() {
               className="streetview-top-right-controls"
               style={{
                 position: 'absolute',
-                top: '12px',
-                right: '14px',
+                top: 'max(12px, env(safe-area-inset-top, 12px))',
+                right: 'max(14px, env(safe-area-inset-right, 14px))',
                 zIndex: 50,
                 display: 'flex',
                 alignItems: 'center',
@@ -2443,7 +2446,13 @@ export default function App() {
             >
               {/* Layout mode switcher: 50/50 Split or Full Browser Screen */}
               <button
-                onClick={() => setViewerLayout(viewerLayout === 'fullscreen' ? 'split' : 'fullscreen')}
+                onClick={() => {
+                  const nextLayout = viewerLayout === 'fullscreen' ? 'split' : 'fullscreen';
+                  setViewerLayout(nextLayout);
+                  setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+                  setTimeout(() => window.dispatchEvent(new Event('resize')), 250);
+                  setTimeout(() => window.dispatchEvent(new Event('resize')), 500);
+                }}
                 title={viewerLayout === 'fullscreen' ? 'Restore to 50/50 Half Screen' : 'Expand to Full Browser Screen'}
                 style={{
                   background: 'rgba(15, 23, 42, 0.85)',

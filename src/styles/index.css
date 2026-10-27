@@ -431,8 +431,18 @@ body {
 }
 
 .panorama-container {
-  width: 100%;
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.panorama-container canvas,
+.panorama-container > div {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* Viewer top bar */
@@ -1352,7 +1362,7 @@ body {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 860px), (max-width: 1024px) and (orientation: portrait) {
   .app-container {
     flex-direction: column;
   }
@@ -1375,6 +1385,7 @@ body {
 
   .panel-viewer {
     flex: 0 0 50%;
+    width: 100% !important;
   }
 
   .panel-viewer.hidden {
@@ -1382,7 +1393,8 @@ body {
   }
 
   .panel-viewer.fullscreen-viewer {
-    flex: 1 !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
     height: 100% !important;
   }
 

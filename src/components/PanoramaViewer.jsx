@@ -21,6 +21,7 @@ export default function PanoramaViewer({
   steerTarget,
   onCloseViewer,
   onFallbackToMapillary,
+  viewerLayout = 'split',
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
@@ -247,6 +248,55 @@ export default function PanoramaViewer({
       viewerRef.current.setHfov(Math.min(hfov + 10, 120));
     }
   }, []);
+
+  // Handle container resizing (e.g. split <-> fullscreen, mobile orientation change)
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const handleResize = () => {
+      try {
+        if (viewerRef.current && typeof viewerRef.current.resize === 'function') {
+          viewerRef.current.resize();
+        }
+      } catch (e) {}
+    };
+
+    const ro = new ResizeObserver(() => {
+      handleResize();
+    });
+    ro.observe(containerRef.current);
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
+  // Staggered resize when viewer layout changes
+  useEffect(() => {
+    const handleResize = () => {
+      try {
+        if (viewerRef.current && typeof viewerRef.current.resize === 'function') {
+          viewerRef.current.resize();
+        }
+      } catch (e) {}
+    };
+
+    handleResize();
+    const t1 = setTimeout(handleResize, 60);
+    const t2 = setTimeout(handleResize, 200);
+    const t3 = setTimeout(handleResize, 450);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [viewerLayout]);
 
   return (
     <div className="panorama-wrapper">
