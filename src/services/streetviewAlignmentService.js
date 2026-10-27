@@ -7,6 +7,8 @@
 const STORAGE_KEY = 'mapillary_aligned_sequences_v1';
 const EXCLUDED_STORAGE_KEY = 'mapillary_excluded_sequences_v1';
 const EXCLUDED_IMAGES_STORAGE_KEY = 'mapillary_excluded_images_v1';
+const NODE_OVERRIDES_STORAGE_KEY = 'mapillary_node_overrides_v1';
+const INTERSECTION_LINKS_STORAGE_KEY = 'mapillary_intersection_links_v1';
 const NEON_URL_KEY = 'lagangilang_neon_db_url';
 const DEFAULT_NEON_URL =
   'postgresql://neondb_owner:npg_NCe0hgVyZ7qx@ep-shy-art-aoq0wgaf-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
@@ -21,6 +23,8 @@ class StreetviewAlignmentService {
     this.alignedSequences = this.loadLocal();
     this.excludedSequences = this.loadExcludedLocal();
     this.excludedImages = this.loadExcludedImagesLocal();
+    this.nodeOverrides = this.loadNodeOverridesLocal();
+    this.intersectionLinks = this.loadIntersectionLinksLocal();
 
     // Auto-scrub default excluded sequences from locally cached aligned sequences
     let scrubbed = false;
@@ -129,6 +133,104 @@ class StreetviewAlignmentService {
     this.excludedImages.delete(strId);
     this.saveExcludedImagesLocal();
     return this.getExcludedImages();
+  }
+
+  loadNodeOverridesLocal() {
+    try {
+      const data = localStorage.getItem(NODE_OVERRIDES_STORAGE_KEY);
+      return data ? JSON.parse(data) : {};
+    } catch (e) {
+      console.warn('Failed to load node overrides from localStorage:', e);
+      return {};
+    }
+  }
+
+  saveNodeOverridesLocal() {
+    try {
+      localStorage.setItem(
+        NODE_OVERRIDES_STORAGE_KEY,
+        JSON.stringify(this.nodeOverrides)
+      );
+    } catch (e) {
+      console.warn('Failed to save node overrides to localStorage:', e);
+    }
+  }
+
+  getNodeOverride(imageId) {
+    if (!imageId) return null;
+    return this.nodeOverrides[String(imageId)] || null;
+  }
+
+  getAllNodeOverrides() {
+    return { ...this.nodeOverrides };
+  }
+
+  setNodeOverride(imageId, overrideData) {
+    if (!imageId) return;
+    const strId = String(imageId);
+    const existing = this.nodeOverrides[strId] || {};
+    this.nodeOverrides[strId] = {
+      ...existing,
+      ...overrideData,
+      updatedAt: new Date().toISOString(),
+    };
+    this.saveNodeOverridesLocal();
+    return this.nodeOverrides[strId];
+  }
+
+  removeNodeOverride(imageId) {
+    if (!imageId) return;
+    const strId = String(imageId);
+    delete this.nodeOverrides[strId];
+    this.saveNodeOverridesLocal();
+  }
+
+  loadIntersectionLinksLocal() {
+    try {
+      const data = localStorage.getItem(INTERSECTION_LINKS_STORAGE_KEY);
+      return data ? JSON.parse(data) : {};
+    } catch (e) {
+      console.warn('Failed to load intersection links from localStorage:', e);
+      return {};
+    }
+  }
+
+  saveIntersectionLinksLocal() {
+    try {
+      localStorage.setItem(
+        INTERSECTION_LINKS_STORAGE_KEY,
+        JSON.stringify(this.intersectionLinks)
+      );
+    } catch (e) {
+      console.warn('Failed to save intersection links to localStorage:', e);
+    }
+  }
+
+  getIntersectionLink(imageId) {
+    if (!imageId) return null;
+    return this.intersectionLinks[String(imageId)] || null;
+  }
+
+  getAllIntersectionLinks() {
+    return { ...this.intersectionLinks };
+  }
+
+  setIntersectionLink(imageId, links) {
+    if (!imageId) return;
+    const strId = String(imageId);
+    this.intersectionLinks[strId] = {
+      ...links,
+      updatedAt: new Date().toISOString(),
+    };
+    this.saveIntersectionLinksLocal();
+    return this.intersectionLinks[strId];
+  }
+
+  removeIntersectionLink(imageId) {
+    if (!imageId) return;
+    const strId = String(imageId);
+    delete this.intersectionLinks[strId];
+    this.saveIntersectionLinksLocal();
   }
 
   getExcludedSequences() {
@@ -636,30 +738,53 @@ class StreetviewAlignmentService {
   /**
    * Find the aligned coordinate, curve heading, and sequential navigation links
    * for a specific Mapillary image ID across all active aligned sequences.
+   * Incorporates fine-tuned node overrides and intersection branch links.
    */
   getAlignedPositionForImage(imageId) {
     if (!imageId) return null;
     const strId = String(imageId);
     if (this.isImageExcluded(strId)) return null;
+
+    const override = this.getNodeOverride(strId);
+    const branchLinks = this.getIntersectionLink(strId);
+
     for (const [seqId, aligned] of Object.entries(this.alignedSequences)) {
       if (this.isSequenceExcluded(seqId)) continue;
       if (!Array.isArray(aligned.images)) continue;
       const foundIdx = aligned.images.findIndex((img) => String(img.id) === strId);
       if (foundIdx !== -1) {
         const found = aligned.images[foundIdx];
+        const baseHeading = found.alignedHeading ?? found.heading ?? 0;
+        const finalHeading = override && typeof override.compassAngleOffset === 'number'
+          ? (baseHeading + override.compassAngleOffset + 360) % 360
+          : baseHeading;
+
         return {
-          lat: found.lat,
-          lng: found.lng,
-          heading: found.alignedHeading ?? found.heading,
+          lat: override?.lat ?? found.lat,
+          lng: override?.lng ?? found.lng,
+          heading: finalHeading,
           sequenceId: seqId,
           imageIndex: foundIdx,
           totalImages: aligned.images.length,
-          nextImageId: foundIdx < aligned.images.length - 1 ? String(aligned.images[foundIdx + 1].id) : null,
+          nextImageId: branchLinks?.forwardNodeId || (foundIdx < aligned.images.length - 1 ? String(aligned.images[foundIdx + 1].id) : null),
           prevImageId: foundIdx > 0 ? String(aligned.images[foundIdx - 1].id) : null,
           isAligned: true,
+          hasOverride: !!override,
+          branchLinks: branchLinks || null,
         };
       }
     }
+
+    if (override || branchLinks) {
+      return {
+        lat: override?.lat,
+        lng: override?.lng,
+        heading: override?.compassAngleOffset || 0,
+        hasOverride: !!override,
+        branchLinks: branchLinks || null,
+      };
+    }
+
     return null;
   }
 }

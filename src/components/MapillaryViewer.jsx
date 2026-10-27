@@ -3,6 +3,7 @@ import { Viewer } from 'mapillary-js';
 import 'mapillary-js/dist/mapillary.css';
 import { isNearCampusJunction, UA_HIGHWAY_JUNCTION } from '../utils/streetViewJunctions';
 import { streetviewAlignmentService } from '../services/streetviewAlignmentService';
+import StreetViewAdminWidget from './StreetViewAdminWidget';
 
 const MAPILLARY_ACCESS_TOKEN = 'MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9';
 // Valid 360° panos at the campus gate entrances (active verified Mapillary imagery)
@@ -46,6 +47,10 @@ export default function MapillaryViewer({
   isAdmin = false,
   onExcludeImage,
   onExcludeSequence,
+  onCalibrateNodePosition,
+  isPinDraggable = false,
+  onTogglePinDraggable,
+  showToast,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
@@ -56,6 +61,64 @@ export default function MapillaryViewer({
   const currentImageIdRef = useRef(null);
   const currentSequenceIdRef = useRef(null);
   const lastValidPosRef = useRef(null);
+
+  // Compass heading calibration handler (Workstream 6.2)
+  const handleCalibrateHeading = useCallback(async (delta, isReset = false) => {
+    const viewer = viewerRef.current;
+    if (!viewer || !currentPos?.id) return;
+    try {
+      const pov = await viewer.getPointOfView();
+      const newBearing = isReset ? (currentPos.originalHeading ?? 0) : ((pov.bearing || 0) + delta + 360) % 360;
+      await viewer.setPointOfView({ bearing: newBearing, pitch: pov.pitch || 0 });
+      
+      const existing = streetviewAlignmentService.getNodeOverride(currentPos.id) || {};
+      const newOffset = isReset ? 0 : (existing.compassAngleOffset || 0) + delta;
+      streetviewAlignmentService.setNodeOverride(currentPos.id, {
+        compassAngleOffset: newOffset,
+      });
+
+      setCurrentPos((prev) => ({
+        ...prev,
+        heading: newBearing,
+      }));
+      onHeadingChange?.(newBearing);
+      showToast?.(`Compass bearing calibrated: ${Math.round(newBearing)}° (${newOffset >= 0 ? '+' : ''}${newOffset}°)`);
+    } catch (e) {
+      console.warn('Heading calibration error:', e);
+    }
+  }, [currentPos, onHeadingChange, showToast]);
+
+  // GPS position nudge handler (Workstream 6.1)
+  const handleNudgePosition = useCallback((dLat, dLng) => {
+    if (!currentPos?.id) return;
+    const newLat = currentPos.lat + dLat;
+    const newLng = currentPos.lng + dLng;
+
+    streetviewAlignmentService.setNodeOverride(currentPos.id, {
+      lat: newLat,
+      lng: newLng,
+    });
+
+    const updatedPos = {
+      ...currentPos,
+      lat: newLat,
+      lng: newLng,
+      isAligned: true,
+    };
+    setCurrentPos(updatedPos);
+    onPositionChange?.(updatedPos);
+    onCalibrateNodePosition?.(currentPos.id, newLat, newLng);
+    showToast?.(`📍 Position calibrated: ${newLat.toFixed(5)}, ${newLng.toFixed(5)}`);
+  }, [currentPos, onPositionChange, onCalibrateNodePosition, showToast]);
+
+  // Navigate to target node (for branches)
+  const handleNavigateToNode = useCallback((targetNodeId) => {
+    if (!viewerRef.current || !targetNodeId) return;
+    viewerRef.current.moveTo(targetNodeId).catch((err) => {
+      console.warn('Failed to move to target node:', err);
+      showToast?.(`⚠️ Could not branch to node ${String(targetNodeId).slice(0, 8)}`);
+    });
+  }, [showToast]);
 
   // Apply filter to exclude unwanted sequences and individual buggy image nodes
   const applyFilter = useCallback(() => {
@@ -347,80 +410,121 @@ export default function MapillaryViewer({
         </div>
       )}
 
-      {/* Admin Location & Exclusion Menu (Workstream 3) */}
-      {isAdmin && currentPos && (
-        <div
-          className="glass-panel"
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            zIndex: 35,
-            padding: '10px 14px',
-            borderRadius: 'var(--radius-lg, 12px)',
-            background: 'rgba(15, 23, 42, 0.92)',
-            border: '1px solid rgba(239, 68, 68, 0.35)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            maxWidth: '280px',
-            fontSize: '0.74rem',
-            color: '#cbd5e1',
-            backdropFilter: 'blur(12px)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <strong style={{ color: '#f87171', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span>🛡️</span> Location Menu
-            </strong>
-            <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
-              {currentPos.lat.toFixed(5)}, {currentPos.lng.toFixed(5)}
-            </span>
-          </div>
+      {/* Minimized Admin Tools & Calibration Widget on Left Side (Workstreams 6 & 7) */}
+      <StreetViewAdminWidget
+        currentPos={currentPos}
+        isAdmin={isAdmin}
+        onExcludeImage={onExcludeImage}
+        onExcludeSequence={onExcludeSequence}
+        onCalibrateHeading={handleCalibrateHeading}
+        onNudgePosition={handleNudgePosition}
+        onNavigateToNode={handleNavigateToNode}
+        isPinDraggable={isPinDraggable}
+        onTogglePinDraggable={onTogglePinDraggable}
+        showToast={showToast}
+      />
 
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.3 }}>
-            <div>Image Key: <code style={{ color: '#38bdf8' }}>{currentPos.id}</code></div>
-            <div>Sequence: <code style={{ color: '#bae6fd' }}>{currentPos.sequenceId ? String(currentPos.sequenceId).slice(0, 10) + '...' : 'N/A'}</code></div>
-          </div>
+      {/* Intersection Branch Chevrons (Workstream 6.3 - for forks like Screenshot 005359) */}
+      {(() => {
+        const branchLink = currentPos?.id ? streetviewAlignmentService.getIntersectionLink(currentPos.id) : null;
+        if (!branchLink || (!branchLink.branchLeftNodeId && !branchLink.forwardNodeId && !branchLink.branchRightNodeId)) {
+          return null;
+        }
 
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button
-              onClick={() => onExcludeImage?.(currentPos.id)}
-              className="btn btn-danger btn-sm"
-              style={{
-                flex: 1,
-                padding: '4px 8px',
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                borderRadius: '6px',
-              }}
-              title="Blacklist and hide this specific image node"
-            >
-              🚫 Exclude Node
-            </button>
-            {currentPos.sequenceId && (
+        return (
+          <div
+            className="intersection-branch-hud"
+            style={{
+              position: 'absolute',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 34,
+              display: 'flex',
+              gap: '8px',
+              background: 'rgba(15, 23, 42, 0.92)',
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-full, 9999px)',
+              border: '1.5px solid #10b981',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+              backdropFilter: 'blur(12px)',
+              animation: 'fadeInUp 0.3s ease',
+            }}
+          >
+            {branchLink.branchLeftNodeId && (
               <button
-                onClick={() => onExcludeSequence?.(currentPos.sequenceId)}
-                className="btn btn-secondary btn-sm"
+                onClick={() => handleNavigateToNode(branchLink.branchLeftNodeId)}
+                className="btn btn-sm"
                 style={{
-                  flex: 1,
-                  padding: '4px 8px',
-                  fontSize: '0.68rem',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '9999px',
+                  padding: '5px 12px',
+                  fontSize: '0.74rem',
                   fontWeight: 700,
-                  borderRadius: '6px',
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  borderColor: 'rgba(239, 68, 68, 0.4)',
-                  color: '#fca5a5',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}
-                title="Blacklist and disable this entire erratic sequence"
+                title="Branch onto left path"
               >
-                ⚠️ Exclude Seq
+                <span>↰</span>
+                <span>Left Branch</span>
+              </button>
+            )}
+
+            {branchLink.forwardNodeId && (
+              <button
+                onClick={() => handleNavigateToNode(branchLink.forwardNodeId)}
+                className="btn btn-sm"
+                style={{
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '9999px',
+                  padding: '5px 12px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+                title="Continue straight down road"
+              >
+                <span>⮝</span>
+                <span>Straight Ahead</span>
+              </button>
+            )}
+
+            {branchLink.branchRightNodeId && (
+              <button
+                onClick={() => handleNavigateToNode(branchLink.branchRightNodeId)}
+                className="btn btn-sm"
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '9999px',
+                  padding: '5px 12px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+                title="Branch onto right path"
+              >
+                <span>↱</span>
+                <span>Right Branch</span>
               </button>
             )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Bottom-Left Highway Junction Transition: Step Out to Abra-Kalinga Highway on Google Street View */}
       {currentPos && isNearCampusJunction(currentPos.lat, currentPos.lng) && onSwitchToGoogle && (

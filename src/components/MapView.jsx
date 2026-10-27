@@ -49,6 +49,7 @@ export default function MapView({
   showMapillaryLines = true,
   excludedSequences = [],
   excludedImageKeys = [],
+  onCalibrateNodePosition,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -1216,6 +1217,7 @@ export default function MapView({
         ? 'Current Street View Position (Locked to Aligned Road Curve)'
         : 'Current Street View Position';
 
+      const canDragNode = Boolean(isAdmin && isDraggable);
       if (!streetViewMarkerRef.current) {
         const el = document.createElement('div');
         el.className = 'streetview-active-marker';
@@ -1225,20 +1227,31 @@ export default function MapView({
         el.style.backgroundColor = markerColor;
         el.style.border = '2px solid #ffffff';
         el.style.boxShadow = markerGlow;
-        el.style.cursor = 'pointer';
+        el.style.cursor = canDragNode ? 'grab' : 'pointer';
         el.style.transition = 'box-shadow 0.2s ease, background-color 0.2s ease';
-        el.title = markerTitle;
+        el.title = canDragNode ? 'Drag to calibrate Street View node position' : markerTitle;
 
-        streetViewMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'center' })
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center', draggable: canDragNode })
           .setLngLat([streetViewPos.lng, streetViewPos.lat])
           .addTo(map);
+
+        marker.on('dragend', () => {
+          const lngLat = marker.getLngLat();
+          if (streetViewPos.id) {
+            onCalibrateNodePosition?.(streetViewPos.id, lngLat.lat, lngLat.lng);
+          }
+        });
+
+        streetViewMarkerRef.current = marker;
       } else {
         const el = streetViewMarkerRef.current.getElement();
         if (el) {
           el.style.backgroundColor = markerColor;
           el.style.boxShadow = markerGlow;
-          el.title = markerTitle;
+          el.style.cursor = canDragNode ? 'grab' : 'pointer';
+          el.title = canDragNode ? 'Drag to calibrate Street View node position' : markerTitle;
         }
+        streetViewMarkerRef.current.setDraggable(canDragNode);
         streetViewMarkerRef.current.setLngLat([streetViewPos.lng, streetViewPos.lat]);
       }
     } else if (streetViewMarkerRef.current) {
@@ -1252,7 +1265,7 @@ export default function MapView({
         streetViewMarkerRef.current = null;
       }
     };
-  }, [streetViewPos]);
+  }, [streetViewPos, isAdmin, isDraggable, onCalibrateNodePosition]);
 
   // Update viewing direction cone for Street View
   useEffect(() => {

@@ -385,6 +385,14 @@ export default function App() {
     }
   }, [isAdmin, showToast]);
 
+  const handleCalibrateNodePosition = useCallback((imageId, lat, lng) => {
+    if (!isAdmin) return;
+    streetviewAlignmentService.setNodeOverride(imageId, { lat, lng });
+    setStreetViewPos((prev) => (prev ? { ...prev, lat, lng, isAligned: true } : prev));
+    setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+    showToast(`📍 Node GPS calibrated: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+  }, [isAdmin, showToast]);
+
   // Automatically calculate route when both Point A and Point B are chosen
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   useEffect(() => {
@@ -910,6 +918,7 @@ export default function App() {
           showMapillaryLines={showMapillaryLines}
           excludedSequences={excludedSequences}
           excludedImageKeys={excludedImageKeys}
+          onCalibrateNodePosition={handleCalibrateNodePosition}
         />
 
         {/* Map top controls */}
@@ -2382,6 +2391,10 @@ export default function App() {
                 isAdmin={isAdmin}
                 onExcludeImage={handleToggleExcludeImage}
                 onExcludeSequence={handleToggleExcludeSequence}
+                onCalibrateNodePosition={handleCalibrateNodePosition}
+                isPinDraggable={pinsDraggable}
+                onTogglePinDraggable={() => setPinsDraggable(!pinsDraggable)}
+                showToast={showToast}
                 onPositionChange={(pos) => {
                   setMapillaryImageId(pos.id);
                   setStreetViewPos(pos);
