@@ -20,6 +20,7 @@ import NavigationView from './components/NavigationView';
 import { getRoute } from './services/routingService';
 import { streetviewAlignmentService } from './services/streetviewAlignmentService';
 import StreetviewLineAligner from './components/StreetviewLineAligner';
+import AdminPasswordModal from './components/AdminPasswordModal';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -83,7 +84,11 @@ export default function App() {
 
   // Theme & Auth State
   const [mapTheme, setMapTheme] = useState(() => localStorage.getItem('lagangilang_map_theme') || 'light'); // 'dark' | 'light' | 'beige' | 'satellite'
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    return sessionStorage.getItem('lagangilang_admin_authenticated') === 'true';
+  });
+  const [showAdminPasswordModal, setShowAdminPasswordModal] = useState(false);
+  const [isChangePasswordMode, setIsChangePasswordMode] = useState(false);
   const [pinsDraggable, setPinsDraggable] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
 
@@ -786,6 +791,25 @@ export default function App() {
     setIsNavigating(false);
   }, []);
 
+  // Handle switching between Tourist and Admin roles (password protected)
+  const handleRoleToggle = useCallback(() => {
+    if (isAdmin) {
+      setIsAdmin(false);
+      sessionStorage.removeItem('lagangilang_admin_authenticated');
+      showToast('🌴 Tourist Explorer active — Explore map & navigate 360 street views');
+    } else {
+      setIsChangePasswordMode(false);
+      setShowAdminPasswordModal(true);
+    }
+  }, [isAdmin, showToast]);
+
+  const handleAdminAuthSuccess = useCallback(() => {
+    setIsAdmin(true);
+    sessionStorage.setItem('lagangilang_admin_authenticated', 'true');
+    setShowAdminPasswordModal(false);
+    showToast('🛡️ Admin Panel unlocked — Marker dragging & location marking enabled');
+  }, [showToast]);
+
   const stagedCount = touristSpots.filter((s) => s.sync_status === 'staged_local').length;
 
   if (isNavigating && routeData) {
@@ -806,16 +830,8 @@ export default function App() {
             {/* Role Indicator Badge */}
             <div
               className={`role-indicator ${isAdmin ? 'admin' : 'tourist'}`}
-              onClick={() => {
-                const next = !isAdmin;
-                setIsAdmin(next);
-                showToast(
-                  next
-                    ? '🛡️ Admin Panel active — Marker dragging & location marking enabled'
-                    : '🌴 Tourist Explorer active — Explore map & navigate 360 street views'
-                );
-              }}
-              title={isAdmin ? 'Switch to Tourist Explorer' : 'Switch to Admin Panel'}
+              onClick={handleRoleToggle}
+              title={isAdmin ? 'Switch to Tourist Explorer' : 'Switch to Admin Panel (Password Required)'}
             >
               <span className="role-indicator-dot" />
               <span>{isAdmin ? '🛡️ Admin Panel' : '🌴 Tourist Explorer'}</span>
@@ -1107,6 +1123,31 @@ export default function App() {
                       {excludedSequences.length}
                     </span>
                   )}
+                </button>
+
+                {/* Change Admin Password Button */}
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setIsChangePasswordMode(true);
+                    setShowAdminPasswordModal(true);
+                  }}
+                  title="Change Admin Password"
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-full)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    color: '#cbd5e1',
+                    background: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span>🔑 Password</span>
                 </button>
               </>
             )}
@@ -2207,6 +2248,15 @@ export default function App() {
         editingSpot={editingSpot}
       />
 
+
+      {/* ===== Admin Password Authorization & Change Modal ===== */}
+      <AdminPasswordModal
+        isOpen={showAdminPasswordModal}
+        onClose={() => setShowAdminPasswordModal(false)}
+        onSuccess={handleAdminAuthSuccess}
+        isChangePassword={isChangePasswordMode}
+        showToast={showToast}
+      />
 
       {/* ===== Floating Toast Notification ===== */}
       {toastMessage && (
