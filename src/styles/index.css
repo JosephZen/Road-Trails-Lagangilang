@@ -3130,20 +3130,6 @@ body {
   transform: translateX(2px);
 }
 
-.intersection-branch-hud {
-  user-select: none;
-  animation: fadeInUp 0.3s ease;
-}
-
-.intersection-branch-hud button {
-  transition: all 0.18s ease;
-}
-
-.intersection-branch-hud button:hover {
-  filter: brightness(1.15);
-  transform: translateY(-1px);
-}
-
 
 
 

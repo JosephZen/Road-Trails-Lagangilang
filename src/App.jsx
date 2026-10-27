@@ -24,8 +24,6 @@ import StreetviewLineAligner from './components/StreetviewLineAligner';
 import AdminPasswordModal from './components/AdminPasswordModal';
 import EmergencyModal from './components/EmergencyModal';
 import WeatherWidget from './components/WeatherWidget';
-import OfflineGuideModal from './components/OfflineGuideModal';
-import offlineCacheService from './services/offlineCacheService';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -63,7 +61,6 @@ export default function App() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [isNavMinimized, setIsNavMinimized] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
-  const [showOfflineModal, setShowOfflineModal] = useState(false);
   const [difficultyFilter, setDifficultyFilter] = useState('all'); // 'all' | 'Easy' | 'Moderate' | 'Challenging'
   const [showCustomOSM, setShowCustomOSM] = useState(true);
 
@@ -976,31 +973,6 @@ export default function App() {
               <span className="btn-label-text">Hotlines</span>
             </button>
 
-            {/* Offline Guide & Data Saver Button */}
-            <button
-              className="btn btn-secondary btn-offline-top"
-              onClick={() => setShowOfflineModal(true)}
-              title="Download maps & trail guide for zero-signal areas / Low-Data Mode"
-              style={{
-                fontSize: '0.8rem',
-                padding: '6px 12px',
-                borderRadius: 'var(--radius-full)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                background: 'rgba(15, 23, 42, 0.92)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: '#ffffff',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
-                backdropFilter: 'blur(12px)',
-              }}
-            >
-              <span>📥</span>
-              <span className="btn-label-text">Offline</span>
-            </button>
-
             {/* Route Button (Tourist prominent) */}
             <button
               className="btn btn-primary"
@@ -1828,38 +1800,6 @@ export default function App() {
                   <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>🚨</span>
                     <span>Emergency Hotlines & Guidelines</span>
-                  </span>
-                  <span>➔</span>
-                </button>
-              </div>
-
-              {/* Offline Maps & Data Saver Mode */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#34d399' }}>
-                  Offline Access & Data Saver
-                </span>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setShowOfflineModal(true);
-                    setSidebarOpen(false);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 14px',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
-                    background: 'rgba(16, 185, 129, 0.15)',
-                    border: '1px solid rgba(16, 185, 129, 0.35)',
-                    color: '#6ee7b7',
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>📥</span>
-                    <span>Download Offline Guide & Low-Data</span>
                   </span>
                   <span>➔</span>
                 </button>
@@ -2947,15 +2887,6 @@ export default function App() {
             showToast?.('📍 Navigating to emergency station location');
           }
         }}
-      />
-
-      {/* ===== Offline Guide & Data Saver Modal ===== */}
-      <OfflineGuideModal
-        isOpen={showOfflineModal}
-        onClose={() => setShowOfflineModal(false)}
-        touristSpots={touristSpots}
-        customGeoJSON={null}
-        showToast={showToast}
       />
 
       {/* ===== Floating Toast Notification ===== */}

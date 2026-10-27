@@ -621,10 +621,14 @@ class StreetviewAlignmentService {
   }
 
   /**
-   * Convert all saved aligned sequences to a MapLibre GeoJSON FeatureCollection
+   * Convert all saved aligned sequences to a MapLibre GeoJSON FeatureCollection.
+   * Automatically connects adjacent sequences (Line A to Line B) when their endpoints
+   * meet within 40 meters, ensuring an unbroken, continuous trail line on the 2D map.
    */
   toGeoJSON() {
     const features = [];
+    const seqEntries = [];
+
     for (const [seqId, data] of Object.entries(this.alignedSequences)) {
       if (this.isSequenceExcluded(seqId)) continue;
       if (!data.coordinates || data.coordinates.length < 2) continue;
@@ -643,6 +647,61 @@ class StreetviewAlignmentService {
           coordinates: data.coordinates,
         },
       });
+      seqEntries.push([seqId, data]);
+    }
+
+    // Automatically bridge Line A to Line B on the 2D map when endpoints are near
+    const connectedPairs = new Set();
+    for (let i = 0; i < seqEntries.length; i++) {
+      for (let j = i + 1; j < seqEntries.length; j++) {
+        const [idA, dataA] = seqEntries[i];
+        const [idB, dataB] = seqEntries[j];
+        const coordsA = dataA.coordinates;
+        const coordsB = dataB.coordinates;
+        const startA = coordsA[0];
+        const endA = coordsA[coordsA.length - 1];
+        const startB = coordsB[0];
+        const endB = coordsB[coordsB.length - 1];
+
+        const candidateConnections = [
+          { pA: endA, pB: startB },
+          { pA: endA, pB: endB },
+          { pA: startA, pB: startB },
+          { pA: startA, pB: endB },
+        ];
+
+        let bestPair = null;
+        let minD = Infinity;
+        for (const conn of candidateConnections) {
+          const d = getHaversineDistance(conn.pA[1], conn.pA[0], conn.pB[1], conn.pB[0]);
+          if (d <= 40 && d < minD) {
+            minD = d;
+            bestPair = conn;
+          }
+        }
+
+        if (bestPair && minD > 0.5) {
+          const pairKey = [idA, idB].sort().join('--');
+          if (!connectedPairs.has(pairKey)) {
+            connectedPairs.add(pairKey);
+            features.push({
+              type: 'Feature',
+              id: `connector-${idA}-${idB}`,
+              properties: {
+                isConnector: true,
+                isAligned: true,
+                sequenceA: idA,
+                sequenceB: idB,
+                distance: Math.round(minD),
+              },
+              geometry: {
+                type: 'LineString',
+                coordinates: [bestPair.pA, bestPair.pB],
+              },
+            });
+          }
+        }
+      }
     }
 
     return {
@@ -921,6 +980,69 @@ class StreetviewAlignmentService {
   }
 
   /**
+   * Find a magnetic snap coordinate near (lng, lat) from any other active aligned sequence's
+   * endpoints or control points, allowing Line A and Line B to connect seamlessly during handle dragging.
+   */
+  findSnapPoint(lng, lat, ignoreSeqId = null, snapDistanceMeters = 20) {
+    if (typeof lng !== 'number' || typeof lat !== 'number') return null;
+
+    let closestPoint = null;
+    let minD = Infinity;
+
+    for (const [seqId, aligned] of Object.entries(this.alignedSequences)) {
+      if (seqId === ignoreSeqId) continue;
+      if (this.isSequenceExcluded(seqId)) continue;
+      if (!Array.isArray(aligned.controlPoints) || aligned.controlPoints.length === 0) continue;
+
+      // Check endpoints (first and last control points) with higher priority
+      const candidates = [
+        aligned.controlPoints[0],
+        aligned.controlPoints[aligned.controlPoints.length - 1],
+        ...aligned.controlPoints.slice(1, -1),
+      ];
+
+      for (const pt of candidates) {
+        if (!Array.isArray(pt) || pt.length < 2) continue;
+        const [pLng, pLat] = pt;
+        const dist = getHaversineDistance(lat, lng, pLat, pLng);
+        if (dist <= snapDistanceMeters && dist < minD) {
+          minD = dist;
+          closestPoint = [pLng, pLat];
+        }
+      }
+    }
+
+    return closestPoint;
+  }
+
+  /**
+   * Find the starting or ending image node of an adjacent aligned sequence near (lat, lng),
+   * seamlessly bridging sequential navigation from Line A to Line B.
+   */
+  findConnectingSequenceNode(lat, lng, excludeSeqId = null, maxDistMeters = 40) {
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    let closestId = null;
+    let minD = Infinity;
+
+    for (const [seqId, aligned] of Object.entries(this.alignedSequences)) {
+      if (seqId === excludeSeqId || this.isSequenceExcluded(seqId)) continue;
+      if (!Array.isArray(aligned.images) || aligned.images.length === 0) continue;
+
+      const candidates = [aligned.images[0], aligned.images[aligned.images.length - 1]];
+      for (const img of candidates) {
+        if (!img || this.isImageExcluded(img.id)) continue;
+        const d = getHaversineDistance(lat, lng, img.lat, img.lng);
+        if (d <= maxDistMeters && d < minD) {
+          minD = d;
+          closestId = String(img.id);
+        }
+      }
+    }
+
+    return closestId;
+  }
+
+  /**
    * Find the closest Mapillary image ID along an aligned sequence to a clicked point.
    */
   findClosestImage(sequenceId, lat, lng) {
@@ -945,6 +1067,7 @@ class StreetviewAlignmentService {
    * Find the aligned coordinate, curve heading, and sequential navigation links
    * for a specific Mapillary image ID across all active aligned sequences.
    * Incorporates fine-tuned node overrides and intersection branch links.
+   * Seamlessly links Line A and Line B when reaching the ends of connected sequences.
    */
   getAlignedPositionForImage(imageId) {
     if (!imageId) return null;
@@ -965,6 +1088,18 @@ class StreetviewAlignmentService {
           ? (baseHeading + override.compassAngleOffset + 360) % 360
           : baseHeading;
 
+        // Determine sequential forward / backward links
+        let nextId = branchLinks?.forwardNodeId || (foundIdx < aligned.images.length - 1 ? String(aligned.images[foundIdx + 1].id) : null);
+        let prevId = foundIdx > 0 ? String(aligned.images[foundIdx - 1].id) : null;
+
+        // Bridge to adjacent sequence (Line A -> Line B) if at edge of this sequence
+        if (!nextId && foundIdx === aligned.images.length - 1) {
+          nextId = this.findConnectingSequenceNode(found.lat, found.lng, seqId, 40);
+        }
+        if (!prevId && foundIdx === 0) {
+          prevId = this.findConnectingSequenceNode(found.lat, found.lng, seqId, 40);
+        }
+
         return {
           lat: override?.lat ?? found.lat,
           lng: override?.lng ?? found.lng,
@@ -972,8 +1107,8 @@ class StreetviewAlignmentService {
           sequenceId: seqId,
           imageIndex: foundIdx,
           totalImages: aligned.images.length,
-          nextImageId: branchLinks?.forwardNodeId || (foundIdx < aligned.images.length - 1 ? String(aligned.images[foundIdx + 1].id) : null),
-          prevImageId: foundIdx > 0 ? String(aligned.images[foundIdx - 1].id) : null,
+          nextImageId: nextId,
+          prevImageId: prevId,
           isAligned: true,
           hasOverride: !!override,
           branchLinks: branchLinks || null,

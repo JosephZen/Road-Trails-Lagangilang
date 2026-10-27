@@ -581,17 +581,24 @@ export default function MapView({
           }
         }
 
-        // 0b. Check if clicked on a user-aligned streetview line (Streetview is 100% active!)
+        // 0b. Check if clicked on a user-aligned streetview line or sequence connector (Streetview is 100% active!)
         if (map.getLayer('aligned-streetview-layer')) {
           const alignedFeatures = map.queryRenderedFeatures(e.point, {
             layers: ['aligned-streetview-layer'],
           });
           if (alignedFeatures.length > 0) {
-            const seqId = alignedFeatures[0].properties?.sequenceId;
+            const feat = alignedFeatures[0];
+            const seqId = feat.properties?.sequenceId;
             if (seqId && !streetviewAlignmentService.isSequenceExcluded(seqId)) {
               const img = streetviewAlignmentService.findClosestImage(seqId, e.lngLat.lat, e.lngLat.lng);
               if (img && img.id) {
                 onMapClickRef.current?.(img.lat ?? e.lngLat.lat, img.lng ?? e.lngLat.lng, String(img.id), true);
+                return;
+              }
+            } else if (feat.properties?.isConnector) {
+              const closestAny = streetviewAlignmentService.findClosestImageAcrossAll(e.lngLat.lat, e.lngLat.lng, 35);
+              if (closestAny && closestAny.image) {
+                onMapClickRef.current?.(closestAny.image.lat, closestAny.image.lng, String(closestAny.image.id), true);
                 return;
               }
             }
@@ -885,8 +892,18 @@ export default function MapView({
       if (draggingHandleIndex.current !== null && aligningSequenceRef.current) {
         const idx = draggingHandleIndex.current;
         const seq = aligningSequenceRef.current;
+        let ptLng = e.lngLat.lng;
+        let ptLat = e.lngLat.lat;
+
+        // Magnetic snap to nearby sequence endpoints/lines to seamlessly connect Line A and Line B
+        const snapCandidate = streetviewAlignmentService.findSnapPoint(ptLng, ptLat, seq.sequenceId, 18);
+        if (snapCandidate) {
+          ptLng = snapCandidate[0];
+          ptLat = snapCandidate[1];
+        }
+
         const newControlPoints = [...seq.controlPoints];
-        newControlPoints[idx] = [e.lngLat.lng, e.lngLat.lat];
+        newControlPoints[idx] = [ptLng, ptLat];
 
         const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
           newControlPoints,
