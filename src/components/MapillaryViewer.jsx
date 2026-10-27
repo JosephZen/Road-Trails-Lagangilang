@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Viewer } from 'mapillary-js';
 import 'mapillary-js/dist/mapillary.css';
 import { isNearCampusJunction, UA_HIGHWAY_JUNCTION } from '../utils/streetViewJunctions';
+import { streetviewAlignmentService } from '../services/streetviewAlignmentService';
 
 const MAPILLARY_ACCESS_TOKEN = 'MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9';
 // Valid 360° panos at the campus gate entrances (active verified Mapillary imagery)
@@ -38,6 +39,7 @@ export default function MapillaryViewer({
   const [hasNext, setHasNext] = useState(true);
   const [hasPrev, setHasPrev] = useState(true);
   const [activeSeqId, setActiveSeqId] = useState(null);
+  const [alignedInfo, setAlignedInfo] = useState(null);
 
   const currentImageIdRef = useRef(null);
   const currentSequenceIdRef = useRef(null);
@@ -70,10 +72,27 @@ export default function MapillaryViewer({
     }
   }, [excludedSequences]);
 
-  // Step Forward along sequence (NavigationDirection.Next = 0)
+  // Step Forward along sequence (deterministic aligned image stepping with fallback to moveDir 0)
   const handleStepForward = useCallback(() => {
     if (!viewerRef.current || isNavigatingRef.current) return;
     isNavigatingRef.current = true;
+
+    // 1. If currently on an aligned sequence, advance directly along the re-aligned road curve
+    const alignedPos = streetviewAlignmentService.getAlignedPositionForImage(currentImageIdRef.current);
+    if (alignedPos && alignedPos.nextImageId) {
+      viewerRef.current
+        .moveTo(alignedPos.nextImageId)
+        .then(() => {
+          isNavigatingRef.current = false;
+        })
+        .catch(() => {
+          viewerRef.current?.moveDir(0)
+            .then(() => { isNavigatingRef.current = false; })
+            .catch(() => { isNavigatingRef.current = false; });
+        });
+      return;
+    }
+
     viewerRef.current
       .moveDir(0)
       .then(() => {
@@ -87,10 +106,27 @@ export default function MapillaryViewer({
       });
   }, []);
 
-  // Step Backward along sequence (NavigationDirection.Prev = 1)
+  // Step Backward along sequence (deterministic aligned image stepping with fallback to moveDir 1)
   const handleStepBackward = useCallback(() => {
     if (!viewerRef.current || isNavigatingRef.current) return;
     isNavigatingRef.current = true;
+
+    // 1. If currently on an aligned sequence, step backward directly along the re-aligned road curve
+    const alignedPos = streetviewAlignmentService.getAlignedPositionForImage(currentImageIdRef.current);
+    if (alignedPos && alignedPos.prevImageId) {
+      viewerRef.current
+        .moveTo(alignedPos.prevImageId)
+        .then(() => {
+          isNavigatingRef.current = false;
+        })
+        .catch(() => {
+          viewerRef.current?.moveDir(1)
+            .then(() => { isNavigatingRef.current = false; })
+            .catch(() => { isNavigatingRef.current = false; });
+        });
+      return;
+    }
+
     viewerRef.current
       .moveDir(1)
       .then(() => {
@@ -160,10 +196,15 @@ export default function MapillaryViewer({
 
         const image = event.image;
         if (image) {
-          currentImageIdRef.current = String(image.id);
+          const imageIdStr = String(image.id);
+          currentImageIdRef.current = imageIdStr;
           const seqId = image.sequenceId || image.sequence?.id;
           currentSequenceIdRef.current = seqId;
           setActiveSeqId(seqId);
+
+          // Retrieve re-aligned curve coordinates if this sequence was re-aligned by admin
+          const alignedPos = streetviewAlignmentService.getAlignedPositionForImage(imageIdStr);
+          setAlignedInfo(alignedPos);
 
           // Auto-recover if an excluded sequence is ever encountered
           const excluded = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
@@ -179,13 +220,21 @@ export default function MapillaryViewer({
           applyFilter(seqId);
 
           const pos = {
-            lat: image.lngLat?.lat,
-            lng: image.lngLat?.lng,
-            id: String(image.id),
+            lat: alignedPos?.lat ?? image.lngLat?.lat,
+            lng: alignedPos?.lng ?? image.lngLat?.lng,
+            id: imageIdStr,
             sequenceId: seqId,
+            heading: alignedPos?.heading ?? image.compassAngle,
+            isAligned: !!alignedPos,
           };
           setCurrentPos(pos);
           onPositionChange?.(pos);
+
+          // For aligned sequences, accurately reflect edge availability along the curve
+          if (alignedPos) {
+            setHasNext(!!alignedPos.nextImageId);
+            setHasPrev(!!alignedPos.prevImageId);
+          }
         }
       });
 
@@ -474,8 +523,17 @@ export default function MapillaryViewer({
             <span>Backward</span>
           </button>
 
-          <span className="streetview-nav-badge">
-            Trail Navigation
+          <span
+            className="streetview-nav-badge"
+            style={{
+              background: alignedInfo ? 'rgba(6, 182, 212, 0.25)' : undefined,
+              borderColor: alignedInfo ? '#06b6d4' : undefined,
+              color: alignedInfo ? '#a5f3fc' : undefined,
+            }}
+          >
+            {alignedInfo
+              ? `🎯 Aligned Trail (${alignedInfo.imageIndex + 1}/${alignedInfo.totalImages})`
+              : 'Trail Navigation'}
           </span>
 
           <button

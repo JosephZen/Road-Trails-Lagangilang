@@ -587,7 +587,7 @@ export default function MapView({
             if (seqId && !streetviewAlignmentService.isSequenceExcluded(seqId)) {
               const img = streetviewAlignmentService.findClosestImage(seqId, e.lngLat.lat, e.lngLat.lng);
               if (img && img.id) {
-                onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, String(img.id), true);
+                onMapClickRef.current?.(img.lat ?? e.lngLat.lat, img.lng ?? e.lngLat.lng, String(img.id), true);
                 return;
               }
             }
@@ -1204,22 +1204,38 @@ export default function MapView({
         map.flyTo({ center: [streetViewPos.lng, streetViewPos.lat], zoom: Math.max(map.getZoom(), 15), duration: 1000 });
       }
 
+      const isAligned = Boolean(streetViewPos.isAligned);
+      const markerColor = isAligned ? '#06b6d4' : '#05cb63';
+      const markerGlow = isAligned
+        ? '0 0 16px #06b6d4, 0 0 4px rgba(0,0,0,0.8)'
+        : '0 0 12px #05cb63, 0 0 4px rgba(0,0,0,0.5)';
+      const markerTitle = isAligned
+        ? 'Current Street View Position (Locked to Aligned Road Curve)'
+        : 'Current Street View Position';
+
       if (!streetViewMarkerRef.current) {
         const el = document.createElement('div');
         el.className = 'streetview-active-marker';
         el.style.width = '18px';
         el.style.height = '18px';
         el.style.borderRadius = '50%';
-        el.style.backgroundColor = '#05cb63';
+        el.style.backgroundColor = markerColor;
         el.style.border = '2px solid #ffffff';
-        el.style.boxShadow = '0 0 12px #05cb63, 0 0 4px rgba(0,0,0,0.5)';
+        el.style.boxShadow = markerGlow;
         el.style.cursor = 'pointer';
-        el.title = 'Current Street View Position';
+        el.style.transition = 'box-shadow 0.2s ease, background-color 0.2s ease';
+        el.title = markerTitle;
 
         streetViewMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([streetViewPos.lng, streetViewPos.lat])
           .addTo(map);
       } else {
+        const el = streetViewMarkerRef.current.getElement();
+        if (el) {
+          el.style.backgroundColor = markerColor;
+          el.style.boxShadow = markerGlow;
+          el.title = markerTitle;
+        }
         streetViewMarkerRef.current.setLngLat([streetViewPos.lng, streetViewPos.lat]);
       }
     } else if (streetViewMarkerRef.current) {

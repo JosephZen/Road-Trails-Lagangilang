@@ -468,6 +468,14 @@ export default function App() {
         }
       })
       .catch(() => {});
+
+    // 4. Background synchronization of aligned streetview sequences from Neon DB
+    streetviewAlignmentService
+      .syncWithNeon()
+      .then(() => {
+        setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+      })
+      .catch(() => {});
   }, []);
 
   // Filter spots by Tourist Attraction vs Service/POI and Barangay

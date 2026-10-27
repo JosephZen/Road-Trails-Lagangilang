@@ -6,6 +6,9 @@
 
 const STORAGE_KEY = 'mapillary_aligned_sequences_v1';
 const EXCLUDED_STORAGE_KEY = 'mapillary_excluded_sequences_v1';
+const NEON_URL_KEY = 'lagangilang_neon_db_url';
+const DEFAULT_NEON_URL =
+  'postgresql://neondb_owner:npg_NCe0hgVyZ7qx@ep-shy-art-aoq0wgaf-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
 const MAPILLARY_GRAPH_API = 'https://graph.mapillary.com';
 const ACCESS_TOKEN = 'MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9';
 
@@ -30,6 +33,7 @@ class StreetviewAlignmentService {
     }
 
     this.syncWithBackend();
+    this.syncWithNeon();
   }
 
   loadLocal() {
@@ -115,12 +119,14 @@ class StreetviewAlignmentService {
         if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
           this.alignedSequences = { ...remote, ...this.alignedSequences };
           this.saveLocal();
-          return;
         }
       }
     } catch (_) {}
 
-    // 2. Fallback for Vercel / static hosting: load bundled aligned_sequences.json
+    // 2. Neon PostgreSQL synchronization (real-time cross-device alignment sync)
+    await this.syncWithNeon();
+
+    // 3. Fallback for static hosting: load bundled aligned_sequences.json
     try {
       const staticRes = await fetch('/data/aligned_sequences.json');
       if (staticRes.ok) {
@@ -132,6 +138,43 @@ class StreetviewAlignmentService {
       }
     } catch (err) {
       console.warn('Fallback aligned sequences load notice:', err);
+    }
+  }
+
+  async syncWithNeon() {
+    try {
+      const dbUrl = (typeof localStorage !== 'undefined' && localStorage.getItem(NEON_URL_KEY)) || DEFAULT_NEON_URL;
+      const { neon } = await import('@neondatabase/serverless');
+      const sql = neon(dbUrl);
+      const rows = await sql`
+        SELECT sequence_id, name, control_points, coordinates, images, updated_at
+        FROM public.aligned_sequences
+      `;
+      if (Array.isArray(rows) && rows.length > 0) {
+        let updated = false;
+        for (const row of rows) {
+          if (!row.sequence_id) continue;
+          const localRecord = this.alignedSequences[row.sequence_id];
+          const localTime = localRecord?.updatedAt || 0;
+          const remoteTime = new Date(row.updated_at || 0).getTime();
+          if (!localRecord || remoteTime > localTime) {
+            this.alignedSequences[row.sequence_id] = {
+              sequenceId: row.sequence_id,
+              name: row.name,
+              controlPoints: row.control_points,
+              coordinates: row.coordinates,
+              images: row.images,
+              updatedAt: remoteTime,
+            };
+            updated = true;
+          }
+        }
+        if (updated) {
+          this.saveLocal();
+        }
+      }
+    } catch (err) {
+      console.warn('Neon aligned_sequences sync notice:', err?.message || err);
     }
   }
 
@@ -149,14 +192,33 @@ class StreetviewAlignmentService {
       name: data.name || `Aligned Sequence ${sequenceId.slice(0, 8)}`,
       controlPoints: data.controlPoints, // Draggable handle coordinates [[lng, lat], ...]
       coordinates: data.coordinates, // High-res interpolated coordinates [[lng, lat], ...]
-      images: data.images, // Array of { id, lat, lng, originalLng, originalLat }
+      images: data.images, // Array of { id, lat, lng, originalLng, originalLat, alignedHeading }
       updatedAt: Date.now(),
     };
 
     this.alignedSequences[sequenceId] = record;
     this.saveLocal();
 
-    // Mirror to backend if available
+    // 1. Save directly to Neon DB so ALL devices immediately receive it
+    try {
+      const dbUrl = (typeof localStorage !== 'undefined' && localStorage.getItem(NEON_URL_KEY)) || DEFAULT_NEON_URL;
+      const { neon } = await import('@neondatabase/serverless');
+      const sql = neon(dbUrl);
+      await sql`
+        INSERT INTO public.aligned_sequences (sequence_id, name, control_points, coordinates, images, updated_at)
+        VALUES (${sequenceId}, ${record.name}, ${JSON.stringify(record.controlPoints || [])}::jsonb, ${JSON.stringify(record.coordinates || [])}::jsonb, ${JSON.stringify(record.images || [])}::jsonb, NOW())
+        ON CONFLICT (sequence_id) DO UPDATE SET
+          name = EXCLUDED.name,
+          control_points = EXCLUDED.control_points,
+          coordinates = EXCLUDED.coordinates,
+          images = EXCLUDED.images,
+          updated_at = NOW();
+      `;
+    } catch (neonErr) {
+      console.warn('Neon save aligned sequence notice:', neonErr?.message || neonErr);
+    }
+
+    // 2. Mirror to Express backend if available
     try {
       await fetch('/api/aligned-sequences', {
         method: 'POST',
@@ -171,6 +233,13 @@ class StreetviewAlignmentService {
   async deleteAlignedSequence(sequenceId) {
     delete this.alignedSequences[sequenceId];
     this.saveLocal();
+
+    try {
+      const dbUrl = (typeof localStorage !== 'undefined' && localStorage.getItem(NEON_URL_KEY)) || DEFAULT_NEON_URL;
+      const { neon } = await import('@neondatabase/serverless');
+      const sql = neon(dbUrl);
+      await sql`DELETE FROM public.aligned_sequences WHERE sequence_id = ${sequenceId}`;
+    } catch (_) {}
 
     try {
       await fetch(`/api/aligned-sequences/${encodeURIComponent(sequenceId)}`, {
@@ -376,8 +445,23 @@ class StreetviewAlignmentService {
   }
 
   /**
+   * Calculate forward compass bearing (0-360 deg) between two coordinates
+   */
+  calculateBearing(lat1, lon1, lat2, lon2) {
+    const toRad = (d) => (d * Math.PI) / 180;
+    const toDeg = (r) => (r * 180) / Math.PI;
+    const dLon = toRad(lon2 - lon1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x =
+      Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+      Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    return Math.round((toDeg(Math.atan2(y, x)) + 360) % 360);
+  }
+
+  /**
    * Given control points, generates a smooth high-density path and maps
    * sequence images proportionally along the bent path.
+   * Also computes the forward tangent curve bearing for every image.
    */
   generateBentGeometry(controlPoints, images) {
     if (!controlPoints || controlPoints.length < 2) {
@@ -394,10 +478,23 @@ class StreetviewAlignmentService {
       const coordIdx = Math.min(coordinates.length - 1, Math.round(fraction * (coordinates.length - 1)));
       const [bentLng, bentLat] = coordinates[coordIdx];
 
+      // Calculate forward curve tangent heading along the bent road
+      let alignedHeading = img.heading || 0;
+      if (coordinates.length >= 2) {
+        if (coordIdx < coordinates.length - 1) {
+          const [nextLng, nextLat] = coordinates[coordIdx + 1];
+          alignedHeading = this.calculateBearing(bentLat, bentLng, nextLat, nextLng);
+        } else if (coordIdx > 0) {
+          const [prevLng, prevLat] = coordinates[coordIdx - 1];
+          alignedHeading = this.calculateBearing(prevLat, prevLng, bentLat, bentLng);
+        }
+      }
+
       return {
         ...img,
         lat: bentLat,
         lng: bentLng,
+        alignedHeading,
       };
     });
 
@@ -470,6 +567,35 @@ class StreetviewAlignmentService {
     }
 
     return closest;
+  }
+
+  /**
+   * Find the aligned coordinate, curve heading, and sequential navigation links
+   * for a specific Mapillary image ID across all active aligned sequences.
+   */
+  getAlignedPositionForImage(imageId) {
+    if (!imageId) return null;
+    const strId = String(imageId);
+    for (const [seqId, aligned] of Object.entries(this.alignedSequences)) {
+      if (this.isSequenceExcluded(seqId)) continue;
+      if (!Array.isArray(aligned.images)) continue;
+      const foundIdx = aligned.images.findIndex((img) => String(img.id) === strId);
+      if (foundIdx !== -1) {
+        const found = aligned.images[foundIdx];
+        return {
+          lat: found.lat,
+          lng: found.lng,
+          heading: found.alignedHeading ?? found.heading,
+          sequenceId: seqId,
+          imageIndex: foundIdx,
+          totalImages: aligned.images.length,
+          nextImageId: foundIdx < aligned.images.length - 1 ? String(aligned.images[foundIdx + 1].id) : null,
+          prevImageId: foundIdx > 0 ? String(aligned.images[foundIdx - 1].id) : null,
+          isAligned: true,
+        };
+      }
+    }
+    return null;
   }
 }
 
