@@ -1748,6 +1748,7 @@ export default function App() {
             ) : viewerPanoMode === 'mapillary' ? (
               <MapillaryViewer
                 imageId={mapillaryImageId || MAPILLARY_CAMPUS_GATE_IMAGE_ID}
+                excludedSequences={excludedSequences}
                 onPositionChange={(pos) => {
                   setMapillaryImageId(pos.id);
                   setStreetViewPos(pos);

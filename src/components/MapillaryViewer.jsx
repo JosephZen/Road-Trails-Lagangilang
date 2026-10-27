@@ -4,7 +4,9 @@ import 'mapillary-js/dist/mapillary.css';
 import { isNearCampusJunction, UA_HIGHWAY_JUNCTION } from '../utils/streetViewJunctions';
 
 const MAPILLARY_ACCESS_TOKEN = 'MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9';
-const DEFAULT_IMAGE_ID = '1532761357806896'; // UA Campus Entrance Gate, Lagangilang
+// Valid 360° panos at the campus gate entrances (active verified Mapillary imagery)
+const DEFAULT_IMAGE_ID = '1171410495001931'; // UA Campus Gate Entrance
+const FALLBACK_NORTH_GATE_ID = '2181045539141833'; // UA North Campus Gate
 
 const isValidMapillaryId = (id) => {
   return id && String(id).length >= 10 && /^\d+$/.test(String(id));
@@ -13,9 +15,16 @@ const isValidMapillaryId = (id) => {
 /**
  * Robust Mapillary 360° Street View Viewer using mapillary-js v4.
  * Renders high-performance street imagery from Mapillary Graph API & Meta CDN.
+ * 
+ * Features:
+ * - Strict single-sequence navigation: follows the continuous road trail forward/backward
+ * - Complete exclusion of erratic/overlapping sequences (e.g. daygfFRm94o2xOpPQNsG0l)
+ * - Suppression of errant lateral/off-road spatial jump arrows
+ * - Floating on-screen Forward / Backward navigation HUD + Keyboard hotkeys (W/S, ↑/↓)
  */
 export default function MapillaryViewer({
   imageId,
+  excludedSequences = [],
   onPositionChange,
   onHeadingChange,
   steerTarget,
@@ -26,8 +35,96 @@ export default function MapillaryViewer({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPos, setCurrentPos] = useState(null);
+  const [hasNext, setHasNext] = useState(true);
+  const [hasPrev, setHasPrev] = useState(true);
+  const [activeSeqId, setActiveSeqId] = useState(null);
+
   const currentImageIdRef = useRef(null);
+  const currentSequenceIdRef = useRef(null);
   const isNavigatingRef = useRef(false);
+
+  // Apply filter to exclude unwanted sequences and lock onto the current sequence trail
+  const applyFilter = useCallback((seqId = null) => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const excluded = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
+    let filterExpr = null;
+
+    if (excluded.length > 0 && seqId) {
+      filterExpr = [
+        'all',
+        ['!in', 'sequenceId', ...excluded],
+        ['==', 'sequenceId', String(seqId)],
+      ];
+    } else if (excluded.length > 0) {
+      filterExpr = ['!in', 'sequenceId', ...excluded];
+    } else if (seqId) {
+      filterExpr = ['==', 'sequenceId', String(seqId)];
+    }
+
+    try {
+      viewer.setFilter(filterExpr);
+    } catch (e) {
+      console.warn('Mapillary filter warning:', e);
+    }
+  }, [excludedSequences]);
+
+  // Step Forward along sequence (NavigationDirection.Next = 0)
+  const handleStepForward = useCallback(() => {
+    if (!viewerRef.current || isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    viewerRef.current
+      .moveDir(0)
+      .then(() => {
+        isNavigatingRef.current = false;
+      })
+      .catch((err) => {
+        isNavigatingRef.current = false;
+        if (err?.name !== 'CancelMapillaryError' && !err?.message?.includes('cancel')) {
+          console.warn('Forward step warning:', err);
+        }
+      });
+  }, []);
+
+  // Step Backward along sequence (NavigationDirection.Prev = 1)
+  const handleStepBackward = useCallback(() => {
+    if (!viewerRef.current || isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    viewerRef.current
+      .moveDir(1)
+      .then(() => {
+        isNavigatingRef.current = false;
+      })
+      .catch((err) => {
+        isNavigatingRef.current = false;
+        if (err?.name !== 'CancelMapillaryError' && !err?.message?.includes('cancel')) {
+          console.warn('Backward step warning:', err);
+        }
+      });
+  }, []);
+
+  // Keyboard navigation support: W / ↑ (Forward) and S / ↓ (Backward)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        handleStepForward();
+      } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        handleStepBackward();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleStepForward, handleStepBackward]);
+
+  // Re-apply filter whenever excludedSequences updates
+  useEffect(() => {
+    applyFilter(currentSequenceIdRef.current);
+  }, [excludedSequences, applyFilter]);
 
   // Initialize Viewer on Mount
   useEffect(() => {
@@ -45,7 +142,9 @@ export default function MapillaryViewer({
         imageId: targetId,
         component: {
           cover: false,
-          direction: true,
+          direction: {
+            distinguishSequence: true, // Visually tags sequence arrows vs cross-sequence edges
+          },
           sequence: true,
           spatial: false, // Disabled: avoids distracting 3D camera wireframes and SfM artifacts
           zoom: true,
@@ -62,20 +161,47 @@ export default function MapillaryViewer({
         const image = event.image;
         if (image) {
           currentImageIdRef.current = String(image.id);
+          const seqId = image.sequenceId || image.sequence?.id;
+          currentSequenceIdRef.current = seqId;
+          setActiveSeqId(seqId);
+
+          // Auto-recover if an excluded sequence is ever encountered
+          const excluded = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
+          if (seqId && excluded.includes(String(seqId))) {
+            console.warn(`Image belongs to excluded sequence ${seqId}; auto-recovering to valid campus entrance...`);
+            viewer.moveTo(DEFAULT_IMAGE_ID).catch(() => {
+              viewer.moveTo(FALLBACK_NORTH_GATE_ID).catch(() => {});
+            });
+            return;
+          }
+
+          // Lock filter to current sequence so navigation arrows only advance/reverse along the road
+          applyFilter(seqId);
+
           const pos = {
             lat: image.lngLat?.lat,
             lng: image.lngLat?.lng,
             id: String(image.id),
+            sequenceId: seqId,
           };
           setCurrentPos(pos);
           onPositionChange?.(pos);
         }
       });
 
+      // Event: Viewer sequence edge status (available forward/backward edges)
+      viewer.on('sequenceedges', (event) => {
+        if (!isMounted) return;
+        const edges = event.status?.edges || [];
+        setHasNext(edges.some((e) => e.data?.direction === 0)); // 0 = Next (Forward)
+        setHasPrev(edges.some((e) => e.data?.direction === 1)); // 1 = Prev (Backward)
+      });
+
       // Event: Viewer fully loaded
       viewer.on('load', () => {
         if (!isMounted) return;
         setIsLoading(false);
+        applyFilter(currentSequenceIdRef.current);
       });
 
       // Event: Camera bearing/pitch change
@@ -180,6 +306,15 @@ export default function MapillaryViewer({
 
       try {
         currentImageIdRef.current = targetId;
+
+        // Temporarily loosen single-sequence restriction so viewer can transition to new sequence
+        const excluded = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
+        if (excluded.length > 0) {
+          try { viewer.setFilter(['!in', 'sequenceId', ...excluded]); } catch (e) {}
+        } else {
+          try { viewer.setFilter(null); } catch (e) {}
+        }
+
         await viewerRef.current.moveTo(targetId);
         if (!isCancelled) {
           setIsLoading(false);
@@ -188,7 +323,6 @@ export default function MapillaryViewer({
         }
       } catch (err) {
         if (isCancelled) return;
-        // Ignore CancelMapillaryError (user clicked another spot or image while transitioning)
         if (
           err?.name === 'CancelMapillaryError' ||
           err?.message?.toLowerCase().includes('cancel')
@@ -210,7 +344,19 @@ export default function MapillaryViewer({
               return;
             }
           } catch (fallbackErr) {
-            console.warn('Fallback also failed:', fallbackErr);
+            console.warn('Fallback gate also failed, trying north gate:', fallbackErr);
+            try {
+              currentImageIdRef.current = FALLBACK_NORTH_GATE_ID;
+              await viewerRef.current.moveTo(FALLBACK_NORTH_GATE_ID);
+              if (!isCancelled) {
+                setIsLoading(false);
+                setError(null);
+                isNavigatingRef.current = false;
+                return;
+              }
+            } catch (northErr) {
+              console.warn('North gate fallback failed:', northErr);
+            }
           }
         }
 
@@ -225,7 +371,7 @@ export default function MapillaryViewer({
     return () => {
       isCancelled = true;
     };
-  }, [imageId]);
+  }, [imageId, excludedSequences]);
 
   // Steer camera toward landmark heading and pitch if requested
   useEffect(() => {
@@ -312,6 +458,35 @@ export default function MapillaryViewer({
               🏠 Reset to Gate
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Bottom-Center Floating Trail Navigation HUD (Strict Forward & Backward along the sequence road) */}
+      {!isLoading && !error && (
+        <div className="streetview-nav-hud">
+          <button
+            className="streetview-nav-btn"
+            disabled={!hasPrev || isNavigatingRef.current}
+            onClick={handleStepBackward}
+            title="Step backward along trail (S or ↓)"
+          >
+            <span>⮟</span>
+            <span>Backward</span>
+          </button>
+
+          <span className="streetview-nav-badge">
+            Trail Navigation
+          </span>
+
+          <button
+            className="streetview-nav-btn"
+            disabled={!hasNext || isNavigatingRef.current}
+            onClick={handleStepForward}
+            title="Step forward along trail (W or ↑)"
+          >
+            <span>Forward</span>
+            <span>⮝</span>
+          </button>
         </div>
       )}
 

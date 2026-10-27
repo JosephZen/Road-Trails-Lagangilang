@@ -14,8 +14,9 @@ export const UA_HIGHWAY_JUNCTION = {
   title: 'Abra-Kalinga Highway (UA Campus Gate Entrance)',
 };
 
-// Starting Mapillary Sequence Image ID at the Campus Gate
-export const MAPILLARY_CAMPUS_GATE_IMAGE_ID = '1532761357806896';
+// Starting Mapillary Sequence Image ID at the Campus Gate (Active 360° Pano at UA Campus Gate)
+export const MAPILLARY_CAMPUS_GATE_IMAGE_ID = '1171410495001931';
+export const MAPILLARY_CAMPUS_NORTH_GATE_IMAGE_ID = '2181045539141833';
 
 /**
  * Determine if a given coordinate is located inside the University of Abra Lagangilang Campus grounds,

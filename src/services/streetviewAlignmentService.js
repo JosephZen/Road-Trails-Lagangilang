@@ -16,6 +16,19 @@ class StreetviewAlignmentService {
   constructor() {
     this.alignedSequences = this.loadLocal();
     this.excludedSequences = this.loadExcludedLocal();
+
+    // Auto-scrub default excluded sequences from locally cached aligned sequences
+    let scrubbed = false;
+    for (const seqId of DEFAULT_EXCLUDED_SEQUENCES) {
+      if (this.alignedSequences[seqId]) {
+        delete this.alignedSequences[seqId];
+        scrubbed = true;
+      }
+    }
+    if (scrubbed) {
+      this.saveLocal();
+    }
+
     this.syncWithBackend();
   }
 

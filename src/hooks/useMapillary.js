@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { streetviewAlignmentService } from '../services/streetviewAlignmentService';
 
 const MAPILLARY_GRAPH_API = 'https://graph.mapillary.com';
 const ACCESS_TOKEN = 'MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9';
@@ -37,7 +38,7 @@ export function useMapillary() {
         isPano: img.is_pano,
         thumbUrl: img.thumb_1024_url,
         sequenceId: img.sequence,
-      }));
+      })).filter((img) => !streetviewAlignmentService.isSequenceExcluded(img.sequenceId));
 
       // If nothing within tight bbox, expand to ~2.5km to ensure sequence clicks always find images
       if (items.length === 0) {
@@ -55,7 +56,7 @@ export function useMapillary() {
             isPano: img.is_pano,
             thumbUrl: img.thumb_1024_url,
             sequenceId: img.sequence,
-          }));
+          })).filter((img) => !streetviewAlignmentService.isSequenceExcluded(img.sequenceId));
         }
       }
 

@@ -1123,7 +1123,7 @@ export default function TouristSpotModal({
                   <input
                     type="text"
                     name="connectedPanoId"
-                    placeholder="e.g. 1532761357806896"
+                    placeholder="e.g. 1171410495001931"
                     value={formData.connectedPanoId}
                     onChange={handleChange}
                     className="input-field"

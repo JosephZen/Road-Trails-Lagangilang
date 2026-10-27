@@ -462,23 +462,24 @@ export default function MapView({
     // Helper to safely extract a sequence ID from any Mapillary feature
     const extractMapillarySequenceId = (feature) => {
       if (!feature) return null;
+      let id = null;
       if (feature.layer?.id === 'mapillary-sequences' || feature.layer?.id === 'mapillary-sequences-casing') {
-        const id = feature.properties?.id || feature.properties?.sequence_id || feature.properties?.sequence || feature.id;
-        return id ? String(id) : null;
+        id = feature.properties?.id || feature.properties?.sequence_id || feature.properties?.sequence || feature.id;
+      } else if (feature.layer?.id === 'mapillary-images') {
+        id = feature.properties?.sequence_id || feature.properties?.sequence;
+      } else if (feature.layer?.id === 'aligned-streetview-layer' || feature.layer?.id === 'aligned-streetview-casing') {
+        id = feature.properties?.sequenceId;
       }
-      if (feature.layer?.id === 'mapillary-images') {
-        const id = feature.properties?.sequence_id || feature.properties?.sequence;
-        return id ? String(id) : null;
-      }
-      if (feature.layer?.id === 'aligned-streetview-layer' || feature.layer?.id === 'aligned-streetview-casing') {
-        return feature.properties?.sequenceId ? String(feature.properties.sequenceId) : null;
-      }
-      return null;
+      if (id && streetviewAlignmentService.isSequenceExcluded(id)) return null;
+      return id ? String(id) : null;
     };
 
     // Helper to safely extract a valid 64-bit Mapillary image ID (never an internal sequence ID or vector tile index)
     const extractMapillaryImageId = (feature) => {
       if (!feature) return null;
+      const seqId = feature.properties?.sequence_id || feature.properties?.sequence || feature.properties?.sequenceId;
+      if (seqId && streetviewAlignmentService.isSequenceExcluded(seqId)) return null;
+
       // Never use properties.id from a sequence feature (it is a sequence ID, not an image ID)
       if (feature.layer?.id === 'mapillary-sequences') {
         const seqImageId = feature.properties?.image_id;
@@ -583,10 +584,12 @@ export default function MapView({
           });
           if (alignedFeatures.length > 0) {
             const seqId = alignedFeatures[0].properties?.sequenceId;
-            const img = streetviewAlignmentService.findClosestImage(seqId, e.lngLat.lat, e.lngLat.lng);
-            if (img && img.id) {
-              onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, String(img.id), true);
-              return;
+            if (seqId && !streetviewAlignmentService.isSequenceExcluded(seqId)) {
+              const img = streetviewAlignmentService.findClosestImage(seqId, e.lngLat.lat, e.lngLat.lng);
+              if (img && img.id) {
+                onMapClickRef.current?.(e.lngLat.lat, e.lngLat.lng, String(img.id), true);
+                return;
+              }
             }
           }
         }

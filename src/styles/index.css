@@ -2863,6 +2863,90 @@ body {
   color: #fff;
 }
 
+/* ==========================================================================
+   Mapillary Street View Navigation & Trail Controls
+   ========================================================================== */
+
+/* Suppress errant cross-sequence lateral arrows and restrict navigation to the sequence trail */
+.mapillary-direction-circle:not(.mapillary-direction-circle-sequence) {
+  display: none !important;
+  pointer-events: none !important;
+}
+.mapillary-direction-turn-circle:not(.mapillary-direction-turn-circle-sequence) {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* Make sequence trail navigation arrows stand out clearly with high-contrast road chevrons */
+.mapillary-direction-circle-sequence {
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.mapillary-direction-circle-sequence:hover {
+  filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.8)) !important;
+}
+
+/* Floating interactive street view trail navigation HUD */
+.streetview-nav-hud {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 6px 14px;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 15px rgba(2, 132, 199, 0.2);
+  user-select: none;
+  animation: fadeInUp 0.3s ease;
+}
+
+.streetview-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.streetview-nav-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border-color: #38bdf8;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+}
+
+.streetview-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: transparent;
+}
+
+.streetview-nav-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.streetview-nav-badge {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  padding: 0 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 
 
 
