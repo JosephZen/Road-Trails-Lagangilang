@@ -212,7 +212,26 @@ export const touristSpotsService = {
   getDeletedSpotIds() {
     try {
       const raw = localStorage.getItem(DELETED_KEY);
-      return raw ? new Set(JSON.parse(raw)) : new Set();
+      const set = raw ? new Set(JSON.parse(raw)) : new Set();
+      // Ensure official emergency stations are never blocked by stale deletion flags
+      const emergencyIds = [
+        'poi_lagangilang_mdrrmo',
+        'poi_lagangilang_pnp',
+        'poi_lagangilang_bfp',
+        'poi_lagangilang_rhu',
+        'poi_lagangilang_tourism_office',
+      ];
+      let cleaned = false;
+      for (const eid of emergencyIds) {
+        if (set.has(eid)) {
+          set.delete(eid);
+          cleaned = true;
+        }
+      }
+      if (cleaned) {
+        localStorage.setItem(DELETED_KEY, JSON.stringify([...set]));
+      }
+      return set;
     } catch {
       return new Set();
     }
@@ -848,13 +867,10 @@ export const touristSpotsService = {
           }
         }
 
-        // Retain only genuine local custom spots not yet in cloud (deduplicating by name)
+        // Retain only genuine local custom spots and seeds not yet in cloud (deduplicating by name)
         for (const ls of local) {
-          // If this spot was previously synced to cloud (or was a known seed spot) but is absent from cloud,
-          // it was deleted in the cloud database! Purge it from this device.
-          const wasCloudOrSeed = ls.sync_status === 'synced_cloud' || (Array.isArray(seedSpots) && seedSpots.some((seed) => seed.id === ls.id));
-          if (wasCloudOrSeed && !seenIds.has(ls.id)) {
-            this.markSpotDeleted(ls.id);
+          // Only purge if explicitly in deletedIds or obsolete
+          if (deletedIds.has(ls.id) || isObsoleteSpot(ls)) {
             continue;
           }
 

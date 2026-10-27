@@ -2926,9 +2926,23 @@ export default function App() {
         onClose={() => setShowEmergencyModal(false)}
         onLocateSpot={(spotId) => {
           setShowEmergencyModal(false);
-          const spot = touristSpots.find((s) => s.id === spotId);
-          if (spot) {
-            handleSelectTouristSpot(spot);
+          // Ensure POIs are not hidden by sidebar filter tabs
+          setSpotFilter('all');
+          setBarangayFilter('all');
+          setDifficultyFilter('all');
+
+          let targetSpot = touristSpots.find((s) => s.id === spotId);
+          if (!targetSpot) {
+            const allSpots = touristSpotsService.getAllSpots();
+            targetSpot = allSpots.find((s) => s.id === spotId);
+            if (targetSpot) {
+              setTouristSpots(allSpots);
+            }
+          }
+
+          if (targetSpot) {
+            handleSelectTouristSpot(targetSpot);
+            showToast?.(`📍 Selected: ${targetSpot.name}`);
           } else {
             showToast?.('📍 Navigating to emergency station location');
           }
