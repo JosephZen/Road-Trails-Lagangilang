@@ -23,7 +23,7 @@ import { streetviewAlignmentService } from './services/streetviewAlignmentServic
 import StreetviewLineAligner from './components/StreetviewLineAligner';
 import AdminPasswordModal from './components/AdminPasswordModal';
 import EmergencyModal from './components/EmergencyModal';
-import WeatherWidget from './components/WeatherWidget';
+import ThemeSelector from './components/ThemeSelector';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -945,9 +945,6 @@ export default function App() {
               <span>Lagangilang Trails</span>
             </div>
 
-            {/* Live Weather Forecast & Trail Advisory Pill */}
-            <WeatherWidget isCompact={viewerOpen && viewerLayout === 'split'} />
-
             {/* Emergency Hotlines & Safety Button */}
             <button
               className="btn btn-secondary btn-emergency-top"
@@ -998,73 +995,15 @@ export default function App() {
               <span className="btn-label-text">Route</span>
             </button>
 
-            {/* Toggle 360° Street View & Trails (Public for all users) */}
-            <button
-              className={`btn ${showMapillaryStreetview ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => {
-                const next = !showMapillaryStreetview;
-                setShowMapillaryStreetview(next);
-                setShowMapillaryDots(next);
-                setShowMapillaryLines(next);
-                showToast(
-                  next
-                    ? '🟢 360° Trail coverage visible on map'
-                    : '⚪ 360° Trail coverage hidden'
-                );
+            {/* Custom Theme Selector Dropdown */}
+            <ThemeSelector
+              theme={mapTheme}
+              onChange={(t) => {
+                setMapTheme(t);
+                localStorage.setItem('lagangilang_map_theme', t);
+                showToast(`Map theme: ${t.charAt(0).toUpperCase() + t.slice(1)}`);
               }}
-              style={{
-                fontSize: '0.8rem',
-                padding: '6px 12px',
-                borderRadius: 'var(--radius-full)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                background: showMapillaryStreetview
-                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                  : 'rgba(15, 23, 42, 0.92)',
-                color: '#ffffff',
-                border: showMapillaryStreetview ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
-                backdropFilter: 'blur(12px)',
-              }}
-              title={
-                showMapillaryStreetview
-                  ? 'Hide 360° Trail lines & photo points'
-                  : 'Display 360° Trail lines & photo points across Lagangilang'
-              }
-            >
-              <span>📷</span>
-              <span className="btn-label-text">
-                {showMapillaryStreetview ? 'Trails: ON' : '360° Trails'}
-              </span>
-            </button>
-
-            {/* Theme Selector Dropdown */}
-            <div className="theme-dropdown-custom" title="Map Theme">
-              <span className="theme-dropdown-icon">
-                {mapTheme === 'dark' ? '🌙' : mapTheme === 'light' ? '☀️' : mapTheme === 'beige' ? '📜' : '🛰️'}
-              </span>
-              <select
-                id="map-theme-dropdown"
-                className="theme-dropdown-select"
-                value={mapTheme}
-                onChange={(e) => {
-                  const t = e.target.value;
-                  setMapTheme(t);
-                  localStorage.setItem('lagangilang_map_theme', t);
-                  showToast(`Map theme: ${t.charAt(0).toUpperCase() + t.slice(1)}`);
-                }}
-                aria-label="Map theme dropdown"
-              >
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-                <option value="beige">Beige</option>
-                <option value="satellite">Satellite</option>
-              </select>
-              <span className="theme-dropdown-chevron">▼</span>
-            </div>
+            />
 
             {/* Admin-only controls & Status (Only shown when Admin is logged in) */}
             {isAdmin && (
@@ -1075,13 +1014,55 @@ export default function App() {
                 <div
                   className="role-indicator admin"
                   onClick={handleRoleToggle}
-                  title="Click to logout from Admin mode"
-                  style={{ cursor: 'pointer' }}
+                  title="Admin Mode Active (Click to Logout)"
                 >
                   <span className="role-indicator-dot" />
-                  <span>🛡️ Admin</span>
-                  <span className="btn-label-text"> (Logout)</span>
+                  <span className="role-indicator-title">🛡️ Admin</span>
+                  <span className="role-indicator-logout">Logout</span>
                 </div>
+
+                {/* Toggle 360° Street View & Trails (Admin only) */}
+                <button
+                  className={`btn ${showMapillaryStreetview ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    const next = !showMapillaryStreetview;
+                    setShowMapillaryStreetview(next);
+                    setShowMapillaryDots(next);
+                    setShowMapillaryLines(next);
+                    showToast(
+                      next
+                        ? '🟢 360° Trail coverage visible on map'
+                        : '⚪ 360° Trail coverage hidden'
+                    );
+                  }}
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-full)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    background: showMapillaryStreetview
+                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                      : 'rgba(15, 23, 42, 0.92)',
+                    color: '#ffffff',
+                    border: showMapillaryStreetview ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                    backdropFilter: 'blur(12px)',
+                  }}
+                  title={
+                    showMapillaryStreetview
+                      ? 'Hide 360° Trail lines & photo points'
+                      : 'Display 360° Trail lines & photo points across Lagangilang'
+                  }
+                >
+                  <span>📷</span>
+                  <span className="btn-label-text">
+                    {showMapillaryStreetview ? 'Trails: ON' : '360° Trails'}
+                  </span>
+                </button>
                 {/* Bend / Align Streetview Line Button (Admin only) */}
                 <button
                   className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}

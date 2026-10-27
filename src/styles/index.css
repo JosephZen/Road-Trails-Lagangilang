@@ -1979,16 +1979,19 @@ body {
 }
 /* ========== Role-Based UI ========== */
 
-/* Role Indicator Badge */
+/* Role Indicator Badge (Admin Pill - Clean Single-Row Layout) */
 .role-indicator {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 15px;
+  gap: 6px;
+  padding: 5px 10px;
   border-radius: var(--radius-full);
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap !important;
+  flex-shrink: 0;
+  line-height: 1;
   transition: all var(--transition-fast);
   cursor: pointer;
   user-select: none;
@@ -1997,19 +2000,46 @@ body {
 
 .role-indicator.admin {
   background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-  border: 1.5px solid #ef4444;
+  border: 1px solid rgba(248, 113, 113, 0.6);
   color: #ffffff;
 }
 
 .role-indicator.admin:hover {
   background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
-  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.5);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
   transform: translateY(-1px);
+}
+
+.role-indicator-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap !important;
+}
+
+.role-indicator-logout {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #fecaca;
+  margin-left: 2px;
+  white-space: nowrap !important;
+  transition: all 0.15s ease;
+}
+
+.role-indicator:hover .role-indicator-logout {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
 }
 
 .role-indicator.tourist {
   background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  border: 1.5px solid #10b981;
+  border: 1px solid #10b981;
   color: #ffffff;
 }
 
@@ -2020,10 +2050,11 @@ body {
 }
 
 .role-indicator-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   animation: pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
 }
 
 .role-indicator.admin .role-indicator-dot {
@@ -2991,6 +3022,22 @@ body {
   padding-left: 8px !important;
   padding-right: 8px !important;
   font-size: 0.78rem !important;
+}
+
+.custom-theme-trigger:hover {
+  background: rgba(30, 41, 59, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  transform: translateY(-1px);
+}
+
+.custom-theme-trigger:active {
+  transform: translateY(0);
+}
+
+.panel-map.split-active .custom-theme-trigger,
+.panel-map:not(.expanded) .custom-theme-trigger {
+  padding: 5px 8px !important;
+  font-size: 0.76rem !important;
 }
 
 .panel-map.split-active .theme-dropdown-select,
