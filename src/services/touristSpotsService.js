@@ -1109,6 +1109,30 @@ export const touristSpotsService = {
   },
 
   /**
+   * Fetch all 360 Panoramas with their full image data from Neon Cloud Database.
+   * Used for offline packaging so all 360 photos can be stored locally for zero-signal operation.
+   */
+  async fetchAllPanoramasWithImages() {
+    try {
+      const rows = await this.executeNeonQuery(async (sql) => {
+        return await sql`
+          SELECT id, label, filename, thumbnail_url, latitude as lat, longitude as lng,
+                 compass_heading as heading, image_data, thumbnail_data
+          FROM public.panoramas
+          WHERE image_data IS NOT NULL
+          ORDER BY captured_at DESC
+        `;
+      });
+      if (Array.isArray(rows)) {
+        return rows;
+      }
+    } catch (err) {
+      console.warn('Could not batch fetch 360 panoramas with images from Neon Cloud:', err.message);
+    }
+    return [];
+  },
+
+  /**
    * Fetch all registered local panoramas metadata from Neon Cloud Database.
    */
   async fetchPanoramasList() {
@@ -1141,3 +1165,5 @@ export const touristSpotsService = {
     return [];
   },
 };
+
+export default touristSpotsService;

@@ -1,17 +1,21 @@
-const CACHE_NAME = 'lagangilang-shell-v1';
+const CACHE_NAME = 'lagangilang-shell-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/favicon.svg',
   '/icons.svg',
+  '/assets/icon-512.png',
+  '/assets/road_trail_360_logo.png',
   '/data/lagangilang_roads_graph.json',
+  '/data/lagangilang-custom.geojson',
+  '/data/aligned_sequences.json',
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[SW] Pre-caching non-fatal warning:', err);
+        console.warn('[SW] Pre-caching warning:', err);
       });
     })
   );
@@ -37,17 +41,35 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Ignore chrome-extension or custom schemes
+  // Ignore chrome-extension or custom non-http schemes
   if (url.protocol.startsWith('chrome') || url.protocol.startsWith('lagangilang')) {
     return;
   }
 
-  // Network first for API/external, Cache first for local static assets
+  // Handle navigation requests (SPA routing)
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((resp) => {
+          if (resp && resp.status === 200) {
+            const copy = resp.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return resp;
+        })
+        .catch(async () => {
+          return (await caches.match(request)) || (await caches.match('/index.html')) || (await caches.match('/'));
+        })
+    );
+    return;
+  }
+
+  // Cache-first with background revalidation for same-origin static assets
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) {
-          // Revalidate in background
+          // Revalidate in background when online
           fetch(request)
             .then((fresh) => {
               if (fresh && fresh.status === 200) {
@@ -57,9 +79,10 @@ self.addEventListener('fetch', (event) => {
             .catch(() => {});
           return cached;
         }
+
         return fetch(request)
           .then((resp) => {
-            if (!resp || resp.status !== 200 || resp.type !== 'basic') {
+            if (!resp || resp.status !== 200) {
               return resp;
             }
             const toCache = resp.clone();
@@ -67,9 +90,8 @@ self.addEventListener('fetch', (event) => {
             return resp;
           })
           .catch(() => {
-            if (request.mode === 'navigate') {
-              return caches.match('/index.html');
-            }
+            // If offline and requesting an image/asset
+            return cached || null;
           });
       })
     );

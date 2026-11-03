@@ -1,12 +1,15 @@
+import { touristSpotsService } from './touristSpotsService';
+
 /**
- * High-Capacity Offline Map Manager (Up to 200 MB)
+ * High-Capacity Offline Map Manager (Up to 1 GB)
  * 
  * Powered by IndexedDB (`lagangilang_offline_db`) and Cache API.
  * Packages and persists:
- * 1. Base Map Tiles (Zoom levels 12 - 19 across Lagangilang bounding box)
+ * 1. Base Map Tiles (Zoom levels 12 - 18 across Lagangilang bounding box)
  * 2. Custom Map Overlays (Campus polygons, aligned streetview lines, local GeoJSON)
  * 3. Offline Road Network Routing Graph (lagangilang_roads_graph.json)
  * 4. POIs, Tourist Spots, Hotlines, and DENR Checkpoints
+ * 5. Full 360° Landmark Panoramas directly from Neon Cloud Database
  */
 
 const DB_NAME = 'lagangilang_offline_db';
@@ -123,6 +126,8 @@ class OfflineMapManager {
             sizeMB: meta?.sizeMB || (tileCount * 0.025).toFixed(1),
             timestamp: meta?.timestamp || null,
             spotsCount: meta?.spotsCount || 0,
+            cached360Count: meta?.cached360Count || 0,
+            maxZoom: meta?.maxZoom || 16,
             hasCustomMap: Boolean(meta?.hasCustomMap),
             hasRoutingGraph: Boolean(meta?.hasRoutingGraph),
           });
@@ -135,28 +140,54 @@ class OfflineMapManager {
   }
 
   /**
-   * Download and package full offline bundle up to 200 MB
+   * Get device storage quota and usage
+   */
+  async getStorageEstimate() {
+    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
+      try {
+        const estimate = await navigator.storage.estimate();
+        const usageMB = (estimate.usage / (1024 * 1024)).toFixed(1);
+        const quotaMB = (estimate.quota / (1024 * 1024)).toFixed(0);
+        const quotaGB = (estimate.quota / (1024 * 1024 * 1024)).toFixed(1);
+        const percentUsed = Math.round((estimate.usage / estimate.quota) * 100) || 0;
+        return { usageMB, quotaMB, quotaGB, percentUsed };
+      } catch (_) {}
+    }
+    return { usageMB: '0', quotaMB: '1000', quotaGB: '1.0', percentUsed: 0 };
+  }
+
+  /**
+   * Download and package full offline bundle up to 1 GB
    * 
    * @param {Object} options
    * @param {Array} options.touristSpots
    * @param {Object} options.customGeoJSON
    * @param {Array} options.hotlines
+   * @param {number} options.maxZoom - Maximum zoom level (16 for ~55MB, 17 for ~140MB, 18 for ~470MB)
    * @param {Function} options.onProgress - ({ stage, percent, mbDownloaded, message }) => void
    */
   async downloadFullOfflineBundle({
     touristSpots = [],
     customGeoJSON = null,
     hotlines = [],
+    maxZoom = 17,
     onProgress = () => {},
   }) {
     if (this.isDownloading) return;
     this.isDownloading = true;
 
+    // Request persistent storage to protect downloaded data from browser eviction
+    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+      try {
+        await navigator.storage.persist();
+      } catch (_) {}
+    }
+
     try {
       const db = await openOfflineDB();
       let totalBytes = 0;
 
-      // Stage 1: Save POIs, Tourist Spots & DENR Checkpoints / Hotlines (10%)
+      // Stage 1: Save POIs, Tourist Spots & DENR Checkpoints / Hotlines (5%)
       onProgress({
         stage: 'spots',
         percent: 5,
@@ -172,10 +203,10 @@ class OfflineMapManager {
       await this.putRecord(db, STORE_METADATA, 'spots_bundle', spotsBundle);
       totalBytes += JSON.stringify(spotsBundle).length;
 
-      // Stage 2: Cache Custom Map Overlays (30%)
+      // Stage 2: Cache Custom Map Overlays (15%)
       onProgress({
         stage: 'custom_map',
-        percent: 20,
+        percent: 15,
         mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
         message: 'Preserving Custom Map Overlays & Aligned Curves...',
       });
@@ -207,10 +238,10 @@ class OfflineMapManager {
         // ignore
       }
 
-      // Stage 3: Cache Road Network Routing Graph (30%)
+      // Stage 3: Cache Road Network Routing Graph (25%)
       onProgress({
         stage: 'routing',
-        percent: 30,
+        percent: 25,
         mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
         message: 'Caching Offline Road Routing Graph...',
       });
@@ -226,106 +257,139 @@ class OfflineMapManager {
         console.warn('Could not cache road routing graph:', e);
       }
 
-      // Stage 4: Cache Custom 360° Landmark Panoramas & Spot Photos (55%)
-      const mediaCandidates = [];
-      touristSpots.forEach((s) => {
-        const ids = [s.id];
-        if (s.connected360?.targetId) ids.push(s.connected360.targetId);
-        if (s.primary_pano_id) ids.push(s.primary_pano_id);
+      // Stage 4: Cache Full 360° Landmark Panoramas from Neon Cloud Database (55%)
+      onProgress({
+        stage: 'media_360',
+        percent: 32,
+        mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
+        message: 'Connecting to Neon Cloud Database for full 360° Landmark Panoramas...',
+      });
 
+      let cachedMediaCount = 0;
+      let neonPanoramas = [];
+      try {
+        neonPanoramas = await touristSpotsService.fetchAllPanoramasWithImages();
+      } catch (err) {
+        console.warn('Could not batch fetch 360 panoramas from NeonDB:', err);
+      }
+
+      // 1. Process all 360 Panoramas retrieved from Neon Cloud Database
+      if (Array.isArray(neonPanoramas) && neonPanoramas.length > 0) {
+        for (let i = 0; i < neonPanoramas.length; i++) {
+          const np = neonPanoramas[i];
+          if (!np.image_data) continue;
+
+          const panoClean = String(np.id).replace(/^pano_/, '');
+          const panoFull = String(np.id).startsWith('pano_') ? String(np.id) : `pano_${np.id}`;
+          const dataUri = np.image_data;
+          // Approximate byte size of base64 data URI
+          totalBytes += Math.round(dataUri.length * 0.75);
+
+          const record = {
+            dataUri,
+            id: np.id,
+            label: np.label,
+            heading: np.heading,
+            updatedAt: new Date().toISOString(),
+          };
+
+          // Save under all possible identifier aliases for instant recall
+          const keys = new Set([
+            panoFull,
+            panoClean,
+            np.id,
+            `${panoClean}.jpg`,
+            `${panoFull}.jpg`,
+            `/panoramas/${panoClean}.jpg`,
+            `/panoramas/${panoFull}.jpg`,
+          ]);
+
+          if (np.filename) {
+            keys.add(np.filename);
+            keys.add(`/panoramas/${np.filename}`);
+          }
+
+          // Match against any tourist spots that reference this panorama
+          touristSpots.forEach((s) => {
+            const matchesId =
+              s.primary_pano_id === panoFull ||
+              s.primary_pano_id === panoClean ||
+              s.connected360?.targetId === panoFull ||
+              s.connected360?.targetId === panoClean ||
+              (s.name && np.label && s.name.trim().toLowerCase() === np.label.trim().toLowerCase());
+
+            if (matchesId) {
+              keys.add(s.id);
+              if (s.connected360?.targetId) keys.add(s.connected360.targetId);
+              if (s.primary_pano_id) keys.add(s.primary_pano_id);
+            }
+          });
+
+          for (const k of keys) {
+            await this.put360Media(db, k, record);
+          }
+          cachedMediaCount++;
+
+          const panoPercent = 32 + Math.round(((i + 1) / neonPanoramas.length) * 23);
+          onProgress({
+            stage: 'media_360',
+            percent: panoPercent,
+            mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
+            message: `📸 Saving NeonDB 360° Photo: ${np.label || np.id} (${cachedMediaCount}/${neonPanoramas.length})...`,
+          });
+        }
+      }
+
+      // 2. Also cache any remaining tourist spot images / thumbnails
+      const spotMediaCandidates = [];
+      touristSpots.forEach((s) => {
         const urls = [];
-        if (s.connected360?.imageUrl && !s.connected360.imageUrl.includes('mapillary') && !s.connected360.imageUrl.includes('google')) {
-          urls.push(s.connected360.imageUrl);
-        }
-        if (s.image && !s.image.includes('mapillary') && !s.image.includes('google')) {
-          urls.push(s.image);
-        }
-        if (s.connected360?.targetId && !String(s.connected360.targetId).includes('mapillary')) {
-          urls.push(`/panoramas/${s.connected360.targetId}.jpg`);
-        }
+        if (s.image && !s.image.includes('mapillary') && !s.image.includes('google')) urls.push(s.image);
         if (Array.isArray(s.images)) {
           s.images.forEach((img) => {
             if (img && typeof img === 'string' && !img.includes('mapillary')) urls.push(img);
           });
         }
-        if (s.panoramaUrl) urls.push(s.panoramaUrl);
-        if (s.image360) urls.push(s.image360);
-
-        urls.forEach((url) => {
-          mediaCandidates.push({ spotId: s.id, spotName: s.name, ids, url });
-        });
+        urls.forEach((url) => spotMediaCandidates.push({ spotId: s.id, url }));
       });
 
-      // Deduplicate candidate URLs
-      const uniqueMedia = [];
-      const seenUrls = new Set();
-      mediaCandidates.forEach((item) => {
-        if (!seenUrls.has(item.url)) {
-          seenUrls.add(item.url);
-          uniqueMedia.push(item);
-        }
-      });
+      const uniqueSpotMedia = spotMediaCandidates.filter(
+        (item, idx, arr) => arr.findIndex((x) => x.url === item.url) === idx
+      );
 
-      let cachedMediaCount = 0;
-      onProgress({
-        stage: 'media_360',
-        percent: 40,
-        mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
-        message: `Caching Custom 360° Panoramas & Photos (0 / ${uniqueMedia.length})...`,
-      });
-
-      for (let i = 0; i < uniqueMedia.length; i++) {
-        const item = uniqueMedia[i];
+      for (let i = 0; i < uniqueSpotMedia.length; i++) {
+        const item = uniqueSpotMedia[i];
         try {
-          // If already a base64 data URI
           if (item.url.startsWith('data:')) {
-            const dataUri = item.url;
-            await this.put360Media(db, item.url, { dataUri, spotId: item.spotId });
-            item.ids.forEach(async (id) => {
-              await this.put360Media(db, id, { dataUri, spotId: item.spotId });
-            });
-            cachedMediaCount++;
-            continue;
-          }
-
-          const res = await fetch(item.url, { mode: 'cors' });
-          if (res.ok) {
-            const blob = await res.blob();
-            totalBytes += blob.size;
-            const dataUri = await this.blobToDataUri(blob);
-            await this.put360Media(db, item.url, { blob, dataUri, spotId: item.spotId });
-            for (const id of item.ids) {
-              await this.put360Media(db, id, { blob, dataUri, spotId: item.spotId });
+            await this.put360Media(db, item.url, { dataUri: item.url, spotId: item.spotId });
+            await this.put360Media(db, `${item.spotId}_cover`, { dataUri: item.url, spotId: item.spotId });
+          } else {
+            const res = await fetch(item.url, { mode: 'cors' });
+            if (res.ok) {
+              const blob = await res.blob();
+              totalBytes += blob.size;
+              const dataUri = await this.blobToDataUri(blob);
+              await this.put360Media(db, item.url, { blob, dataUri, spotId: item.spotId });
+              await this.put360Media(db, `${item.spotId}_cover`, { blob, dataUri, spotId: item.spotId });
             }
-            cachedMediaCount++;
           }
-        } catch (err) {
-          // Continue if single image fails
-        }
-
-        const mediaPercent = 40 + Math.round(((i + 1) / Math.max(1, uniqueMedia.length)) * 18);
-        onProgress({
-          stage: 'media_360',
-          percent: mediaPercent,
-          mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
-          message: `📸 Caching Custom 360° Landmark Panoramas & Spot Photos (${cachedMediaCount} / ${uniqueMedia.length})...`,
-        });
+        } catch (_) {}
       }
 
-      // Stage 5: Cache Map Tiles (Zooms 12 - 16 across Lagangilang BBox) (100%)
+      // Stage 5: Cache Map Tiles (Zooms 12 - maxZoom across Lagangilang BBox) (100%)
       // Uses CORS-friendly CartoDB Voyager tiles (never throws 403 Access Blocked on file://, webviews or offline)
-      const tileList = getBboxTileList(LAGANGILANG_BBOX, 12, 16);
+      const tileList = getBboxTileList(LAGANGILANG_BBOX, 12, maxZoom);
       const totalTiles = tileList.length;
 
       onProgress({
         stage: 'tiles',
-        percent: 60,
+        percent: 58,
         mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
-        message: `Downloading ${totalTiles} High-Res CartoDB Voyager Map Tiles...`,
+        message: `Downloading ${totalTiles} High-Res CartoDB Voyager Tiles (Zoom 12-${maxZoom})...`,
       });
 
       const subdomains = ['a', 'b', 'c', 'd'];
-      const batchSize = 6;
+      const batchSize = 12;
       let completedTiles = 0;
 
       for (let i = 0; i < tileList.length; i += batchSize) {
@@ -352,12 +416,12 @@ class OfflineMapManager {
           })
         );
 
-        const tilePercent = 60 + Math.round((completedTiles / totalTiles) * 38);
+        const tilePercent = 58 + Math.round((completedTiles / totalTiles) * 40);
         onProgress({
           stage: 'tiles',
           percent: tilePercent,
           mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
-          message: `Caching CartoDB Voyager Tiles: ${completedTiles} of ${totalTiles} complete...`,
+          message: `Caching CartoDB Tiles: ${completedTiles} of ${totalTiles} complete...`,
         });
       }
 
@@ -369,6 +433,7 @@ class OfflineMapManager {
         spotsCount: touristSpots.length,
         hotlinesCount: hotlines.length,
         cached360Count: cachedMediaCount,
+        maxZoom,
         hasCustomMap: Boolean(customMapData),
         hasRoutingGraph: true,
         timestamp: new Date().toISOString(),
@@ -418,24 +483,89 @@ class OfflineMapManager {
     });
   }
 
+  /**
+   * Save a single 360 panorama texture to local offline IndexedDB
+   */
+  async save360Media(key, dataUriOrBlob, spotId = null) {
+    if (!key || !dataUriOrBlob) return false;
+    try {
+      const db = await openOfflineDB();
+      let dataUri = typeof dataUriOrBlob === 'string' ? dataUriOrBlob : null;
+      let blob = dataUriOrBlob instanceof Blob ? dataUriOrBlob : null;
+
+      if (blob && !dataUri) {
+        dataUri = await this.blobToDataUri(blob);
+      }
+
+      const record = {
+        dataUri,
+        blob,
+        spotId: spotId || null,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const strKey = String(key).trim();
+      const cleanKey = strKey.replace(/^pano_/, '').replace(/\.jpg$/, '');
+      const keysToSave = new Set([
+        strKey,
+        cleanKey,
+        strKey.startsWith('pano_') ? strKey : `pano_${cleanKey}`,
+        `${cleanKey}.jpg`,
+        `pano_${cleanKey}.jpg`,
+        `/panoramas/${cleanKey}.jpg`,
+        `/panoramas/pano_${cleanKey}.jpg`,
+      ]);
+
+      if (spotId) {
+        keysToSave.add(String(spotId));
+      }
+
+      for (const k of keysToSave) {
+        await this.put360Media(db, k, record);
+      }
+      return true;
+    } catch (e) {
+      console.warn('Could not save 360 media to offline storage:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Retrieve cached 360 panorama by any alias or identifier
+   */
   async get360Media(idOrUrl) {
     if (!idOrUrl) return null;
     try {
       const db = await openOfflineDB();
       const tx = db.transaction(STORE_360_MEDIA, 'readonly');
       const store = tx.objectStore(STORE_360_MEDIA);
-      const req = store.get(String(idOrUrl));
-      return new Promise((resolve) => {
-        req.onsuccess = () => {
-          const val = req.result;
-          if (!val) return resolve(null);
-          if (val.dataUri) return resolve(val.dataUri);
-          if (val.blob) return resolve(URL.createObjectURL(val.blob));
-          if (typeof val === 'string') return resolve(val);
-          resolve(null);
-        };
-        req.onerror = () => resolve(null);
-      });
+
+      const strId = String(idOrUrl).trim();
+      const cleanId = strId.replace(/^pano_/, '').replace(/\.jpg$/, '');
+      const candidates = [
+        strId,
+        cleanId,
+        `pano_${cleanId}`,
+        `${cleanId}.jpg`,
+        `pano_${cleanId}.jpg`,
+        `/panoramas/${cleanId}.jpg`,
+        `/panoramas/pano_${cleanId}.jpg`,
+      ];
+
+      for (const cand of candidates) {
+        const val = await new Promise((resolve) => {
+          const req = store.get(cand);
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => resolve(null);
+        });
+
+        if (val) {
+          if (val.dataUri) return val.dataUri;
+          if (val.blob) return URL.createObjectURL(val.blob);
+          if (typeof val === 'string') return val;
+        }
+      }
+      return null;
     } catch (e) {
       return null;
     }

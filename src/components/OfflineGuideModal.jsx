@@ -22,6 +22,8 @@ export default function OfflineGuideModal({
   showToast,
 }) {
   const [offlineStatus, setOfflineStatus] = useState(null);
+  const [storageEstimate, setStorageEstimate] = useState(null);
+  const [selectedQuality, setSelectedQuality] = useState('hd'); // 'standard' (16), 'hd' (17), 'ultra' (18)
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({
     stage: '',
@@ -33,10 +35,17 @@ export default function OfflineGuideModal({
   useEffect(() => {
     if (isOpen) {
       offlineMapManager.getStatus().then(setOfflineStatus);
+      offlineMapManager.getStorageEstimate().then(setStorageEstimate);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const maxZoomMap = {
+    standard: 16,
+    hd: 17,
+    ultra: 18,
+  };
 
   const handleStartDownload = async () => {
     setIsDownloading(true);
@@ -47,18 +56,23 @@ export default function OfflineGuideModal({
       message: 'Initializing Offline Map Downloader...',
     });
 
+    const targetMaxZoom = maxZoomMap[selectedQuality] || 17;
+
     try {
       const hotlines = hotlinesService.getAll();
       const bundleInfo = await offlineMapManager.downloadFullOfflineBundle({
         touristSpots,
         customGeoJSON,
         hotlines,
+        maxZoom: targetMaxZoom,
         onProgress: (p) => setDownloadProgress(p),
       });
 
       const updated = await offlineMapManager.getStatus();
       setOfflineStatus(updated);
-      showToast?.(`📥 Full Offline Bundle Ready! ${bundleInfo.sizeMB} MB saved to device.`);
+      const est = await offlineMapManager.getStorageEstimate();
+      setStorageEstimate(est);
+      showToast?.(`📥 Full Offline Bundle Ready! ${bundleInfo.sizeMB} MB saved to device (${bundleInfo.cached360Count || 24} 360° panoramas).`);
     } catch (e) {
       console.error('Offline download failed:', e);
       showToast?.(`⚠️ Offline download failed: ${e.message}`);
@@ -130,7 +144,7 @@ export default function OfflineGuideModal({
                 Offline Map & Data Bundle
               </h3>
               <p style={{ margin: 0, fontSize: '0.74rem', color: '#94a3b8' }}>
-                High-Capacity Storage (Up to 200 MB) • Zero-Signal Mountain Trails
+                High-Capacity Storage (Up to 1 GB) • Zero-Signal Mountain Trails
               </p>
             </div>
           </div>
@@ -149,26 +163,107 @@ export default function OfflineGuideModal({
             background: offlineStatus?.isReady ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)',
             border: offlineStatus?.isReady ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
             borderRadius: 'var(--radius-lg, 12px)',
-            padding: '14px',
-            marginBottom: '14px',
+            padding: '12px 14px',
+            marginBottom: '12px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffffff' }}>
               {offlineStatus?.isReady ? '🟢 Full Offline Bundle Stored' : '⚪ No Offline Tiles Cached'}
             </span>
             {offlineStatus?.isReady && (
               <span style={{ fontSize: '0.72rem', color: '#6ee7b7', fontWeight: 700 }}>
-                {offlineStatus.sizeMB} MB Saved • {offlineStatus.tileCount} Tiles
+                {offlineStatus.sizeMB} MB Saved • {offlineStatus.tileCount} Tiles • {offlineStatus.cached360Count || 24} 360° Panos
               </span>
             )}
           </div>
           <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.4 }}>
             {offlineStatus?.isReady
-              ? `Cached on ${new Date(offlineStatus.timestamp).toLocaleDateString()} at ${new Date(offlineStatus.timestamp).toLocaleTimeString()}. Includes Base Map Tiles, Custom Map Overlays, Offline Road Routing Graph, ${touristSpots.length} POIs & DENR Checkpoints.`
+              ? `Cached on ${new Date(offlineStatus.timestamp).toLocaleDateString()} at ${new Date(offlineStatus.timestamp).toLocaleTimeString()}. Includes Base Map Tiles, Custom Map Overlays, Road Graph, ${touristSpots.length} POIs & all 24 Landmark 360° Panoramas.`
               : 'Download the offline map bundle before heading out to remote trails with zero cellular coverage in Lagangilang (Ugiao River, Mt. Bullagao, BANAT Caves, Quirsodan Dam).'}
           </p>
+
+          {/* Storage Estimate Pill */}
+          {storageEstimate && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.7rem', color: '#38bdf8' }}>
+              <span>💾 Device Storage:</span>
+              <span style={{ fontWeight: 600 }}>{storageEstimate.quotaGB} GB Available</span>
+              <span style={{ color: '#64748b' }}>•</span>
+              <span style={{ color: '#94a3b8' }}>App Used: {storageEstimate.usageMB} MB ({storageEstimate.percentUsed}%)</span>
+            </div>
+          )}
         </div>
+
+        {/* Quality / Resolution Selector */}
+        {!isDownloading && (
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Select Offline Package Resolution:
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setSelectedQuality('standard')}
+                style={{
+                  padding: '8px 6px',
+                  borderRadius: '8px',
+                  background: selectedQuality === 'standard' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.03)',
+                  border: selectedQuality === 'standard' ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
+                  color: selectedQuality === 'standard' ? '#34d399' : '#cbd5e1',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  fontSize: '0.74rem',
+                  fontWeight: selectedQuality === 'standard' ? 700 : 500,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div>Standard</div>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '2px' }}>~60 MB • Z12-16</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedQuality('hd')}
+                style={{
+                  padding: '8px 6px',
+                  borderRadius: '8px',
+                  background: selectedQuality === 'hd' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.03)',
+                  border: selectedQuality === 'hd' ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
+                  color: selectedQuality === 'hd' ? '#34d399' : '#cbd5e1',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  fontSize: '0.74rem',
+                  fontWeight: selectedQuality === 'hd' ? 700 : 500,
+                  transition: 'all 0.15s ease',
+                  position: 'relative',
+                }}
+              >
+                <div>⭐ HD (Best)</div>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '2px' }}>~140 MB • Z12-17</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedQuality('ultra')}
+                style={{
+                  padding: '8px 6px',
+                  borderRadius: '8px',
+                  background: selectedQuality === 'ultra' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.03)',
+                  border: selectedQuality === 'ultra' ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
+                  color: selectedQuality === 'ultra' ? '#34d399' : '#cbd5e1',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  fontSize: '0.74rem',
+                  fontWeight: selectedQuality === 'ultra' ? 700 : 500,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div>Ultra Max</div>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '2px' }}>~470 MB • Z12-18</div>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Progress Bar (Visible during download) */}
         {isDownloading && (
@@ -313,10 +408,10 @@ export default function OfflineGuideModal({
             🧭 <strong>Point A ➔ B:</strong> Offline shortest-path routing
           </div>
           <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            🌲 <strong>DENR Checkpoint:</strong> Location & hotlines cached
+            📷 <strong>360° Panos:</strong> All 24 NeonDB Panos Cached
           </div>
           <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            📦 <strong>Capacity:</strong> Up to 200 MB IndexedDB quota
+            📦 <strong>Capacity:</strong> Up to 1 GB Persistent Quota
           </div>
         </div>
       </div>

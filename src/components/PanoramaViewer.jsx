@@ -84,24 +84,40 @@ export default function PanoramaViewer({
         (panorama.image?.startsWith('data:') && panorama.image.length > 35000 ? panorama.image : null);
 
       // 2. Offline IndexedDB check (cached 360 landmark media for web & APK offline usage)
-      if (!finalImageUrl && panorama.id) {
-        try {
-          const offlineMedia = await offlineMapManager.get360Media(panorama.id);
-          if (offlineMedia && !isCancelled) {
-            finalImageUrl = offlineMedia;
-          }
-        } catch (_) {}
+      if (!finalImageUrl) {
+        const idCandidates = [
+          panorama.id,
+          panorama.targetId,
+          panorama.primaryPanoId,
+          panorama.spotId,
+          panorama.filename,
+        ].filter(Boolean);
+
+        for (const candidate of idCandidates) {
+          try {
+            const offlineMedia = await offlineMapManager.get360Media(candidate);
+            if (offlineMedia && !isCancelled) {
+              finalImageUrl = offlineMedia;
+              break;
+            }
+          } catch (_) {}
+        }
       }
 
-      // 3. Query Neon Cloud DB for direct image_data if not found in props
+      // 3. Query Neon Cloud DB for direct image_data if not found in props or offline storage
       if (!finalImageUrl && panorama.id) {
         try {
           let cloudTexture = await touristSpotsService.fetchPanoramaImageData(panorama.id);
           if (!cloudTexture && !String(panorama.id).startsWith('pano_')) {
             cloudTexture = await touristSpotsService.fetchPanoramaImageData(`pano_${panorama.id}`);
           }
+          if (!cloudTexture && panorama.targetId) {
+            cloudTexture = await touristSpotsService.fetchPanoramaImageData(panorama.targetId);
+          }
           if (cloudTexture && !isCancelled) {
             finalImageUrl = cloudTexture;
+            // Auto-persist to IndexedDB for seamless zero-signal offline recall later
+            offlineMapManager.save360Media(panorama.id, cloudTexture, panorama.spotId).catch(() => {});
           }
         } catch (e) {
           console.warn('Could not retrieve Neon Cloud 360 texture:', e);

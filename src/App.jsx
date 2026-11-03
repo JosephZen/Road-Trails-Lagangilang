@@ -2289,6 +2289,9 @@ export default function App() {
                 viewerLayout={viewerLayout}
                 panorama={{
                   id: activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || activeTouristSpot.id,
+                  spotId: activeTouristSpot.id,
+                  targetId: activeTouristSpot.connected360?.targetId,
+                  primaryPanoId: activeTouristSpot.primary_pano_id,
                   filename: `${activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || activeTouristSpot.id}.jpg`,
                   imageUrl:
                     activeTouristSpot.connected360?.imageUrl ||
