@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Viewer } from 'mapillary-js';
 import 'mapillary-js/dist/mapillary.css';
 import { isNearCampusJunction, UA_HIGHWAY_JUNCTION } from '../utils/streetViewJunctions';
@@ -44,6 +44,7 @@ export default function MapillaryViewer({
   onHeadingChange,
   steerTarget,
   onSwitchToGoogle,
+  hasDedicatedCard = false,
   isAdmin = false,
   onExcludeImage,
   onExcludeSequence,
@@ -59,6 +60,16 @@ export default function MapillaryViewer({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPos, setCurrentPos] = useState(null);
+
+  // Proximity and manual inter-sequence bridges for active node (Workstream 8)
+  const proximityBridges = useMemo(() => {
+    if (!currentPos?.id) return [];
+    try {
+      return streetviewAlignmentService.findProximityBridges(currentPos.id, 25) || [];
+    } catch (e) {
+      return [];
+    }
+  }, [currentPos?.id]);
 
   const currentImageIdRef = useRef(null);
   const currentSequenceIdRef = useRef(null);
@@ -499,53 +510,75 @@ export default function MapillaryViewer({
         showToast={showToast}
       />
 
-      {/* Bottom-Left Highway Junction Transition: Step Out to Abra-Kalinga Highway on Google Street View */}
-      {currentPos && isNearCampusJunction(currentPos.lat, currentPos.lng) && onSwitchToGoogle && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '20px',
-            left: '16px',
-            zIndex: 35,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(15, 23, 42, 0.94)',
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-full, 9999px)',
-            border: '1.5px solid #38bdf8',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(12px)',
-            animation: 'fadeInUp 0.3s ease-out',
-            width: 'fit-content',
-          }}
-        >
-          <span style={{ fontSize: '1rem' }}>🌐</span>
-          <span style={{ fontSize: '0.74rem', color: '#bae6fd', fontWeight: 600 }}>
-            Highway Connection:
-          </span>
-          <button
-            onClick={() => onSwitchToGoogle({ lat: UA_HIGHWAY_JUNCTION.lat, lng: UA_HIGHWAY_JUNCTION.lng })}
+      {/* ===== BOTTOM-LEFT OF MAPILLARY: Highway transition & Google Switch (Aspect Ratio Adaptive) ===== */}
+      <div
+        className={`streetview-bottom-left-controls ${hasDedicatedCard ? 'has-spot-card' : ''}`}
+      >
+        {/* Inter-Sequence Proximity & Manual Transition Prompts (Workstream 8) */}
+        {proximityBridges.map((b, idx) => (
+          <div
+            key={idx}
+            className="streetview-transition-prompt bridge-prompt"
             style={{
-              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: 'var(--radius-full, 9999px)',
-              padding: '4px 12px',
-              fontSize: '0.74rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.4)',
+              border: '1.5px solid #a855f7',
+              boxShadow: '0 8px 24px rgba(168, 85, 247, 0.35)',
             }}
           >
-            <span>Step Out to Highway (Google Street View)</span>
-            <span>→</span>
-          </button>
+            <span style={{ fontSize: '0.9rem' }}>🔗</span>
+            <span className="prompt-label" style={{ color: '#d8b4fe' }}>
+              {b.targetName || 'Adjacent Trail'} {b.distance ? `(${Math.round(b.distance)}m)` : ''}
+            </span>
+            <button
+              onClick={() => handleNavigateToNode(b.targetImageId || b.targetKey)}
+              className="prompt-btn"
+              style={{
+                background: 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)',
+                boxShadow: '0 2px 8px rgba(168, 85, 247, 0.4)',
+              }}
+              title="Transition smoothly to adjacent sequence across intersection"
+            >
+              <span>Bridge Trail</span>
+              <span>→</span>
+            </button>
+          </div>
+        ))}
+
+        {/* Step Out to Highway Junction Prompt */}
+        {currentPos && isNearCampusJunction(currentPos.lat, currentPos.lng) && onSwitchToGoogle && (
+          <div className="streetview-transition-prompt junction-prompt">
+            <span style={{ fontSize: '0.9rem' }}>🌐</span>
+            <span className="prompt-label">Highway Connection:</span>
+            <button
+              onClick={() => onSwitchToGoogle({ lat: UA_HIGHWAY_JUNCTION.lat, lng: UA_HIGHWAY_JUNCTION.lng })}
+              className="prompt-btn"
+            >
+              <span>Step Out to Highway (Google)</span>
+              <span>→</span>
+            </button>
+          </div>
+        )}
+
+        {/* Omnipresent Switch Capsule: Mapillary to Google Street View */}
+        <div className="streetview-engine-switch-pill">
+          <span style={{ fontSize: '0.95rem' }}>🚗</span>
+          <div className="switch-text-group">
+            <span className="switch-title-desktop">Mapillary Trail</span>
+            <span className="switch-title-mobile">Mapillary</span>
+          </div>
+
+          {onSwitchToGoogle && (
+            <button
+              onClick={() => onSwitchToGoogle({ lat: currentPos?.lat || 17.6142, lng: currentPos?.lng || 120.734 })}
+              className="streetview-switch-btn google-switch"
+              title="Transition to Google Street View"
+            >
+              <span>🌐</span>
+              <span className="btn-label-desktop">Switch to Google</span>
+              <span className="btn-label-mobile">Google</span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Street View Viewer container with native 3D spatial arrows */}
       <div ref={containerRef} className="panorama-container" style={{ width: '100%', height: '100%' }} />

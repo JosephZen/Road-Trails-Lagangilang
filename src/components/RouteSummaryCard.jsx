@@ -1,328 +1,485 @@
-import React, { useState, useMemo } from 'react';
-import { formatDuration, formatDistance, getManeuverIcon } from '../services/routingService';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  getRouteElevationProfile,
+  calculateAdvancedETAs,
+  formatMinutes,
+  formatKm,
+} from '../services/routeConditionService';
+import { getManeuverIcon } from '../services/routingService';
 
 /**
  * RouteSummaryCard
- * Floating non-blocking card displayed on the main map when a route is active.
- * Deprecates full-screen takeover navigation in favor of on-map route overview.
+ * In-navbar navigation HUD for phones, tablets, and desktops.
+ * Integrates directly into the top navigation bar when routing is active,
+ * allowing instant travel mode switching, destination changing, turn-by-turn directions,
+ * and 1-tap exit to immediately revert the nav bar to normal.
  */
 export default function RouteSummaryCard({
   routeData,
   routeOrigin,
   routeDestination,
   routingProfile = 'driving',
+  onProfileChange,
   onReverseRoute,
   onClearRoute,
-  onStartStreetViewRoute,
+  onTriggerPopups,
   touristSpots = [],
   isSplitView = false,
+  weather = null,
+  onChangeDestination,
+  onStartStreetViewRoute,
 }) {
   const [showSteps, setShowSteps] = useState(false);
+  const [elevationData, setElevationData] = useState(null);
 
-  // Helper to resolve origin/destination names from tourist spots or coordinates
-  const resolveLocationName = (coords, fallbackLabel) => {
-    if (!coords) return fallbackLabel;
-    const [lng, lat] = coords;
-    
-    // Check if coordinates match Lagangilang Town Plaza
-    if (Math.abs(lng - 120.734) < 0.005 && Math.abs(lat - 17.6142) < 0.005) {
-      return '🏛️ Poblacion Town Plaza';
-    }
+  // Sync active mode from profile
+  const activeMode = useMemo(() => {
+    if (routingProfile === 'walking' || routingProfile === 'foot') return 'person';
+    if (routingProfile === 'motorcycle') return 'motorcycle';
+    return 'car';
+  }, [routingProfile]);
 
-    // Match with tourist spot
-    const match = touristSpots.find((s) => {
-      const sLat = s.location?.lat ?? s.lat;
-      const sLng = s.location?.lng ?? s.lng;
-      return Math.abs(sLat - lat) < 0.0003 && Math.abs(sLng - lng) < 0.0003;
+  // Identify destination landmark if it matches a tourist spot
+  const destinationSpot = useMemo(() => {
+    if (!routeDestination) return null;
+    return touristSpots.find((s) => {
+      const lat = s.location?.lat ?? s.lat;
+      const lng = s.location?.lng ?? s.lng;
+      return (
+        Math.abs(lat - routeDestination[1]) < 0.0005 &&
+        Math.abs(lng - routeDestination[0]) < 0.0005
+      );
     });
+  }, [routeDestination, touristSpots]);
 
-    if (match) return match.name;
-    return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
+  const destDisplayName = destinationSpot?.name || 'Destination';
+
+  // Fetch elevation profile for the route geometry
+  useEffect(() => {
+    if (!routeData?.geometry?.coordinates) return;
+
+    let isMounted = true;
+    getRouteElevationProfile(routeData.geometry.coordinates)
+      .then((elev) => {
+        if (isMounted) setElevationData(elev);
+      })
+      .catch((err) => {
+        console.warn('Could not fetch route elevation:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [routeData]);
+
+  // Calculate advanced mode ETAs considering elevation and road conditions
+  const etas = useMemo(() => {
+    if (!routeData) return null;
+    return calculateAdvancedETAs(routeData, elevationData, weather);
+  }, [routeData, elevationData, weather]);
+
+  if (!routeData || !etas) return null;
+
+  const currentModeInfo = etas[activeMode] || etas.car;
+  const steps = routeData?.legs?.flatMap((l) => l.steps || []) || [];
+
+  const handleSelectMode = (mode) => {
+    let nextProfile = 'driving';
+    if (mode === 'person') nextProfile = 'walking';
+    else if (mode === 'motorcycle') nextProfile = 'motorcycle';
+    else nextProfile = 'driving';
+
+    if (onProfileChange) {
+      onProfileChange(nextProfile);
+    }
   };
-
-  const originName = useMemo(
-    () => resolveLocationName(routeOrigin, 'Point A (Start)'),
-    [routeOrigin, touristSpots]
-  );
-
-  const destinationName = useMemo(
-    () => resolveLocationName(routeDestination, 'Point B (Destination)'),
-    [routeDestination, touristSpots]
-  );
-
-  if (!routeData) return null;
-
-  const distanceText = formatDistance(routeData.distance || 0);
-  const drivingTimeText = formatDuration(routeData.duration || 0);
-  
-  // Walking calculation (average walking speed 4.5 km/h = 1.25 m/s)
-  const walkingSeconds = Math.round((routeData.distance || 0) / 1.25);
-  const walkingTimeText = formatDuration(walkingSeconds);
-
-  // Steps
-  const steps = routeData?.legs?.flatMap((l) => l.steps) || [];
 
   return (
     <div
-      className={`route-summary-floating-card ${isSplitView ? 'split-mode' : ''}`}
+      className={`nav-active-navigation-bar ${isSplitView ? 'split-mode' : ''}`}
       style={{
-        position: 'absolute',
-        top: '16px',
-        left: '16px',
-        maxWidth: '380px',
-        width: 'calc(100vw - 32px)',
-        zIndex: 1000,
-        background: 'rgba(15, 23, 42, 0.92)',
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        flex: 1,
+        minWidth: 0,
+        background: 'rgba(15, 23, 42, 0.94)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid rgba(59, 130, 246, 0.35)',
-        borderRadius: '16px',
-        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+        border: '1px solid rgba(59, 130, 246, 0.45)',
+        borderRadius: '9999px',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+        padding: '3px 8px',
         color: '#f8fafc',
-        padding: '16px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
-        transition: 'all 0.25s ease',
+        pointerEvents: 'auto',
+        animation: 'fadeInDown 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        minHeight: '38px',
       }}
     >
-      {/* Header bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '1.2rem' }}>🛣️</span>
-          <div>
-            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#60a5fa' }}>
-              Active Route
-            </h4>
-            <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-              {routingProfile === 'walking' ? '🚶 Pedestrian Mode' : '🚗 Vehicle Mode'}
-            </span>
-          </div>
-        </div>
-
+      {/* Mode Selector Segment: Car, Motorcycle, Person */}
+      <div
+        className="route-mode-segmented"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          background: 'rgba(2, 6, 23, 0.65)',
+          padding: '2px',
+          borderRadius: '9999px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          flexShrink: 0,
+        }}
+      >
+        {/* Car */}
         <button
-          onClick={onClearRoute}
-          title="Clear active route"
+          onClick={() => handleSelectMode('car')}
+          title="Car Travel Mode"
           style={{
-            background: 'rgba(239, 68, 68, 0.15)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '8px',
-            color: '#f87171',
-            padding: '4px 8px',
-            fontSize: '0.75rem',
+            background:
+              activeMode === 'car'
+                ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                : 'transparent',
+            color: activeMode === 'car' ? '#ffffff' : '#94a3b8',
+            border: 'none',
+            borderRadius: '9999px',
+            padding: '3px 6px',
+            fontSize: '0.74rem',
+            fontWeight: 700,
             cursor: 'pointer',
-            fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
+            gap: '3px',
+            boxShadow: activeMode === 'car' ? '0 2px 8px rgba(59, 130, 246, 0.4)' : 'none',
+            transition: 'all 0.15s ease',
           }}
         >
-          ✕ Clear
+          <span>🚗</span>
+          <span className="mode-text-desktop">Car</span>
+        </button>
+
+        {/* Motorcycle */}
+        <button
+          onClick={() => handleSelectMode('motorcycle')}
+          title="Motorcycle Mode"
+          style={{
+            background:
+              activeMode === 'motorcycle'
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : 'transparent',
+            color: activeMode === 'motorcycle' ? '#ffffff' : '#94a3b8',
+            border: 'none',
+            borderRadius: '9999px',
+            padding: '3px 6px',
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            boxShadow: activeMode === 'motorcycle' ? '0 2px 8px rgba(16, 185, 129, 0.4)' : 'none',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <span>🏍️</span>
+          <span className="mode-text-desktop">Motor</span>
+        </button>
+
+        {/* Person / Walking */}
+        <button
+          onClick={() => handleSelectMode('person')}
+          title="Walking Mode"
+          style={{
+            background:
+              activeMode === 'person'
+                ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                : 'transparent',
+            color: activeMode === 'person' ? '#ffffff' : '#94a3b8',
+            border: 'none',
+            borderRadius: '9999px',
+            padding: '3px 6px',
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            boxShadow: activeMode === 'person' ? '0 2px 8px rgba(245, 158, 11, 0.4)' : 'none',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <span>🚶</span>
+          <span className="mode-text-desktop">Walk</span>
         </button>
       </div>
 
-      {/* Origin & Destination */}
+      {/* Core Stats: ETA, KM, Minutes */}
       <div
-        style={{
-          background: 'rgba(2, 6, 23, 0.55)',
-          borderRadius: '10px',
-          padding: '10px 12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          fontSize: '0.82rem',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span
-            style={{
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              background: '#22c55e',
-              color: '#000',
-              fontWeight: 800,
-              fontSize: '0.65rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            A
-          </span>
-          <span style={{ color: '#e2e8f0', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {originName}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span
-            style={{
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              background: '#ef4444',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: '0.65rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            B
-          </span>
-          <span style={{ color: '#e2e8f0', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {destinationName}
-          </span>
-        </div>
-      </div>
-
-      {/* Metrics Row: Distance & ETAs */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '8px',
-          marginTop: '12px',
-          textAlign: 'center',
-        }}
-      >
-        <div
-          style={{
-            background: 'rgba(30, 41, 59, 0.7)',
-            padding: '8px 4px',
-            borderRadius: '8px',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-          }}
-        >
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Distance</div>
-          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#38bdf8' }}>{distanceText}</div>
-        </div>
-
-        <div
-          style={{
-            background: 'rgba(30, 41, 59, 0.7)',
-            padding: '8px 4px',
-            borderRadius: '8px',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-          }}
-        >
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Drive ETA</div>
-          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#4ade80' }}>{drivingTimeText}</div>
-        </div>
-
-        <div
-          style={{
-            background: 'rgba(30, 41, 59, 0.7)',
-            padding: '8px 4px',
-            borderRadius: '8px',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-          }}
-        >
-          <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Walk ETA</div>
-          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fbbf24' }}>{walkingTimeText}</div>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div
+        onClick={onTriggerPopups}
+        title="Click to highlight route on map"
         style={{
           display: 'flex',
-          gap: '8px',
-          marginTop: '12px',
+          alignItems: 'center',
+          gap: '4px',
+          cursor: 'pointer',
+          padding: '2px 4px',
+          borderRadius: '6px',
+          minWidth: 0,
         }}
       >
-        {onReverseRoute && (
-          <button
-            onClick={onReverseRoute}
-            title="Swap Origin and Destination"
+        <span
+          style={{
+            fontSize: '0.88rem',
+            fontWeight: 800,
+            color: activeMode === 'person' ? '#fbbf24' : activeMode === 'motorcycle' ? '#34d399' : '#60a5fa',
+            letterSpacing: '-0.01em',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {currentModeInfo.formatted}
+        </span>
+        <span
+          style={{
+            fontSize: '0.72rem',
+            color: '#94a3b8',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          · {etas.distanceKm}
+        </span>
+        {etas.ascent > 8 && (
+          <span
+            className="mode-text-desktop"
+            title={`Elevation gain: +${etas.ascent}m`}
             style={{
-              flex: 1,
-              padding: '8px 10px',
-              borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              background: 'rgba(255, 255, 255, 0.08)',
-              color: '#e2e8f0',
-              fontSize: '0.78rem',
+              fontSize: '0.62rem',
+              color: '#cbd5e1',
+              background: 'rgba(255, 255, 255, 0.12)',
+              padding: '1px 4px',
+              borderRadius: '9999px',
               fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
+              whiteSpace: 'nowrap',
             }}
           >
-            ⇄ Reverse
-          </button>
-        )}
-
-        {steps.length > 0 && (
-          <button
-            onClick={() => setShowSteps(!showSteps)}
-            title="Toggle Step-by-Step Directions"
-            style={{
-              flex: 1,
-              padding: '8px 10px',
-              borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              background: showSteps ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-              color: showSteps ? '#60a5fa' : '#e2e8f0',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-            }}
-          >
-            {showSteps ? '▲ Hide Steps' : '▼ View Steps'}
-          </button>
+            ⛰️+{etas.ascent}m
+          </span>
         )}
       </div>
 
-      {/* Expandable Step-by-Step Turn-by-turn breakdown */}
-      {showSteps && steps.length > 0 && (
-        <div
+      {/* Destination Chip & Quick Switcher Button */}
+      <button
+        onClick={onChangeDestination}
+        title="Click to change destination or pick another spot"
+        className="nav-dest-chip"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          background: 'rgba(255, 255, 255, 0.08)',
+          border: '1px solid rgba(255, 255, 255, 0.18)',
+          borderRadius: '9999px',
+          padding: '3px 8px',
+          color: '#ffffff',
+          fontSize: '0.74rem',
+          fontWeight: 600,
+          cursor: 'pointer',
+          maxWidth: '125px',
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
+          flexShrink: 1,
+          transition: 'all 0.15s ease',
+        }}
+      >
+        <span>🎯</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {destDisplayName}
+        </span>
+        <span style={{ fontSize: '0.65rem', color: '#60a5fa' }}>▾</span>
+      </button>
+
+      {/* Reverse Start & Destination */}
+      {onReverseRoute && (
+        <button
+          onClick={onReverseRoute}
+          title="Reverse Start & Destination points"
           style={{
-            marginTop: '12px',
-            maxHeight: '180px',
-            overflowY: 'auto',
-            background: 'rgba(2, 6, 23, 0.75)',
-            borderRadius: '8px',
-            padding: '8px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '9999px',
+            color: '#cbd5e1',
+            width: '28px',
+            height: '28px',
+            padding: 0,
+            fontSize: '0.8rem',
+            cursor: 'pointer',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'all 0.15s ease',
           }}
         >
-          {steps.map((st, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '8px',
-                fontSize: '0.76rem',
-                color: '#cbd5e1',
-                paddingBottom: '4px',
-                borderBottom: i < steps.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
-              }}
-            >
-              <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>
-                {getManeuverIcon(st.maneuver?.type, st.maneuver?.modifier)}
-              </span>
-              <div style={{ flex: 1 }}>
-                <div>{st.maneuver?.instruction || st.name || `Step ${i + 1}`}</div>
-                <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
-                  {formatDistance(st.distance)} · {formatDuration(st.duration)}
-                </div>
+          ⇄
+        </button>
+      )}
+
+      {/* Turn-by-Turn Steps Toggle */}
+      {steps.length > 0 && (
+        <button
+          onClick={() => setShowSteps(!showSteps)}
+          title={showSteps ? 'Hide steps' : 'View turn-by-turn directions'}
+          style={{
+            background: showSteps ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+            border: showSteps
+              ? '1px solid rgba(59, 130, 246, 0.45)'
+              : '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '9999px',
+            color: showSteps ? '#60a5fa' : '#cbd5e1',
+            width: '28px',
+            height: '28px',
+            padding: 0,
+            fontSize: '0.74rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          📋
+        </button>
+      )}
+
+      {/* 360° Street View at Start (if available) */}
+      {onStartStreetViewRoute && (
+        <button
+          onClick={onStartStreetViewRoute}
+          title="Open 360° Street View at route start"
+          style={{
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '9999px',
+            color: '#cbd5e1',
+            width: '28px',
+            height: '28px',
+            padding: 0,
+            fontSize: '0.74rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          📷
+        </button>
+      )}
+
+      {/* Exit Navigation & Revert Nav Bar */}
+      <button
+        onClick={onClearRoute}
+        title="Exit Navigation and restore standard nav bar"
+        style={{
+          background: 'rgba(239, 68, 68, 0.2)',
+          border: '1px solid rgba(239, 68, 68, 0.45)',
+          borderRadius: '9999px',
+          color: '#fca5a5',
+          padding: '4px 9px',
+          fontSize: '0.74rem',
+          fontWeight: 700,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '3px',
+          flexShrink: 0,
+          marginLeft: 'auto',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        ✕ Exit
+      </button>
+
+      {/* Expandable Turn-by-Turn Steps Dropdown Drawer */}
+      {showSteps && (
+        <div
+          className="nav-steps-dropdown"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 8px)',
+            left: 0,
+            right: 0,
+            minWidth: '280px',
+            maxWidth: '430px',
+            maxHeight: '260px',
+            overflowY: 'auto',
+            background: 'rgba(15, 23, 42, 0.96)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(59, 130, 246, 0.4)',
+            borderRadius: '16px',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6)',
+            padding: '10px',
+            zIndex: 1050,
+            animation: 'fadeInDown 0.2s ease',
+          }}
+        >
+          {/* Surface & Elevation Stats */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(2, 6, 23, 0.5)',
+              borderRadius: '8px',
+              padding: '6px 8px',
+              fontSize: '0.68rem',
+              color: '#94a3b8',
+              marginBottom: '6px',
+            }}
+          >
+            <span>🛣️ {etas.surfaceType}</span>
+            <span>⛰️ {etas.ascent > 0 ? `+${etas.ascent}m ascent` : 'Flat terrain'}</span>
+            <span>🔄 {etas.turnCount} turns</span>
+          </div>
+
+          {/* Turn Steps List */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+            }}
+          >
+            {steps.map((st, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.72rem',
+                  color: '#cbd5e1',
+                  padding: '4px 6px',
+                  borderRadius: '6px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                }}
+              >
+                <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>
+                  {getManeuverIcon(st.maneuver?.type, st.maneuver?.modifier)}
+                </span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {st.maneuver?.instruction || st.name || `Step ${i + 1}`}
+                </span>
+                <span style={{ fontSize: '0.64rem', color: '#64748b', flexShrink: 0 }}>
+                  {formatKm(st.distance)}
+                </span>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

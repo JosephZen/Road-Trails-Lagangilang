@@ -97,62 +97,20 @@ export default function GoogleStreetViewViewer({
         onLoad={() => setIsLoading(false)}
       />
 
-      {/* ===== BOTTOM-LEFT OF STREETVIEW: All transitions and engine controls ===== */}
+      {/* ===== BOTTOM-LEFT OF STREETVIEW: All transitions and engine controls (Responsive to device aspect ratio) ===== */}
       <div
-        className="streetview-bottom-left-controls"
-        style={{
-          position: 'absolute',
-          bottom: '20px',
-          left: '16px',
-          zIndex: 40,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          maxWidth: hasDedicatedCard ? 'calc(100% - 360px)' : 'calc(100% - 32px)',
-          marginLeft: hasDedicatedCard ? '335px' : '0px',
-          pointerEvents: 'auto',
-          animation: 'fadeInUp 0.3s ease-out',
-          transition: 'all 0.25s ease',
-        }}
+        className={`streetview-bottom-left-controls ${hasDedicatedCard ? 'has-spot-card' : ''}`}
       >
         {/* Transition prompt: Inside Campus Ground (No Google vehicle coverage) */}
         {inCampus && onSwitchToMapillary && (
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 12px',
-              background: 'rgba(15, 23, 42, 0.94)',
-              borderRadius: 'var(--radius-full, 9999px)',
-              border: '1.5px solid #f59e0b',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-              backdropFilter: 'blur(12px)',
-              width: 'fit-content',
-            }}
-          >
-            <span style={{ fontSize: '0.95rem' }}>🏫</span>
-            <span style={{ fontSize: '0.74rem', color: '#fbbf24', fontWeight: 600 }}>
-              Inside UA Campus (No Google road coverage)
-            </span>
+          <div className="streetview-transition-prompt campus-prompt">
+            <span style={{ fontSize: '0.9rem' }}>🏫</span>
+            <span className="prompt-label">Inside UA Campus (No Google coverage)</span>
             <button
               onClick={handleEnterMapillaryCampus}
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: 'var(--radius-full, 9999px)',
-                padding: '4px 12px',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
-              }}
+              className="prompt-btn"
             >
-              <span>🚗 Switch to Mapillary Trail</span>
+              <span>🚗 Switch to Mapillary</span>
               <span>→</span>
             </button>
           </div>
@@ -160,115 +118,48 @@ export default function GoogleStreetViewViewer({
 
         {/* Transition prompt: Near UA Campus Entrance Highway Junction */}
         {!inCampus && nearJunction && onSwitchToMapillary && (
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 12px',
-              background: 'rgba(15, 23, 42, 0.94)',
-              borderRadius: 'var(--radius-full, 9999px)',
-              border: '1.5px solid #10b981',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-              backdropFilter: 'blur(12px)',
-              width: 'fit-content',
-            }}
-          >
-            <span style={{ fontSize: '0.95rem' }}>🚗</span>
-            <span style={{ fontSize: '0.74rem', color: '#86efac', fontWeight: 600 }}>
-              Junction Connected:
-            </span>
+          <div className="streetview-transition-prompt junction-prompt">
+            <span style={{ fontSize: '0.9rem' }}>🚗</span>
+            <span className="prompt-label">Junction Connected:</span>
             <button
               onClick={handleEnterMapillaryCampus}
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: 'var(--radius-full, 9999px)',
-                padding: '4px 12px',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
-              }}
+              className="prompt-btn"
             >
-              <span>Enter UA Campus Grounds (Mapillary)</span>
+              <span>Enter Campus (Mapillary)</span>
               <span>→</span>
             </button>
           </div>
         )}
 
-        {/* Google Street View Status & Transition Hub */}
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(15, 23, 42, 0.92)',
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-full, 9999px)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            backdropFilter: 'blur(12px)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-            width: 'fit-content',
-            flexWrap: 'wrap',
-          }}
-        >
-          <span style={{ fontSize: '1rem' }}>🌐</span>
-          <div>
-            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
-              Google Street View
-            </div>
-            <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
-              {title || `${parsedLat.toFixed(5)}, ${parsedLng.toFixed(5)}`}
-            </div>
+        {/* Google Street View Status & Transition Hub (Aspect Ratio Adaptive Pill) */}
+        <div className="streetview-engine-switch-pill">
+          <span style={{ fontSize: '0.95rem' }}>🌐</span>
+          <div className="switch-text-group">
+            <span className="switch-title-desktop">Google Street View</span>
+            <span className="switch-title-mobile">Google</span>
           </div>
 
           <a
             href={externalUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              marginLeft: '4px',
-              fontSize: '0.68rem',
-              color: '#60a5fa',
-              textDecoration: 'none',
-              padding: '2px 8px',
-              borderRadius: '4px',
-              background: 'rgba(59, 130, 246, 0.15)',
-              border: '1px solid rgba(96, 165, 250, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
+            className="streetview-external-link"
             title="Open in official Google Maps app or browser tab"
           >
-            <span>Open in Google Maps</span>
+            <span className="link-text-desktop">Open in Google Maps</span>
+            <span className="link-text-mobile">Maps</span>
             <span>↗</span>
           </a>
 
           {onSwitchToMapillary && (
             <button
               onClick={() => onSwitchToMapillary({ lat: parsedLat, lng: parsedLng })}
-              style={{
-                fontSize: '0.68rem',
-                color: '#34d399',
-                background: 'rgba(16, 185, 129, 0.15)',
-                border: '1px solid rgba(52, 211, 153, 0.4)',
-                borderRadius: '4px',
-                padding: '2px 8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontWeight: 600,
-              }}
+              className="streetview-switch-btn mapillary-switch"
               title="Transition to Mapillary streetview at this location"
             >
-              <span>🚗 Switch to Mapillary</span>
+              <span>🚗</span>
+              <span className="btn-label-desktop">Switch to Mapillary</span>
+              <span className="btn-label-mobile">Mapillary</span>
             </button>
           )}
         </div>

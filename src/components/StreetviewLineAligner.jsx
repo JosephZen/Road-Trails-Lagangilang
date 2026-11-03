@@ -42,9 +42,9 @@ export default function StreetviewLineAligner({
       </div>
 
       <div className="aligner-tips">
-        <span>💡 <strong>Drag handles</strong> onto the road curve.</span>
-        <span>💡 <strong>Click line</strong> to add curve point.</span>
-        <span>💡 <strong>Right-click handle</strong> to remove.</span>
+        <span>💡 <strong>Touch & drag handles</strong> onto the road curve.</span>
+        <span>💡 <strong>Tap line</strong> to add curve handle.</span>
+        <span>💡 <strong>Double-tap or Right-click</strong> handle to remove.</span>
       </div>
 
       <div className="aligner-actions">

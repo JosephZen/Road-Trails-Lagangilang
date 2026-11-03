@@ -6,9 +6,42 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { calculateBearing } from '../utils/geoUtils';
 import { normalizeCategoryName, getDefaultCategoryIcon } from '../services/touristSpotsService';
 import { streetviewAlignmentService } from '../services/streetviewAlignmentService';
+import { calculateAdvancedETAs } from '../services/routeConditionService';
+import offlineMapManager from '../services/offlineMapManager';
 
 // MapLibre GL worker initialization
 setWorkerUrl(maplibreWorkerUrl);
+
+// Register offline tile protocol once for MapLibre GL
+if (typeof window !== 'undefined' && maplibregl?.addProtocol && !window.__lagangilangOfflineProtocolRegistered) {
+  window.__lagangilangOfflineProtocolRegistered = true;
+  maplibregl.addProtocol('lagangilang-offline', async (params, abortController) => {
+    const match = params.url.match(/lagangilang-offline:\/\/(\d+)\/(\d+)\/(\d+)/);
+    if (match) {
+      const [, z, x, y] = match;
+      try {
+        const blob = await offlineMapManager.getTileBlob(z, x, y);
+        if (blob) {
+          const arrayBuffer = await blob.arrayBuffer();
+          return { data: arrayBuffer };
+        }
+      } catch (_) {}
+
+      // If tile is not cached in IndexedDB yet, fallback to OpenStreetMap live if online
+      try {
+        const res = await fetch(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`, {
+          signal: abortController.signal,
+          mode: 'cors',
+        });
+        if (res.ok) {
+          const buffer = await res.arrayBuffer();
+          return { data: buffer };
+        }
+      } catch (_) {}
+    }
+    return { data: new ArrayBuffer(0) };
+  });
+}
 
 /**
  * MapView component using MapLibre GL JS with OpenFreeMap tiles.
@@ -31,8 +64,10 @@ export default function MapView({
   onSpotLocationChange,
   showCoverageGaps = true,
   routeGeoJSON,
+  routeData = null,
   routeOrigin,
   routeDestination,
+  routingProfile = 'driving',
   showCustomOSM = true,
   routingMode = false,
   pickingMode = null,
@@ -121,6 +156,27 @@ export default function MapView({
   // Get style URL based on theme
   const getStyleObj = useCallback((t) => {
     switch (t) {
+      case 'offline':
+        return {
+          version: 8,
+          sources: {
+            'offline-tiles': {
+              type: 'raster',
+              tiles: ['lagangilang-offline://{z}/{x}/{y}'],
+              tileSize: 256,
+              attribution: 'Offline Map &copy; Lagangilang Eco-Trails',
+            },
+          },
+          layers: [
+            {
+              id: 'offline-base',
+              type: 'raster',
+              source: 'offline-tiles',
+              minzoom: 0,
+              maxzoom: 19,
+            },
+          ],
+        };
       case 'light': return 'https://tiles.openfreemap.org/styles/liberty';
       case 'beige': return 'https://tiles.openfreemap.org/styles/positron';
       case 'satellite': return {
@@ -269,9 +325,9 @@ export default function MapView({
         source: 'route-line',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': '#1e3a5f',
-          'line-width': 10,
-          'line-opacity': 0.4,
+          'line-color': '#064E3B',
+          'line-width': 9,
+          'line-opacity': 0.85,
         },
       });
 
@@ -281,9 +337,9 @@ export default function MapView({
         source: 'route-line',
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': '#3b82f6',
+          'line-color': '#22C55E',
           'line-width': 5,
-          'line-opacity': 0.85,
+          'line-opacity': 1.0,
         },
       });
 
@@ -358,9 +414,9 @@ export default function MapView({
         type: 'circle',
         source: 'active-align-handles-source',
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 6, 15, 9, 18, 12],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 14, 18, 18],
           'circle-color': '#00f0ff',
-          'circle-stroke-width': 3,
+          'circle-stroke-width': 4,
           'circle-stroke-color': '#ffffff',
           'circle-opacity': 1,
         },
@@ -512,8 +568,8 @@ export default function MapView({
         // Check if user is in "Select Streetview to Align" mode
         if (isSelectingAlignmentTargetRef.current) {
           const hitBox = [
-            [e.point.x - 22, e.point.y - 22],
-            [e.point.x + 22, e.point.y + 22],
+            [e.point.x - 30, e.point.y - 30],
+            [e.point.x + 30, e.point.y + 30],
           ];
           const seqFeatures = map.queryRenderedFeatures(hitBox, {
             layers: ['mapillary-sequences', 'mapillary-images', 'aligned-streetview-layer'],
@@ -530,8 +586,8 @@ export default function MapView({
         // If currently aligning, but user clicks directly on a different streetview line to switch
         if (aligningSequenceRef.current && !map.queryRenderedFeatures(e.point, { layers: ['active-align-handles-layer'] }).length) {
           const hitBox = [
-            [e.point.x - 18, e.point.y - 18],
-            [e.point.x + 18, e.point.y + 18],
+            [e.point.x - 24, e.point.y - 24],
+            [e.point.x + 24, e.point.y + 24],
           ];
           const otherSeqFeatures = map.queryRenderedFeatures(hitBox, {
             layers: ['mapillary-sequences', 'aligned-streetview-layer'],
@@ -545,9 +601,13 @@ export default function MapView({
           }
         }
 
-        // 0a. If in alignment mode, clicking on the active bent line inserts a new curve handle
+        // 0a. If in alignment mode, clicking/tapping on the active bent line inserts a new curve handle
         if (aligningSequenceRef.current && map.getLayer('active-align-line-inner')) {
-          const lineFeatures = map.queryRenderedFeatures(e.point, {
+          const lineBox = [
+            [e.point.x - 16, e.point.y - 16],
+            [e.point.x + 16, e.point.y + 16],
+          ];
+          const lineFeatures = map.queryRenderedFeatures(lineBox, {
             layers: ['active-align-line-inner', 'active-align-line-casing'],
           });
           if (lineFeatures.length > 0) {
@@ -877,19 +937,26 @@ export default function MapView({
       }
     });
 
-    map.on('mousedown', 'active-align-handles-layer', (e) => {
+    const onHandleDragStart = (e) => {
       if (!aligningSequenceRef.current) return;
-      e.originalEvent?.preventDefault();
+      if (e.originalEvent) {
+        e.originalEvent.preventDefault?.();
+        e.originalEvent.stopPropagation?.();
+      }
       const feature = e.features?.[0];
       if (feature && feature.properties?.index !== undefined) {
         draggingHandleIndex.current = feature.properties.index;
         map.dragPan.disable();
+        map.touchZoomRotate.disable();
         map.getCanvas().style.cursor = 'grabbing';
       }
-    });
+    };
 
-    map.on('mousemove', (e) => {
+    const onHandleDragMove = (e) => {
       if (draggingHandleIndex.current !== null && aligningSequenceRef.current) {
+        if (e.originalEvent) {
+          e.originalEvent.preventDefault?.();
+        }
         const idx = draggingHandleIndex.current;
         const seq = aligningSequenceRef.current;
         let ptLng = e.lngLat.lng;
@@ -938,17 +1005,71 @@ export default function MapView({
           images: mappedImages,
         });
       }
-    });
+    };
 
-    const onGlobalMouseUp = () => {
+    const onGlobalDragEnd = () => {
       if (draggingHandleIndex.current !== null) {
         draggingHandleIndex.current = null;
         map.dragPan.enable();
+        map.touchZoomRotate.enable();
         map.getCanvas().style.cursor = '';
       }
     };
 
-    map.on('mouseup', onGlobalMouseUp);
+    map.on('mousedown', 'active-align-handles-layer', onHandleDragStart);
+    map.on('touchstart', 'active-align-handles-layer', onHandleDragStart);
+
+    map.on('mousemove', onHandleDragMove);
+    map.on('touchmove', onHandleDragMove);
+
+    map.on('mouseup', onGlobalDragEnd);
+    map.on('touchend', onGlobalDragEnd);
+    map.on('touchcancel', onGlobalDragEnd);
+
+    // Double-click / Double-tap handle to remove it (for touch devices and mice)
+    map.on('dblclick', 'active-align-handles-layer', (e) => {
+      if (!aligningSequenceRef.current) return;
+      e.originalEvent?.preventDefault?.();
+      e.originalEvent?.stopPropagation?.();
+      const feature = e.features?.[0];
+      const idx = feature?.properties?.index;
+      const seq = aligningSequenceRef.current;
+      if (seq && idx !== undefined && seq.controlPoints.length > 2) {
+        const newControlPoints = seq.controlPoints.filter((_, i) => i !== idx);
+        const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+          newControlPoints,
+          seq.images
+        );
+
+        const lineSrc = map.getSource('active-align-line-source');
+        const handlesSrc = map.getSource('active-align-handles-source');
+
+        if (lineSrc) {
+          lineSrc.setData({
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates } }],
+          });
+        }
+
+        if (handlesSrc) {
+          handlesSrc.setData({
+            type: 'FeatureCollection',
+            features: newControlPoints.map((cp, i) => ({
+              type: 'Feature',
+              properties: { index: i },
+              geometry: { type: 'Point', coordinates: cp },
+            })),
+          });
+        }
+
+        onUpdateAligningSequenceRef.current?.({
+          ...seq,
+          controlPoints: newControlPoints,
+          coordinates,
+          images: mappedImages,
+        });
+      }
+    });
 
     mapRef.current = map;
 
@@ -1080,14 +1201,14 @@ export default function MapView({
           type: 'line',
           source: 'route-line',
           layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': '#1e3a5f', 'line-width': 10, 'line-opacity': 0.4 },
+          paint: { 'line-color': '#064E3B', 'line-width': 9, 'line-opacity': 0.85 },
         });
         mapRef.current.addLayer({
           id: 'route-line-layer',
           type: 'line',
           source: 'route-line',
           layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 0.85 },
+          paint: { 'line-color': '#22C55E', 'line-width': 5, 'line-opacity': 1.0 },
         });
       }
 
@@ -1159,9 +1280,9 @@ export default function MapView({
           type: 'circle',
           source: 'active-align-handles-source',
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 6, 15, 9, 18, 12],
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 14, 18, 18],
             'circle-color': '#00f0ff',
-            'circle-stroke-width': 3,
+            'circle-stroke-width': 4,
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 1,
           },
@@ -1346,12 +1467,13 @@ export default function MapView({
 
       const isPoi = spot.spotType === 'poi' || spot.type === 'poi';
       const cleanCategory = normalizeCategoryName(spot.category);
-      const icon = spot.categoryIcon || getDefaultCategoryIcon(cleanCategory, spot.spotType) || (isPoi ? '📍' : '⭐');
+      const isCheckpoint = Boolean(spot.isCheckpoint || cleanCategory.toLowerCase().includes('checkpoint') || cleanCategory.toLowerCase().includes('denr'));
+      const icon = isCheckpoint ? '🌲' : (spot.categoryIcon || getDefaultCategoryIcon(cleanCategory, spot.spotType) || (isPoi ? '📍' : '⭐'));
 
       const canDrag = !!isAdmin && !!isDraggable;
 
       const el = document.createElement('div');
-      el.className = `poi-marker ${isPoi ? 'poi-service' : 'poi-attraction'} ${
+      el.className = `poi-marker ${isCheckpoint ? 'poi-checkpoint' : isPoi ? 'poi-service' : 'poi-attraction'} ${
         spot.id === activeTouristSpotId ? 'active' : ''
       } ${spot.sync_status === 'staged_local' ? 'staged' : ''} ${canDrag ? 'is-admin-draggable' : ''}`;
       el.dataset.poiId = spot.id;
@@ -1359,7 +1481,7 @@ export default function MapView({
 
       el.innerHTML = `
         <div class="poi-marker-inner">
-          <div class="poi-marker-pin ${isPoi ? 'pin-poi' : 'pin-tourist'}">
+          <div class="poi-marker-pin ${isCheckpoint ? 'pin-checkpoint' : isPoi ? 'pin-poi' : 'pin-tourist'}">
             <span class="poi-marker-icon">${icon}</span>
           </div>
           <div class="poi-marker-label">${spot.name}</div>
@@ -1458,6 +1580,11 @@ export default function MapView({
           geometry: routeGeoJSON,
           properties: {},
         });
+        // Explicit layer ordering: Layer bright green route line ON TOP OF cyan streetview lines
+        try {
+          if (map.getLayer('route-line-casing')) map.moveLayer('route-line-casing');
+          if (map.getLayer('route-line-layer')) map.moveLayer('route-line-layer');
+        } catch (_) {}
       } else {
         source.setData({ type: 'FeatureCollection', features: [] });
       }
@@ -1468,41 +1595,143 @@ export default function MapView({
     return () => window.removeEventListener('map-style-loaded', updateRoute);
   }, [routeGeoJSON]);
 
-  // Route origin & destination markers
+  // Route origin & destination markers with Pop-up POI that automatically disappears
   const routeMarkersRef = useRef([]);
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    // Clear existing route markers
-    routeMarkersRef.current.forEach(m => m.remove());
+    // Clear existing route markers and timers
+    routeMarkersRef.current.forEach((m) => m.remove());
     routeMarkersRef.current = [];
 
+    const resolveLocationName = (coords, fallbackLabel) => {
+      if (!coords) return fallbackLabel;
+      const [lng, lat] = coords;
+      if (Math.abs(lng - 120.734) < 0.005 && Math.abs(lat - 17.6142) < 0.005) {
+        return 'Poblacion Town Plaza';
+      }
+      const match = touristSpots.find((s) => {
+        const sLat = s.location?.lat ?? s.lat;
+        const sLng = s.location?.lng ?? s.lng;
+        return Math.abs(sLat - lat) < 0.0004 && Math.abs(sLng - lng) < 0.0004;
+      });
+      if (match) return match.name;
+      return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
+    };
+
+    let etaString = '';
+    if (routeData) {
+      try {
+        const etas = calculateAdvancedETAs(routeData);
+        let cur = etas.car;
+        if (routingProfile === 'walking' || routingProfile === 'foot') cur = etas.person;
+        else if (routingProfile === 'motorcycle') cur = etas.motorcycle;
+        etaString = `⏱️ ${cur.icon} ${cur.formatted} · ${etas.distanceKm}`;
+      } catch (e) {
+        // Fallback
+      }
+    }
+
+    const popupTimers = [];
+
+    // Helper to reveal and auto-hide a popup card
+    const scheduleFade = (cardEl) => {
+      if (!cardEl) return;
+      cardEl.classList.remove('hidden', 'fade-out');
+      const timer = setTimeout(() => {
+        cardEl.classList.add('fade-out');
+        const hideTimer = setTimeout(() => {
+          cardEl.classList.add('hidden');
+        }, 380);
+        popupTimers.push(hideTimer);
+      }, 5000);
+      popupTimers.push(timer);
+    };
+
+    // Point A Marker & Pop-up POI
     if (routeOrigin) {
+      const originName = resolveLocationName(routeOrigin, 'Point A (Start)');
       const el = document.createElement('div');
-      el.className = 'route-marker route-marker-origin';
-      el.innerHTML = '<div class="route-marker-dot">A</div>';
+      el.className = 'route-marker-wrapper origin-wrapper';
+      el.innerHTML = `
+        <div class="route-poi-transient-card origin-card">
+          <div class="poi-card-badge origin-badge">🟢 Point A (Start)</div>
+          <div class="poi-card-name">${originName}</div>
+        </div>
+        <div class="route-marker-dot origin-dot" title="Point A (Start) - Click to toggle details">A</div>
+      `;
+
+      const card = el.querySelector('.origin-card');
+      scheduleFade(card);
+
+      const dot = el.querySelector('.origin-dot');
+      if (dot) {
+        dot.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (card.classList.contains('hidden')) {
+            scheduleFade(card);
+          } else {
+            card.classList.add('hidden');
+          }
+        });
+      }
+
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat(routeOrigin)
         .addTo(map);
       routeMarkersRef.current.push(marker);
     }
 
+    // Point B Marker & Pop-up POI
     if (routeDestination) {
+      const destName = resolveLocationName(routeDestination, 'Point B (Destination)');
       const el = document.createElement('div');
-      el.className = 'route-marker route-marker-destination';
-      el.innerHTML = '<div class="route-marker-dot">B</div>';
+      el.className = 'route-marker-wrapper dest-wrapper';
+      el.innerHTML = `
+        <div class="route-poi-transient-card dest-card">
+          <div class="poi-card-badge dest-badge">🔴 Point B (Destination)</div>
+          <div class="poi-card-name">${destName}</div>
+          ${etaString ? `<div class="poi-card-eta">${etaString}</div>` : ''}
+        </div>
+        <div class="route-marker-dot dest-dot" title="Point B (Destination) - Click to toggle ETA">B</div>
+      `;
+
+      const card = el.querySelector('.dest-card');
+      scheduleFade(card);
+
+      const dot = el.querySelector('.dest-dot');
+      if (dot) {
+        dot.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (card.classList.contains('hidden')) {
+            scheduleFade(card);
+          } else {
+            card.classList.add('hidden');
+          }
+        });
+      }
+
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat(routeDestination)
         .addTo(map);
       routeMarkersRef.current.push(marker);
     }
 
+    // Custom event to re-trigger popups when user clicks compact pill
+    const handleReTrigger = () => {
+      const cards = document.querySelectorAll('.route-poi-transient-card');
+      cards.forEach((c) => scheduleFade(c));
+    };
+    window.addEventListener('show-route-popups', handleReTrigger);
+
     return () => {
-      routeMarkersRef.current.forEach(m => m.remove());
+      popupTimers.forEach(clearTimeout);
+      window.removeEventListener('show-route-popups', handleReTrigger);
+      routeMarkersRef.current.forEach((m) => m.remove());
       routeMarkersRef.current = [];
     };
-  }, [routeOrigin, routeDestination]);
+  }, [routeOrigin, routeDestination, routeData, routingProfile, touristSpots]);
 
   // Toggle Mapillary Streetview layers (Green sequence lines and image dots)
   useEffect(() => {

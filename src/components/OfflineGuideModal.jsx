@@ -1,69 +1,87 @@
 import React, { useState, useEffect } from 'react';
+import offlineMapManager from '../services/offlineMapManager';
 import offlineCacheService from '../services/offlineCacheService';
+import hotlinesService from '../services/hotlinesService';
 
 /**
  * OfflineGuideModal Component
- * Allows tourists and municipal officers to download the entire Lagangilang map,
- * tourist spots, trail routes, emergency contacts, and offline guide into local storage
- * so the system functions in dead zones and zero-signal mountain trails.
+ * Full High-Capacity Offline Map & Data Packager (Up to 200 MB)
+ * Caches:
+ * 1. Base Map Tiles (Zooms 12-19)
+ * 2. Custom Map Overlays (Campus polygons, aligned curves)
+ * 3. Offline Road Routing Graph (lagangilang_roads_graph.json)
+ * 4. POIs, Tourist Spots, DENR Checkpoints & Emergency Hotlines
  */
 export default function OfflineGuideModal({
   isOpen,
   onClose,
   touristSpots = [],
   customGeoJSON = null,
+  isOfflineModeActive = false,
+  onToggleOfflineMode,
   showToast,
 }) {
-  const [cachedBundle, setCachedBundle] = useState(null);
-  const [isCaching, setIsCaching] = useState(false);
-  const [isDataSaver, setIsDataSaver] = useState(() => offlineCacheService.isDataSaver);
+  const [offlineStatus, setOfflineStatus] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({
+    stage: '',
+    percent: 0,
+    mbDownloaded: '0.0',
+    message: '',
+  });
 
   useEffect(() => {
     if (isOpen) {
-      setCachedBundle(offlineCacheService.getCachedBundle());
-      setIsDataSaver(offlineCacheService.isDataSaver);
+      offlineMapManager.getStatus().then(setOfflineStatus);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleDownload = async () => {
-    setIsCaching(true);
+  const handleStartDownload = async () => {
+    setIsDownloading(true);
+    setDownloadProgress({
+      stage: 'starting',
+      percent: 0,
+      mbDownloaded: '0.0',
+      message: 'Initializing Offline Map Downloader...',
+    });
+
     try {
-      const res = await offlineCacheService.cacheOfflineBundle(touristSpots, customGeoJSON);
-      setCachedBundle(offlineCacheService.getCachedBundle());
-      showToast?.(`📥 Successfully cached map styles, ${res.count} spots & hotlines into device storage!`);
+      const hotlines = hotlinesService.getAll();
+      const bundleInfo = await offlineMapManager.downloadFullOfflineBundle({
+        touristSpots,
+        customGeoJSON,
+        hotlines,
+        onProgress: (p) => setDownloadProgress(p),
+      });
+
+      const updated = await offlineMapManager.getStatus();
+      setOfflineStatus(updated);
+      showToast?.(`📥 Full Offline Bundle Ready! ${bundleInfo.sizeMB} MB saved to device.`);
     } catch (e) {
-      showToast?.(`⚠️ Cache error: ${e.message}`);
+      console.error('Offline download failed:', e);
+      showToast?.(`⚠️ Offline download failed: ${e.message}`);
     } finally {
-      setIsCaching(false);
+      setIsDownloading(false);
     }
   };
 
-  const handleDownloadHtmlFile = () => {
+  const handleClearCache = async () => {
+    const ok = await offlineMapManager.clearOfflineData();
+    if (ok) {
+      setOfflineStatus(await offlineMapManager.getStatus());
+      showToast?.('🗑️ Offline map tiles and data cleared.');
+    }
+  };
+
+  const handleDownloadStandaloneHtml = () => {
     try {
       offlineCacheService.downloadOfflineMapHtml(touristSpots);
       showToast?.('💾 Standalone offline map file downloaded to your device!');
     } catch (e) {
-      showToast?.('⚠️ Could not generate offline map file');
+      showToast?.('⚠️ Could not generate standalone HTML file');
     }
-  };
-
-  const handleClear = () => {
-    offlineCacheService.clearCachedBundle();
-    setCachedBundle(null);
-    showToast?.('🗑️ Offline cache cleared');
-  };
-
-  const handleToggleDataSaver = () => {
-    const next = !isDataSaver;
-    setIsDataSaver(next);
-    offlineCacheService.setDataSaverPreference(next);
-    showToast?.(
-      next
-        ? '⚡ Low-Data Mode ENABLED: 360 preloading paused, lighter image fallbacks'
-        : '🌐 Full Bandwidth Mode restored'
-    );
   };
 
   return (
@@ -85,9 +103,9 @@ export default function OfflineGuideModal({
         className="glass-panel"
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxWidth: '520px',
+          maxWidth: '540px',
           width: '92%',
-          padding: '20px',
+          padding: '22px',
           borderRadius: 'var(--radius-xl, 16px)',
           border: '1.5px solid rgba(16, 185, 129, 0.45)',
           background: 'rgba(15, 23, 42, 0.96)',
@@ -101,11 +119,11 @@ export default function OfflineGuideModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '1.6rem' }}>📥</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#34d399' }}>
-                Offline Maps & Low-Data Mode
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#34d399' }}>
+                Offline Map & Data Bundle
               </h3>
-              <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8' }}>
-                For Zero-Signal Mountain Trails & Remote Areas in Lagangilang
+              <p style={{ margin: 0, fontSize: '0.74rem', color: '#94a3b8' }}>
+                High-Capacity Storage (Up to 200 MB) • Zero-Signal Mountain Trails
               </p>
             </div>
           </div>
@@ -121,8 +139,8 @@ export default function OfflineGuideModal({
         {/* Status Card */}
         <div
           style={{
-            background: cachedBundle ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-            border: cachedBundle ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
+            background: offlineStatus?.isReady ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+            border: offlineStatus?.isReady ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
             borderRadius: 'var(--radius-lg, 12px)',
             padding: '14px',
             marginBottom: '14px',
@@ -130,32 +148,68 @@ export default function OfflineGuideModal({
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffffff' }}>
-              {cachedBundle ? '🟢 Offline Guide Ready' : '⚪ No Offline Guide Cached'}
+              {offlineStatus?.isReady ? '🟢 Full Offline Bundle Stored' : '⚪ No Offline Tiles Cached'}
             </span>
-            {cachedBundle && (
-              <span style={{ fontSize: '0.7rem', color: '#6ee7b7' }}>
-                {cachedBundle.spotsCount} Spots Available Offline
+            {offlineStatus?.isReady && (
+              <span style={{ fontSize: '0.72rem', color: '#6ee7b7', fontWeight: 700 }}>
+                {offlineStatus.sizeMB} MB Saved • {offlineStatus.tileCount} Tiles
               </span>
             )}
           </div>
           <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.4 }}>
-            {cachedBundle
-              ? `Downloaded on ${new Date(cachedBundle.cachedAt).toLocaleDateString()} at ${new Date(cachedBundle.cachedAt).toLocaleTimeString()}. All spot GPS pins, descriptions, emergency hotlines, and trail tips are stored on your device.`
-              : 'Download the offline guide package before heading out to trails with spotty or zero cellular coverage (e.g. Ugiao River, BANAT Caves, Quirsodan Dam).'}
+            {offlineStatus?.isReady
+              ? `Cached on ${new Date(offlineStatus.timestamp).toLocaleDateString()} at ${new Date(offlineStatus.timestamp).toLocaleTimeString()}. Includes Base Map Tiles, Custom Map Overlays, Offline Road Routing Graph, ${touristSpots.length} POIs & DENR Checkpoints.`
+              : 'Download the offline map bundle before heading out to remote trails with zero cellular coverage in Lagangilang (Ugiao River, Mt. Bullagao, BANAT Caves, Quirsodan Dam).'}
           </p>
         </div>
 
+        {/* Progress Bar (Visible during download) */}
+        {isDownloading && (
+          <div
+            style={{
+              background: 'rgba(2, 6, 23, 0.8)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              borderRadius: '10px',
+              padding: '12px',
+              marginBottom: '16px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '6px', color: '#38bdf8', fontWeight: 700 }}>
+              <span>{downloadProgress.message}</span>
+              <span>{downloadProgress.percent}% ({downloadProgress.mbDownloaded} MB)</span>
+            </div>
+            <div
+              style={{
+                width: '100%',
+                height: '8px',
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '4px',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  width: `${downloadProgress.percent}%`,
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #10b981 0%, #38bdf8 100%)',
+                  transition: 'width 0.2s ease',
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               className="btn btn-primary"
-              onClick={handleDownload}
-              disabled={isCaching}
+              onClick={handleStartDownload}
+              disabled={isDownloading}
               style={{
                 flex: 1,
-                padding: '9px 14px',
-                fontSize: '0.82rem',
+                padding: '10px 16px',
+                fontSize: '0.84rem',
                 fontWeight: 700,
                 background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
                 borderColor: '#10b981',
@@ -163,31 +217,63 @@ export default function OfflineGuideModal({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '6px',
+                cursor: isDownloading ? 'not-allowed' : 'pointer',
               }}
             >
-              <span>{isCaching ? '⏳' : '📥'}</span>
-              <span>{isCaching ? 'Caching Map & Guide...' : 'Cache Map & Guide in App'}</span>
+              <span>{isDownloading ? '⏳' : '📥'}</span>
+              <span>{isDownloading ? 'Downloading Bundle...' : 'Download Full Offline Map & Data'}</span>
             </button>
 
-            {cachedBundle && (
+            {offlineStatus?.isReady && (
               <button
                 className="btn btn-danger"
-                onClick={handleClear}
-                style={{ padding: '8px 12px', fontSize: '0.78rem' }}
-                title="Clear cached offline bundle"
+                onClick={handleClearCache}
+                disabled={isDownloading}
+                style={{ padding: '8px 14px', fontSize: '0.8rem' }}
+                title="Clear cached offline map bundle"
               >
                 🗑️ Clear
               </button>
             )}
           </div>
 
+          {/* Direct Switch to Offline Map Preview Button */}
+          <button
+            className={`btn ${isOfflineModeActive ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => onToggleOfflineMode?.(!isOfflineModeActive)}
+            style={{
+              padding: '10px 16px',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              background: isOfflineModeActive
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : 'rgba(30, 41, 59, 0.9)',
+              border: isOfflineModeActive ? '1.5px solid #34d399' : '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: isOfflineModeActive ? '0 0 15px rgba(16, 185, 129, 0.4)' : 'none',
+              transition: 'all 0.2s ease',
+            }}
+            title="Toggle between Live Online Tiles and Cached Offline IndexedDB Tiles to test offline map"
+          >
+            <span>{isOfflineModeActive ? '✅' : '🗺️'}</span>
+            <span>
+              {isOfflineModeActive
+                ? 'Use / Preview Offline Map Now (Active)'
+                : 'Use / Preview Offline Map (Cached Tiles)'}
+            </span>
+          </button>
+
           <button
             className="btn btn-secondary"
-            onClick={handleDownloadHtmlFile}
+            onClick={handleDownloadStandaloneHtml}
             style={{
               padding: '9px 14px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
+              fontSize: '0.8rem',
+              fontWeight: 600,
               background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
               borderColor: '#38bdf8',
               color: '#ffffff',
@@ -196,62 +282,35 @@ export default function OfflineGuideModal({
               justifyContent: 'center',
               gap: '6px',
             }}
-            title="Download a standalone interactive map file that opens without any internet"
+            title="Download single-file offline HTML map for direct opening in phone browser"
           >
-            <span>💾</span>
-            <span>Download Offline Interactive Map (.html file)</span>
+            <span>📄</span>
+            <span>Export Standalone Offline Map Guide (.HTML)</span>
           </button>
         </div>
 
-        {/* Data Saver Mode Toggle */}
+        {/* Feature Highlights Grid */}
         <div
           style={{
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: 'var(--radius-lg, 12px)',
-            padding: '12px 14px',
-            marginBottom: '14px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '8px',
+            fontSize: '0.72rem',
+            color: '#94a3b8',
           }}
         >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '1rem' }}>⚡</span>
-              <strong style={{ fontSize: '0.84rem', color: '#ffffff' }}>Low-Data / Data Saver Mode</strong>
-            </div>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#94a3b8' }}>
-              Compresses panoramas and prevents heavy background 360 pre-fetching to save mobile data.
-            </p>
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            🗺️ <strong>Custom Map:</strong> Preserved & active offline
           </div>
-          <button
-            onClick={handleToggleDataSaver}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-full, 9999px)',
-              fontSize: '0.76rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              border: isDataSaver ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.2)',
-              background: isDataSaver ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.06)',
-              color: isDataSaver ? '#34d399' : '#94a3b8',
-              transition: 'all 0.18s ease',
-            }}
-          >
-            {isDataSaver ? 'ON 🟢' : 'OFF ⚪'}
-          </button>
-        </div>
-
-        {/* Footer */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={onClose}
-            style={{ padding: '6px 18px', fontSize: '0.8rem' }}
-          >
-            Done
-          </button>
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            🧭 <strong>Point A ➔ B:</strong> Offline shortest-path routing
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            🌲 <strong>DENR Checkpoint:</strong> Location & hotlines cached
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            📦 <strong>Capacity:</strong> Up to 200 MB IndexedDB quota
+          </div>
         </div>
       </div>
     </div>

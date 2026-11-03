@@ -139,21 +139,28 @@ export default function RoutePlanner({
     <div className="route-planner">
       <h3 className="route-planner-title">🧭 Route & Navigation</h3>
 
-      {/* Travel Profile Selector */}
+      {/* Travel Profile Selector (Car, Motorcycle, Person) */}
       <div className="route-profile-selector" style={{ marginBottom: '12px' }}>
         {[
-          { id: 'driving', icon: '🚗', label: 'Driving' },
-          { id: 'foot', icon: '🚶', label: 'Walking' },
-        ].map((p) => (
-          <button
-            key={p.id}
-            className={`btn btn-sm ${routingProfile === p.id ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => onSetProfile(p.id)}
-            style={{ flex: 1 }}
-          >
-            {p.icon} {p.label}
-          </button>
-        ))}
+          { id: 'driving', icon: '🚗', label: 'Car' },
+          { id: 'motorcycle', icon: '🏍️', label: 'Motor' },
+          { id: 'walking', icon: '🚶', label: 'Walk' },
+        ].map((p) => {
+          const isSelected =
+            routingProfile === p.id ||
+            (p.id === 'walking' && routingProfile === 'foot') ||
+            (p.id === 'driving' && (routingProfile === 'car' || !['motorcycle', 'walking', 'foot'].includes(routingProfile)));
+          return (
+            <button
+              key={p.id}
+              className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => onSetProfile(p.id)}
+              style={{ flex: 1 }}
+            >
+              {p.icon} {p.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Point A (Origin / Start) Card */}

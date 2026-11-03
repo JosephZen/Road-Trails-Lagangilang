@@ -44,6 +44,7 @@ export const CATEGORY_DEFINITIONS = {
   cat_bank: { id: 'cat_bank', name: 'Bank & ATM', icon: '🏧' },
   cat_transport: { id: 'cat_transport', name: 'Transport Terminal', icon: '🚌' },
   cat_emergency: { id: 'cat_emergency', name: 'Government & Emergency Services', icon: '🏛️' },
+  cat_checkpoint: { id: 'cat_checkpoint', name: 'DENR Environmental Checkpoint', icon: '🌲' },
 };
 
 /**
@@ -70,6 +71,7 @@ export function normalizeCategoryName(rawCategory) {
 export function normalizeCategoryId(categoryName) {
   if (!categoryName) return 'cat_heritage';
   const lower = String(categoryName).toLowerCase().trim();
+  if (lower.includes('denr') || lower.includes('checkpoint')) return 'cat_checkpoint';
   for (const def of Object.values(CATEGORY_DEFINITIONS)) {
     if (def.name.toLowerCase() === lower || def.id.toLowerCase() === lower) {
       return def.id;
@@ -84,6 +86,7 @@ export function normalizeCategoryId(categoryName) {
 export function getDefaultCategoryIcon(category, spotType = 'tourist_spot') {
   if (!category) return spotType === 'poi' ? '🏪' : '⭐';
   const lower = String(category).toLowerCase().trim();
+  if (lower.includes('denr') || lower.includes('checkpoint')) return '🌲';
   for (const def of Object.values(CATEGORY_DEFINITIONS)) {
     if (def.name.toLowerCase() === lower || def.id.toLowerCase() === lower) {
       return def.icon;

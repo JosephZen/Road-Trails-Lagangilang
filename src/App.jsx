@@ -24,6 +24,9 @@ import StreetviewLineAligner from './components/StreetviewLineAligner';
 import AdminPasswordModal from './components/AdminPasswordModal';
 import EmergencyModal from './components/EmergencyModal';
 import ThemeSelector from './components/ThemeSelector';
+import WeatherWidget from './components/WeatherWidget';
+import OfflineGuideModal from './components/OfflineGuideModal';
+import hotlinesService from './services/hotlinesService';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -61,6 +64,7 @@ export default function App() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [isNavMinimized, setIsNavMinimized] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [showOfflineModal, setShowOfflineModal] = useState(false);
   const [difficultyFilter, setDifficultyFilter] = useState('all'); // 'all' | 'Easy' | 'Moderate' | 'Challenging'
   const [showCustomOSM, setShowCustomOSM] = useState(true);
 
@@ -478,7 +482,17 @@ export default function App() {
   const loadTouristSpots = useCallback(() => {
     // 1. Instant local render (offline-first, zero delay)
     const spots = touristSpotsService.getAllSpots();
-    setTouristSpots(spots);
+    const hotlinePois = hotlinesService.asMapPois();
+    const merged = [...spots];
+    hotlinePois.forEach((hp) => {
+      const idx = merged.findIndex((s) => s.id === hp.id);
+      if (idx >= 0) {
+        merged[idx] = { ...merged[idx], ...hp };
+      } else {
+        merged.push(hp);
+      }
+    });
+    setTouristSpots(merged);
 
     // 2. Fetch local panoramas list from Neon Cloud
     touristSpotsService
@@ -495,7 +509,17 @@ export default function App() {
       .fetchFromCloud()
       .then((cloudSpots) => {
         if (Array.isArray(cloudSpots) && cloudSpots.length > 0) {
-          setTouristSpots(cloudSpots);
+          const freshHotlines = hotlinesService.asMapPois();
+          const mergedCloud = [...cloudSpots];
+          freshHotlines.forEach((hp) => {
+            const idx = mergedCloud.findIndex((s) => s.id === hp.id);
+            if (idx >= 0) {
+              mergedCloud[idx] = { ...mergedCloud[idx], ...hp };
+            } else {
+              mergedCloud.push(hp);
+            }
+          });
+          setTouristSpots(mergedCloud);
         }
       })
       .catch(() => {});
@@ -508,6 +532,14 @@ export default function App() {
       })
       .catch(() => {});
   }, []);
+
+  // Real-time synchronization when hotlines or DENR Checkpoints change
+  useEffect(() => {
+    const unsub = hotlinesService.subscribe(() => {
+      loadTouristSpots();
+    });
+    return () => unsub();
+  }, [loadTouristSpots]);
 
   // Filter spots by Tourist Attraction vs Service/POI, Barangay, and Trail Difficulty
   const displayedSpots = useMemo(() => {
@@ -859,25 +891,6 @@ export default function App() {
         className={`panel-map ${!viewerOpen ? 'expanded' : ''} ${viewerOpen && viewerLayout === 'split' ? 'split-active' : ''} ${viewerOpen && viewerLayout === 'fullscreen' ? 'fullscreen-collapsed' : ''} ${isAdmin ? 'admin-mode' : ''}`}
         style={viewerOpen && viewerLayout === 'split' ? { flex: `0 0 ${mapWidth}%` } : {}}
       >
-        {/* Floating Route Summary Card over 2D Map (streamlined on-map route navigation) */}
-        {routeData && (
-          <RouteSummaryCard
-            routeData={routeData}
-            routeOrigin={routeOrigin}
-            routeDestination={routeDestination}
-            routingProfile={routingProfile}
-            touristSpots={touristSpots}
-            isSplitView={viewerOpen && viewerLayout === 'split'}
-            onReverseRoute={handleSwapPoints}
-            onClearRoute={handleClearRoute}
-            onStartStreetViewRoute={() => {
-              if (routeOrigin) {
-                handleMapClick(routeOrigin[1], routeOrigin[0]);
-                showToast('📷 Opening 360° Street View at route start');
-              }
-            }}
-          />
-        )}
         {/* 2D MapView (Base layer rendered first in DOM order) */}
         <MapView
           theme={mapTheme}
@@ -899,8 +912,10 @@ export default function App() {
           }
           mapZoom={15}
           routeGeoJSON={routeData?.geometry || null}
+          routeData={routeData}
           routeOrigin={routeOrigin}
           routeDestination={routeDestination}
+          routingProfile={routingProfile}
           routingMode={routingMode || !!pickingTarget}
           pickingMode={pickingTarget}
           isAdmin={isAdmin}
@@ -920,8 +935,36 @@ export default function App() {
 
         {/* Map top controls */}
         <div className="map-overlay-top">
-          {/* Horizontally scrollable/dynamic action bar across all aspect ratios */}
-          <div className="nav-scroll-container">
+          {routeData ? (
+            <RouteSummaryCard
+              routeData={routeData}
+              routeOrigin={routeOrigin}
+              routeDestination={routeDestination}
+              routingProfile={routingProfile}
+              onProfileChange={(newProf) => setRoutingProfile(newProf)}
+              onTriggerPopups={() => window.dispatchEvent(new CustomEvent('show-route-popups'))}
+              touristSpots={touristSpots}
+              isSplitView={viewerOpen && viewerLayout === 'split'}
+              onReverseRoute={handleSwapPoints}
+              onClearRoute={() => {
+                handleClearRoute();
+                setIsNavigating(false);
+                showToast('Navigation closed — Nav bar restored');
+              }}
+              onChangeDestination={() => {
+                setSidebarTab('routing');
+                setSidebarOpen(true);
+              }}
+              onStartStreetViewRoute={() => {
+                if (routeOrigin) {
+                  handleMapClick(routeOrigin[1], routeOrigin[0]);
+                  showToast('📷 Opening 360° Street View at route start');
+                }
+              }}
+            />
+          ) : (
+            /* Horizontally scrollable/dynamic action bar across all aspect ratios */
+            <div className="nav-scroll-container">
             {/* Tourism Brand Header Pill */}
             <div
               className="brand-pill"
@@ -942,14 +985,17 @@ export default function App() {
               }}
             >
               <span>🌲</span>
-              <span>Lagangilang Trails</span>
+              <span>Road & Trail</span>
             </div>
 
-            {/* Emergency Hotlines & Safety Button */}
+            {/* Explore Spots Drawer Button */}
             <button
-              className="btn btn-secondary btn-emergency-top"
-              onClick={() => setShowEmergencyModal(true)}
-              title="Official Lagangilang LGU Emergency Hotlines & Trail Safety Guidelines"
+              className="btn btn-secondary"
+              onClick={() => {
+                setSidebarTab('spots');
+                setSidebarOpen(true);
+              }}
+              title="Explore Tourist Spots, Caves, Waterfalls & Heritage Sites"
               style={{
                 fontSize: '0.8rem',
                 padding: '6px 12px',
@@ -961,6 +1007,34 @@ export default function App() {
                 flexShrink: 0,
                 background: 'rgba(15, 23, 42, 0.92)',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#ffffff',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                backdropFilter: 'blur(12px)',
+              }}
+            >
+              <span>📍</span>
+              <span className="btn-label-text">Explore</span>
+            </button>
+
+            {/* Live Weather & Trail Advisory Pill */}
+            <WeatherWidget isCompact={true} />
+
+            {/* Emergency Hotlines Button */}
+            <button
+              className="btn btn-secondary btn-emergency-top"
+              onClick={() => setShowEmergencyModal(true)}
+              title="Official Lagangilang LGU Emergency Hotlines & DENR Checkpoints"
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                background: 'rgba(15, 23, 42, 0.92)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
                 color: '#ffffff',
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
                 backdropFilter: 'blur(12px)',
@@ -995,6 +1069,31 @@ export default function App() {
               <span className="btn-label-text">Route</span>
             </button>
 
+            {/* High-Capacity Offline Map & Data Packager Button */}
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowOfflineModal(true)}
+              title="Download Full Offline Map Tiles & Data Bundle for Zero-Signal Trails"
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-full)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                background: 'rgba(15, 23, 42, 0.92)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                color: '#6ee7b7',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                backdropFilter: 'blur(12px)',
+              }}
+            >
+              <span>📥</span>
+              <span className="btn-label-text">Offline</span>
+            </button>
+
             {/* Custom Theme Selector Dropdown */}
             <ThemeSelector
               theme={mapTheme}
@@ -1021,7 +1120,7 @@ export default function App() {
                   <span className="role-indicator-logout">Logout</span>
                 </div>
 
-                {/* Toggle 360° Street View & Trails (Admin only) */}
+                {/* 360° Street View & Trails Toggle (Admin only) */}
                 <button
                   className={`btn ${showMapillaryStreetview ? 'btn-primary' : 'btn-secondary'}`}
                   onClick={() => {
@@ -1307,6 +1406,7 @@ export default function App() {
               </>
             )}
           </div>
+          )}
 
           {/* Sidebar toggle - Guaranteed visible & pinned on the far right across all aspect ratios */}
           <button
@@ -2314,6 +2414,7 @@ export default function App() {
                     setStreetViewPos({ lat: opts.lat, lng: opts.lng });
                   }
                 }}
+                hasDedicatedCard={!!activeTouristSpot}
               />
             ) : (
               <GoogleStreetViewViewer
@@ -2841,10 +2942,17 @@ export default function App() {
         showToast={showToast}
       />
 
-      {/* ===== Emergency Contacts & Trail Safety Modal ===== */}
+      {/* ===== Emergency Contacts, DENR Checkpoints & Trail Safety Modal ===== */}
       <EmergencyModal
         isOpen={showEmergencyModal}
         onClose={() => setShowEmergencyModal(false)}
+        isAdmin={isAdmin}
+        showToast={showToast}
+        onRouteToSpot={(coords) => {
+          setRouteDestination(coords);
+          setSidebarTab('routing');
+          setSidebarOpen(true);
+        }}
         onLocateSpot={(spotId) => {
           setShowEmergencyModal(false);
           // Ensure POIs are not hidden by sidebar filter tabs
@@ -2868,6 +2976,26 @@ export default function App() {
             showToast?.('📍 Navigating to emergency station location');
           }
         }}
+      />
+
+      {/* ===== High-Capacity Offline Map & Data Packager Modal ===== */}
+      <OfflineGuideModal
+        isOpen={showOfflineModal}
+        onClose={() => setShowOfflineModal(false)}
+        touristSpots={touristSpots}
+        customGeoJSON={alignedGeoJSON}
+        isOfflineModeActive={mapTheme === 'offline'}
+        onToggleOfflineMode={(activate) => {
+          const next = activate ? 'offline' : 'light';
+          setMapTheme(next);
+          localStorage.setItem('lagangilang_map_theme', next);
+          showToast?.(
+            activate
+              ? '🗺️ Switched to Offline Map (Cached Tiles Active)'
+              : '🌐 Returned to Live Online Map'
+          );
+        }}
+        showToast={showToast}
       />
 
       {/* ===== Floating Toast Notification ===== */}

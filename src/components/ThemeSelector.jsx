@@ -6,6 +6,7 @@ const THEMES = [
   { id: 'dark', label: 'Dark', icon: '🌙' },
   { id: 'beige', label: 'Beige', icon: '📜' },
   { id: 'satellite', label: 'Satellite', icon: '🛰️' },
+  { id: 'offline', label: 'Offline', icon: '📥' },
 ];
 
 export default function ThemeSelector({ theme = 'light', onChange }) {

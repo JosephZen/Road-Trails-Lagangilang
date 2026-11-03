@@ -1315,9 +1315,9 @@ body {
 /* ========== Responsive for Tablets, Desktops & Mobile Viewports ========== */
 @media (max-width: 1024px) {
   .map-overlay-top {
-    top: max(var(--space-sm), env(safe-area-inset-top, 10px));
-    left: max(var(--space-sm), env(safe-area-inset-left, 10px));
-    right: max(var(--space-sm), env(safe-area-inset-right, 10px));
+    top: max(16px, env(safe-area-inset-top, 16px));
+    left: max(12px, env(safe-area-inset-left, 12px));
+    right: max(12px, env(safe-area-inset-right, 12px));
     gap: 8px;
   }
 
@@ -1344,9 +1344,9 @@ body {
 
 @media (max-width: 900px) {
   .map-overlay-top {
-    top: max(var(--space-sm), env(safe-area-inset-top, 8px));
-    left: max(var(--space-sm), env(safe-area-inset-left, 8px));
-    right: max(var(--space-sm), env(safe-area-inset-right, 8px));
+    top: max(16px, env(safe-area-inset-top, 16px));
+    left: max(10px, env(safe-area-inset-left, 10px));
+    right: max(10px, env(safe-area-inset-right, 10px));
     gap: 6px;
   }
 
@@ -1421,9 +1421,9 @@ body {
 
 @media (max-width: 600px) {
   .map-overlay-top {
-    top: max(var(--space-xs), env(safe-area-inset-top, 6px));
-    left: max(var(--space-xs), env(safe-area-inset-left, 6px));
-    right: max(var(--space-xs), env(safe-area-inset-right, 6px));
+    top: max(16px, env(safe-area-inset-top, 16px));
+    left: max(8px, env(safe-area-inset-left, 8px));
+    right: max(8px, env(safe-area-inset-right, 8px));
     gap: 4px;
   }
 
@@ -1513,6 +1513,28 @@ body {
 .poi-marker-pin.pin-poi {
   background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.55);
+}
+
+/* DENR Environmental Checkpoint & Monitoring Station Pin */
+.poi-marker-pin.pin-checkpoint {
+  background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important;
+  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.7), 0 0 0 2px rgba(74, 222, 128, 0.6) !important;
+  border: 2px solid #ffffff !important;
+  animation: pulse-checkpoint 2.5s infinite ease-in-out;
+}
+
+@keyframes pulse-checkpoint {
+  0%, 100% {
+    box-shadow: 0 4px 14px rgba(22, 101, 52, 0.7), 0 0 0 2px rgba(74, 222, 128, 0.6);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(22, 101, 52, 0.9), 0 0 0 5px rgba(74, 222, 128, 0.25);
+  }
+}
+
+.poi-checkpoint .poi-marker-tooltip {
+  border-color: rgba(34, 197, 94, 0.8) !important;
+  color: #86efac !important;
 }
 
 .poi-service .poi-marker-tooltip {
@@ -2978,23 +3000,33 @@ body {
   transform: scale(1.12);
 }
 
-/* Floating Route Summary Card over main map */
-.route-summary-floating-card {
-  animation: fadeInDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+/* In-Navbar Active Navigation Bar (Phone, Tablet, Desktop) */
+.nav-active-navigation-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  animation: fadeInDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (max-width: 768px) {
-  .route-summary-floating-card {
-    top: 58px !important;
-    left: 8px !important;
-    width: calc(100vw - 16px) !important;
-    max-width: none !important;
-    padding: 12px !important;
+  .nav-active-navigation-bar .mode-text-desktop {
+    display: none !important;
+  }
+  .nav-active-navigation-bar {
+    gap: 4px !important;
+    padding: 2px 4px !important;
+  }
+  .nav-dest-chip {
+    max-width: 90px !important;
+    padding: 3px 6px !important;
+    font-size: 0.68rem !important;
   }
 }
 
-.route-summary-floating-card.split-mode {
-  max-width: calc(100% - 32px) !important;
+.nav-active-navigation-bar.split-mode {
+  max-width: 100% !important;
 }
 
 .brand-pill {
@@ -3175,6 +3207,313 @@ body {
   background: rgba(30, 41, 59, 0.95) !important;
   border-color: #38bdf8 !important;
   transform: translateX(2px);
+}
+
+/* ==========================================================================
+   Street View Engine Switcher Responsive Layout (Aspect Ratio Adaptive)
+   ========================================================================== */
+
+.streetview-bottom-left-controls {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: calc(100% - 32px);
+  pointer-events: auto;
+  animation: fadeInUp 0.3s ease-out;
+  transition: all 0.25s ease;
+}
+
+/* Wide screen layout (desktop, laptop) */
+@media (min-width: 769px) {
+  .streetview-bottom-left-controls.has-spot-card {
+    left: 316px;
+    max-width: calc(100% - 336px);
+  }
+}
+
+/* Narrow screens / Phones portrait / Device aspect ratios where width is constrained */
+@media (max-width: 768px), (max-aspect-ratio: 13/9) {
+  .streetview-bottom-left-controls {
+    left: 10px !important;
+    bottom: 12px !important;
+    max-width: calc(100% - 20px) !important;
+    margin-left: 0 !important;
+  }
+
+  .streetview-bottom-left-controls.has-spot-card {
+    bottom: 58px !important; /* Stack neatly above the 38px bottom tourist card */
+    left: 10px !important;
+    margin-left: 0 !important;
+  }
+
+  .streetview-engine-switch-pill {
+    padding: 4px 8px !important;
+    gap: 6px !important;
+  }
+
+  .switch-title-desktop,
+  .link-text-desktop,
+  .btn-label-desktop {
+    display: none !important;
+  }
+
+  .switch-title-mobile,
+  .link-text-mobile,
+  .btn-label-mobile {
+    display: inline !important;
+  }
+}
+
+/* By default on desktop, show desktop text and hide mobile text */
+.switch-title-mobile,
+.link-text-mobile,
+.btn-label-mobile {
+  display: none;
+}
+
+.streetview-engine-switch-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.94);
+  padding: 5px 12px;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  width: fit-content;
+  flex-wrap: nowrap;
+}
+
+.switch-text-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.switch-title-desktop,
+.switch-title-mobile {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.streetview-external-link {
+  font-size: 0.68rem;
+  color: #60a5fa;
+  text-decoration: none;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.streetview-external-link:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #60a5fa;
+}
+
+.streetview-switch-btn {
+  font-size: 0.68rem;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.streetview-switch-btn.mapillary-switch {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+}
+
+.streetview-switch-btn.mapillary-switch:hover {
+  background: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.streetview-switch-btn.google-switch {
+  color: #60a5fa;
+  background: rgba(2, 132, 199, 0.18);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+}
+
+.streetview-switch-btn.google-switch:hover {
+  background: rgba(2, 132, 199, 0.3);
+  box-shadow: 0 0 8px rgba(2, 132, 199, 0.4);
+}
+
+/* Street View Junction & Campus Transition Prompts */
+.streetview-transition-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: rgba(15, 23, 42, 0.94);
+  border-radius: var(--radius-full, 9999px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.streetview-transition-prompt.campus-prompt {
+  border: 1.5px solid #f59e0b;
+}
+
+.streetview-transition-prompt.junction-prompt {
+  border: 1.5px solid #10b981;
+}
+
+.streetview-transition-prompt .prompt-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.streetview-transition-prompt .prompt-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-full, 9999px);
+  padding: 3px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
+}
+
+/* ==========================================================================
+   Point A & Point B Transient Pop-up POI (Auto-Disappears after 5s)
+   ========================================================================== */
+
+.route-marker-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.route-poi-transient-card {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 6px 10px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  white-space: nowrap;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 110px;
+  max-width: 220px;
+  pointer-events: auto;
+  cursor: pointer;
+  animation: popInCard 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: opacity 0.38s ease, transform 0.38s ease;
+}
+
+/* Small triangular arrow pointing to the marker pin */
+.route-poi-transient-card::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid rgba(15, 23, 42, 0.95);
+}
+
+.route-poi-transient-card.origin-card {
+  border-left: 3px solid #22c55e;
+}
+
+.route-poi-transient-card.dest-card {
+  border-left: 3px solid #ef4444;
+}
+
+.route-poi-transient-card.fade-out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(4px);
+  pointer-events: none;
+}
+
+.route-poi-transient-card.hidden {
+  display: none !important;
+}
+
+.poi-card-badge {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.poi-card-badge.origin-badge {
+  color: #4ade80;
+}
+
+.poi-card-badge.dest-badge {
+  color: #f87171;
+}
+
+.poi-card-name {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #f8fafc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.poi-card-eta {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #38bdf8;
+  margin-top: 1px;
+}
+
+@keyframes popInCard {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 
 
