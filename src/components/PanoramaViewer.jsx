@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { touristSpotsService } from '../services/touristSpotsService';
+import offlineMapManager from '../services/offlineMapManager';
 
 import 'pannellum/build/pannellum.css';
 import 'pannellum/build/pannellum.js';
@@ -82,7 +83,17 @@ export default function PanoramaViewer({
         (panorama.imageUrl?.startsWith('data:') ? panorama.imageUrl : null) ||
         (panorama.image?.startsWith('data:') && panorama.image.length > 35000 ? panorama.image : null);
 
-      // 2. Query Neon Cloud DB for direct image_data if not found in props
+      // 2. Offline IndexedDB check (cached 360 landmark media for web & APK offline usage)
+      if (!finalImageUrl && panorama.id) {
+        try {
+          const offlineMedia = await offlineMapManager.get360Media(panorama.id);
+          if (offlineMedia && !isCancelled) {
+            finalImageUrl = offlineMedia;
+          }
+        } catch (_) {}
+      }
+
+      // 3. Query Neon Cloud DB for direct image_data if not found in props
       if (!finalImageUrl && panorama.id) {
         try {
           let cloudTexture = await touristSpotsService.fetchPanoramaImageData(panorama.id);

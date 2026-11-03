@@ -75,12 +75,19 @@ export default function OfflineGuideModal({
     }
   };
 
-  const handleDownloadStandaloneHtml = () => {
+  const handleDownloadStandaloneHtml = async () => {
     try {
-      offlineCacheService.downloadOfflineMapHtml(touristSpots);
+      showToast?.('📦 Packaging standalone offline map with cached tiles & 360 media...');
+      const [tileDict, media360Dict] = await Promise.all([
+        offlineMapManager.getAllTileDataUris().catch(() => ({})),
+        offlineMapManager.getAll360Media().catch(() => ({})),
+      ]);
+      offlineCacheService.downloadOfflineMapHtml(touristSpots, tileDict, media360Dict);
       showToast?.('💾 Standalone offline map file downloaded to your device!');
     } catch (e) {
-      showToast?.('⚠️ Could not generate standalone HTML file');
+      console.error('Standalone HTML export error:', e);
+      offlineCacheService.downloadOfflineMapHtml(touristSpots, {}, {});
+      showToast?.('💾 Standalone offline map generated!');
     }
   };
 

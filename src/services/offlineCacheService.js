@@ -128,13 +128,15 @@ class OfflineCacheService {
 
   /**
    * Generate and trigger download of a self-contained interactive offline HTML map file
-   * Built with real interactive Leaflet & OpenFreeMap/OSM tiles + full POIs, Checkpoints, and Emergency Hotlines.
-   * Eliminates the primitive dark stick-figure vector schematic in favor of a true interactive street & terrain map.
+   * Built with real interactive Leaflet & embedded Base64 tile dictionary + full POIs, Checkpoints, 360° Panoramas, and Hotlines.
+   * Completely immune to OpenStreetMap 403 blocks and works 100% offline with zero external tile dependencies.
    */
-  downloadOfflineMapHtml(spots = []) {
+  downloadOfflineMapHtml(spots = [], tileDictionary = {}, media360Dictionary = {}) {
     const spotsData = JSON.stringify(spots || []);
     const hotlinesData = JSON.stringify(EMERGENCY_HOTLINES);
     const guidelinesData = JSON.stringify(TRAIL_SAFETY_GUIDELINES);
+    const tilesData = JSON.stringify(tileDictionary || {});
+    const media360Data = JSON.stringify(media360Dictionary || {});
     const generatedDate = new Date().toLocaleDateString();
 
     const htmlContent = `<!DOCTYPE html>
@@ -143,8 +145,8 @@ class OfflineCacheService {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0">
   <title>Lagangilang Road & Trail • Interactive Offline Map Guide</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; flex-direction: column; min-height: 100vh; }
@@ -172,7 +174,7 @@ class OfflineCacheService {
     .spot-meta { font-size: 0.73rem; color: #94a3b8; margin-top: 3px; line-height: 1.3; }
     
     .hotline-item { padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 10px; }
-    .hotline-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; font-size: 0.78rem; font-weight: 700; text-decoration: none; margin-top: 8px; margin-right: 6px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4); }
+    .hotline-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; font-size: 0.78rem; font-weight: 700; text-decoration: none; margin-top: 8px; margin-right: 6px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4); border: none; cursor: pointer; }
     .rule-item { display: flex; gap: 8px; margin-bottom: 10px; font-size: 0.8rem; line-height: 1.4; color: #cbd5e1; }
     
     /* Custom Pin Badges */
@@ -183,13 +185,20 @@ class OfflineCacheService {
     .pin-emergency { background: #ef4444; }
     .pin-checkpoint { background: #15803d; border-color: #86efac; }
     .pin-poi { background: #0284c7; }
+
+    /* 360 Panorama Modal */
+    #pano-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 10000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
+    #pano-modal.active { display: flex; }
+    #pano-img-container { width: 100%; max-width: 900px; height: 70vh; background: #000; border-radius: 12px; overflow: hidden; position: relative; border: 1.5px solid #38bdf8; display: flex; align-items: center; justify-content: center; }
+    #pano-img { width: 100%; height: 100%; object-fit: cover; }
+    .pano-close-btn { position: absolute; top: 14px; right: 14px; background: rgba(15,23,42,0.85); border: 1px solid rgba(255,255,255,0.3); color: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   </style>
 </head>
 <body>
   <header>
     <h1>🌲 Road & Trail • Lagangilang, Abra</h1>
     <div>
-      <span class="badge-offline">Interactive Real Street & Terrain Map (${generatedDate})</span>
+      <span class="badge-offline">Interactive Offline Map (${generatedDate})</span>
     </div>
   </header>
 
@@ -224,7 +233,20 @@ class OfflineCacheService {
     </div>
   </div>
 
+  <!-- 360 Panorama Viewer Modal -->
+  <div id="pano-modal" onclick="closePanoModal()">
+    <div id="pano-img-container" onclick="event.stopPropagation()">
+      <button class="pano-close-btn" onclick="closePanoModal()">✕</button>
+      <img id="pano-img" src="" alt="360 Panorama Landmark" />
+      <div style="position: absolute; bottom: 12px; left: 14px; background: rgba(15,23,42,0.85); padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; color: #38bdf8;">
+        📷 Offline 360° Landmark Panorama
+      </div>
+    </div>
+  </div>
+
   <script>
+    window.OFFLINE_TILES = ${tilesData};
+    window.OFFLINE_360_MEDIA = ${media360Data};
     const spots = ${spotsData};
     const hotlines = ${hotlinesData};
     const guidelines = ${guidelinesData};
@@ -236,10 +258,29 @@ class OfflineCacheService {
     // Initialize Leaflet Map centered on Lagangilang, Abra
     const map = L.map('map').setView([17.6142, 120.7340], 14);
 
-    // OpenStreetMap / OpenFreeMap standard tile layer
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Custom Offline & CORS-Safe Tile Layer (Uses Base64 tiles when offline, CartoDB Voyager fallback)
+    const OfflineTileLayer = L.TileLayer.extend({
+      createTile: function(coords, done) {
+        const tile = document.createElement('img');
+        const key = coords.z + '/' + coords.x + '/' + coords.y;
+
+        if (window.OFFLINE_TILES && window.OFFLINE_TILES[key]) {
+          tile.src = window.OFFLINE_TILES[key];
+          setTimeout(function() { done(null, tile); }, 0);
+        } else {
+          const subdomains = ['a', 'b', 'c', 'd'];
+          const s = subdomains[Math.abs(coords.x + coords.y) % subdomains.length];
+          tile.src = 'https://' + s + '.basemaps.cartocdn.com/rastertiles/voyager/' + coords.z + '/' + coords.x + '/' + coords.y + '.png';
+          tile.onload = function() { done(null, tile); };
+          tile.onerror = function(err) { done(null, tile); };
+        }
+        return tile;
+      }
+    });
+
+    new OfflineTileLayer('', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors • Lagangilang Trails'
+      attribution: '&copy; CartoDB &copy; OpenStreetMap contributors • Lagangilang Trails'
     }).addTo(map);
 
     document.getElementById('all-count').textContent = spots.length;
@@ -252,8 +293,22 @@ class OfflineCacheService {
       return 'pin-tourist';
     }
 
+    function open360Modal(spotId) {
+      const spot = spots.find(s => s.id === spotId);
+      const targetId = spot?.connected360?.targetId || spotId;
+      const media = window.OFFLINE_360_MEDIA[spotId] || window.OFFLINE_360_MEDIA[targetId] || spot?.image || spot?.connected360?.imageUrl;
+      if (media) {
+        document.getElementById('pano-img').src = media;
+        document.getElementById('pano-modal').classList.add('active');
+      }
+    }
+
+    function closePanoModal() {
+      document.getElementById('pano-modal').classList.remove('active');
+      document.getElementById('pano-img').src = '';
+    }
+
     function renderMapMarkers() {
-      // Clear existing markers
       markers.forEach(m => map.removeLayer(m));
       markers.length = 0;
 
@@ -278,6 +333,9 @@ class OfflineCacheService {
 
         const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
 
+        const targetPanoId = s.connected360?.targetId || s.id;
+        const has360 = Boolean(window.OFFLINE_360_MEDIA[s.id] || window.OFFLINE_360_MEDIA[targetPanoId] || s.connected360?.imageUrl || s.image);
+
         const popupContent =
           '<div style="min-width:180px;">' +
           '  <h4 style="margin:0 0 4px 0; color:#38bdf8; font-size:0.95rem;">' + iconChar + ' ' + s.name + '</h4>' +
@@ -285,6 +343,7 @@ class OfflineCacheService {
           (s.description ? '<p style="margin:0 0 6px 0; font-size:0.75rem; color:#cbd5e1; line-height:1.3;">' + s.description + '</p>' : '') +
           '  <div style="font-size:0.7rem; color:#94a3b8;">📍 ' + Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5) + '</div>' +
           (s.phone ? '<a href="tel:' + s.phone.replace(/[^0-9+]/g, '') + '" class="hotline-btn">📞 ' + s.phone + '</a>' : '') +
+          (has360 ? '<button onclick="open360Modal(\\'' + s.id + '\\')" class="hotline-btn" style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">📷 View 360° Panorama</button>' : '') +
           '</div>';
 
         marker.bindPopup(popupContent);

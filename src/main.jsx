@@ -85,3 +85,17 @@ createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </StrictMode>
 );
+
+// Register service worker for reliable offline application shell access
+if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        // console.log('[SW] ServiceWorker registered:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('[SW] ServiceWorker registration failed:', err);
+      });
+  });
+}

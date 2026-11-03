@@ -85,10 +85,11 @@ export default function App() {
         style={styles.webview}
         javaScriptEnabled={true}
         domStorageEnabled={true}
+        databaseEnabled={true}
         geolocationEnabled={true}
         allowsFullscreenVideo={true}
         cacheEnabled={true}
-        cacheMode="LOAD_DEFAULT"
+        cacheMode={!isConnected ? "LOAD_CACHE_ELSE_NETWORK" : "LOAD_DEFAULT"}
         originWhitelist={['*']}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         startInLoadingState={true}

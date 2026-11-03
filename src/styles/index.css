@@ -3005,7 +3005,9 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
+  flex: 0 1 auto;
+  max-width: fit-content;
+  margin: 0 auto;
   min-width: 0;
   animation: fadeInDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -3015,13 +3017,20 @@ body {
     display: none !important;
   }
   .nav-active-navigation-bar {
-    gap: 4px !important;
-    padding: 2px 4px !important;
+    gap: 3px !important;
+    padding: 2px 6px !important;
+    max-width: 100% !important;
   }
   .nav-dest-chip {
-    max-width: 90px !important;
-    padding: 3px 6px !important;
+    max-width: 85px !important;
+    padding: 2px 6px !important;
     font-size: 0.68rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-dest-chip {
+    display: none !important; /* On small phones, hide destination chip to strictly show ETA, KM, minutes */
   }
 }
 

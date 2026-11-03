@@ -10,13 +10,14 @@
  */
 
 const DB_NAME = 'lagangilang_offline_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
-// Stores: 'tiles', 'custom_map', 'routing', 'metadata'
+// Stores: 'tiles', 'custom_map', 'routing', 'metadata', 'media_360'
 const STORE_TILES = 'tiles';
 const STORE_CUSTOM_MAP = 'custom_map';
 const STORE_ROUTING = 'routing';
 const STORE_METADATA = 'metadata';
+const STORE_360_MEDIA = 'media_360';
 
 // Bounding box for Lagangilang, Abra
 export const LAGANGILANG_BBOX = {
@@ -51,6 +52,9 @@ function openOfflineDB() {
       }
       if (!db.objectStoreNames.contains(STORE_METADATA)) {
         db.createObjectStore(STORE_METADATA);
+      }
+      if (!db.objectStoreNames.contains(STORE_360_MEDIA)) {
+        db.createObjectStore(STORE_360_MEDIA);
       }
     };
 
@@ -203,10 +207,10 @@ class OfflineMapManager {
         // ignore
       }
 
-      // Stage 3: Cache Road Network Routing Graph (50%)
+      // Stage 3: Cache Road Network Routing Graph (30%)
       onProgress({
         stage: 'routing',
-        percent: 40,
+        percent: 30,
         mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
         message: 'Caching Offline Road Routing Graph...',
       });
@@ -222,18 +226,105 @@ class OfflineMapManager {
         console.warn('Could not cache road routing graph:', e);
       }
 
-      // Stage 4: Cache Map Tiles (Zooms 12 - 16 across Lagangilang BBox) (100%)
+      // Stage 4: Cache Custom 360° Landmark Panoramas & Spot Photos (55%)
+      const mediaCandidates = [];
+      touristSpots.forEach((s) => {
+        const ids = [s.id];
+        if (s.connected360?.targetId) ids.push(s.connected360.targetId);
+        if (s.primary_pano_id) ids.push(s.primary_pano_id);
+
+        const urls = [];
+        if (s.connected360?.imageUrl && !s.connected360.imageUrl.includes('mapillary') && !s.connected360.imageUrl.includes('google')) {
+          urls.push(s.connected360.imageUrl);
+        }
+        if (s.image && !s.image.includes('mapillary') && !s.image.includes('google')) {
+          urls.push(s.image);
+        }
+        if (s.connected360?.targetId && !String(s.connected360.targetId).includes('mapillary')) {
+          urls.push(`/panoramas/${s.connected360.targetId}.jpg`);
+        }
+        if (Array.isArray(s.images)) {
+          s.images.forEach((img) => {
+            if (img && typeof img === 'string' && !img.includes('mapillary')) urls.push(img);
+          });
+        }
+        if (s.panoramaUrl) urls.push(s.panoramaUrl);
+        if (s.image360) urls.push(s.image360);
+
+        urls.forEach((url) => {
+          mediaCandidates.push({ spotId: s.id, spotName: s.name, ids, url });
+        });
+      });
+
+      // Deduplicate candidate URLs
+      const uniqueMedia = [];
+      const seenUrls = new Set();
+      mediaCandidates.forEach((item) => {
+        if (!seenUrls.has(item.url)) {
+          seenUrls.add(item.url);
+          uniqueMedia.push(item);
+        }
+      });
+
+      let cachedMediaCount = 0;
+      onProgress({
+        stage: 'media_360',
+        percent: 40,
+        mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
+        message: `Caching Custom 360° Panoramas & Photos (0 / ${uniqueMedia.length})...`,
+      });
+
+      for (let i = 0; i < uniqueMedia.length; i++) {
+        const item = uniqueMedia[i];
+        try {
+          // If already a base64 data URI
+          if (item.url.startsWith('data:')) {
+            const dataUri = item.url;
+            await this.put360Media(db, item.url, { dataUri, spotId: item.spotId });
+            item.ids.forEach(async (id) => {
+              await this.put360Media(db, id, { dataUri, spotId: item.spotId });
+            });
+            cachedMediaCount++;
+            continue;
+          }
+
+          const res = await fetch(item.url, { mode: 'cors' });
+          if (res.ok) {
+            const blob = await res.blob();
+            totalBytes += blob.size;
+            const dataUri = await this.blobToDataUri(blob);
+            await this.put360Media(db, item.url, { blob, dataUri, spotId: item.spotId });
+            for (const id of item.ids) {
+              await this.put360Media(db, id, { blob, dataUri, spotId: item.spotId });
+            }
+            cachedMediaCount++;
+          }
+        } catch (err) {
+          // Continue if single image fails
+        }
+
+        const mediaPercent = 40 + Math.round(((i + 1) / Math.max(1, uniqueMedia.length)) * 18);
+        onProgress({
+          stage: 'media_360',
+          percent: mediaPercent,
+          mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
+          message: `📸 Caching Custom 360° Landmark Panoramas & Spot Photos (${cachedMediaCount} / ${uniqueMedia.length})...`,
+        });
+      }
+
+      // Stage 5: Cache Map Tiles (Zooms 12 - 16 across Lagangilang BBox) (100%)
+      // Uses CORS-friendly CartoDB Voyager tiles (never throws 403 Access Blocked on file://, webviews or offline)
       const tileList = getBboxTileList(LAGANGILANG_BBOX, 12, 16);
       const totalTiles = tileList.length;
 
       onProgress({
         stage: 'tiles',
-        percent: 50,
+        percent: 60,
         mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
-        message: `Downloading ${totalTiles} High-Res Map Tiles for Lagangilang...`,
+        message: `Downloading ${totalTiles} High-Res CartoDB Voyager Map Tiles...`,
       });
 
-      // Fetch and store tiles in batches of 6 concurrent requests
+      const subdomains = ['a', 'b', 'c', 'd'];
       const batchSize = 6;
       let completedTiles = 0;
 
@@ -242,14 +333,16 @@ class OfflineMapManager {
         await Promise.all(
           batch.map(async (t) => {
             const tileKey = `${t.z}/${t.x}/${t.y}`;
-            const tileUrl = `https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`;
+            const s = subdomains[(t.x + t.y) % subdomains.length];
+            const tileUrl = `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/${t.z}/${t.x}/${t.y}.png`;
 
             try {
-              const res = await fetch(tileUrl, { mode: 'cors', credentials: 'omit' });
+              const res = await fetch(tileUrl, { mode: 'cors' });
               if (res.ok) {
                 const blob = await res.blob();
                 totalBytes += blob.size;
-                await this.putTileBlob(db, tileKey, blob);
+                const dataUri = await this.blobToDataUri(blob);
+                await this.putTileRecord(db, tileKey, { blob, dataUri });
               }
             } catch (err) {
               // Tile failed, continue without breaking bundle
@@ -259,12 +352,12 @@ class OfflineMapManager {
           })
         );
 
-        const tilePercent = 50 + Math.round((completedTiles / totalTiles) * 48);
+        const tilePercent = 60 + Math.round((completedTiles / totalTiles) * 38);
         onProgress({
           stage: 'tiles',
           percent: tilePercent,
           mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
-          message: `Caching Tiles: ${completedTiles} of ${totalTiles} complete...`,
+          message: `Caching CartoDB Voyager Tiles: ${completedTiles} of ${totalTiles} complete...`,
         });
       }
 
@@ -275,6 +368,7 @@ class OfflineMapManager {
         totalBytes,
         spotsCount: touristSpots.length,
         hotlinesCount: hotlines.length,
+        cached360Count: cachedMediaCount,
         hasCustomMap: Boolean(customMapData),
         hasRoutingGraph: true,
         timestamp: new Date().toISOString(),
@@ -292,6 +386,110 @@ class OfflineMapManager {
       return bundleInfo;
     } finally {
       this.isDownloading = false;
+    }
+  }
+
+  blobToDataUri(blob) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  putTileRecord(db, tileKey, record) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_TILES, 'readwrite');
+      const store = tx.objectStore(STORE_TILES);
+      store.put(record, tileKey);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  put360Media(db, key, record) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_360_MEDIA, 'readwrite');
+      const store = tx.objectStore(STORE_360_MEDIA);
+      store.put(record, String(key));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async get360Media(idOrUrl) {
+    if (!idOrUrl) return null;
+    try {
+      const db = await openOfflineDB();
+      const tx = db.transaction(STORE_360_MEDIA, 'readonly');
+      const store = tx.objectStore(STORE_360_MEDIA);
+      const req = store.get(String(idOrUrl));
+      return new Promise((resolve) => {
+        req.onsuccess = () => {
+          const val = req.result;
+          if (!val) return resolve(null);
+          if (val.dataUri) return resolve(val.dataUri);
+          if (val.blob) return resolve(URL.createObjectURL(val.blob));
+          if (typeof val === 'string') return resolve(val);
+          resolve(null);
+        };
+        req.onerror = () => resolve(null);
+      });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async getAll360Media() {
+    try {
+      const db = await openOfflineDB();
+      const tx = db.transaction(STORE_360_MEDIA, 'readonly');
+      const store = tx.objectStore(STORE_360_MEDIA);
+      return new Promise((resolve) => {
+        const mediaMap = {};
+        const req = store.openCursor();
+        req.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const val = cursor.value;
+            const dataUri = val?.dataUri || (typeof val === 'string' ? val : null);
+            if (dataUri) mediaMap[cursor.key] = dataUri;
+            cursor.continue();
+          } else {
+            resolve(mediaMap);
+          }
+        };
+        req.onerror = () => resolve({});
+      });
+    } catch (e) {
+      return {};
+    }
+  }
+
+  async getAllTileDataUris() {
+    try {
+      const db = await openOfflineDB();
+      const tx = db.transaction(STORE_TILES, 'readonly');
+      const store = tx.objectStore(STORE_TILES);
+      return new Promise((resolve) => {
+        const tileDict = {};
+        const req = store.openCursor();
+        req.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const val = cursor.value;
+            const dataUri = val?.dataUri || (typeof val === 'string' && val.startsWith('data:') ? val : null);
+            if (dataUri) tileDict[cursor.key] = dataUri;
+            cursor.continue();
+          } else {
+            resolve(tileDict);
+          }
+        };
+        req.onerror = () => resolve({});
+      });
+    } catch (e) {
+      return {};
     }
   }
 
@@ -322,7 +520,25 @@ class OfflineMapManager {
       const store = tx.objectStore(STORE_TILES);
       const req = store.get(`${z}/${x}/${y}`);
       return new Promise((resolve) => {
-        req.onsuccess = () => resolve(req.result || null);
+        req.onsuccess = () => {
+          const val = req.result;
+          if (!val) return resolve(null);
+          if (val instanceof Blob) return resolve(val);
+          if (val.blob instanceof Blob) return resolve(val.blob);
+          if (val.dataUri && val.dataUri.startsWith('data:')) {
+            try {
+              const byteString = atob(val.dataUri.split(',')[1]);
+              const mimeString = val.dataUri.split(',')[0].split(':')[1].split(';')[0];
+              const ab = new ArrayBuffer(byteString.length);
+              const ia = new Uint8Array(ab);
+              for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+              }
+              return resolve(new Blob([ab], { type: mimeString }));
+            } catch (_) {}
+          }
+          resolve(null);
+        };
         req.onerror = () => resolve(null);
       });
     } catch (e) {
@@ -333,11 +549,17 @@ class OfflineMapManager {
   async clearOfflineData() {
     try {
       const db = await openOfflineDB();
-      const tx = db.transaction([STORE_TILES, STORE_CUSTOM_MAP, STORE_ROUTING, STORE_METADATA], 'readwrite');
+      const tx = db.transaction(
+        [STORE_TILES, STORE_CUSTOM_MAP, STORE_ROUTING, STORE_METADATA, STORE_360_MEDIA],
+        'readwrite'
+      );
       tx.objectStore(STORE_TILES).clear();
       tx.objectStore(STORE_CUSTOM_MAP).clear();
       tx.objectStore(STORE_ROUTING).clear();
       tx.objectStore(STORE_METADATA).clear();
+      if (tx.objectStoreNames.contains(STORE_360_MEDIA)) {
+        tx.objectStore(STORE_360_MEDIA).clear();
+      }
       return new Promise((resolve) => {
         tx.oncomplete = () => resolve(true);
         tx.onerror = () => resolve(false);
