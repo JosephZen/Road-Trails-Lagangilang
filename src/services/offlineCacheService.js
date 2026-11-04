@@ -201,9 +201,10 @@ class OfflineCacheService {
     .pin-checkpoint { background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important; border-color: #4ade80 !important; }
     .pin-emergency { background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important; border-color: #f87171 !important; }
     .pin-nature { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important; border-color: #5eead4 !important; }
-    .pin-heritage { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important; border-color: #93c5fd !important; }
+    .pin-heritage { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; border-color: #b45309 !important; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.7) !important; }
+    .pin-cafe { background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%) !important; border-color: #fb923c !important; }
     .pin-service { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important; border-color: #7dd3fc !important; }
-    .pin-tourist { background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%) !important; border-color: #ffffff !important; }
+    .pin-tourist { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; border-color: #b45309 !important; }
 
     /* 360 Panorama Modal */
     #pano-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 10000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
@@ -303,12 +304,45 @@ class OfflineCacheService {
 
     document.getElementById('all-count').textContent = spots.length;
 
+    // 17 Official Barangays of Lagangilang, Abra
+    const LAGANGILANG_BARANGAYS_LIST = [
+      { name: 'Aguet', lat: 17.6335, lng: 120.7810 },
+      { name: 'Bacooc', lat: 17.6015, lng: 120.7650 },
+      { name: 'Balais', lat: 17.5850, lng: 120.7580 },
+      { name: 'Cayapa', lat: 17.5920, lng: 120.8050 },
+      { name: 'Dalaguisen', lat: 17.5755, lng: 120.7425 },
+      { name: 'Laang', lat: 17.6145, lng: 120.7285 },
+      { name: 'Lagben', lat: 17.6250, lng: 120.8120 },
+      { name: 'Laguiben', lat: 17.6080, lng: 120.7485 },
+      { name: 'Nagtipulan', lat: 17.6280, lng: 120.7520 },
+      { name: 'Nagtupacan', lat: 17.5945, lng: 120.7450 },
+      { name: 'Paganao', lat: 17.6190, lng: 120.7950 },
+      { name: 'Pawa', lat: 17.5985, lng: 120.7330 },
+      { name: 'Poblacion', lat: 17.6115, lng: 120.7335 },
+      { name: 'Presentar', lat: 17.6045, lng: 120.7310 },
+      { name: 'San Isidro', lat: 17.5890, lng: 120.7690 },
+      { name: 'Tagodtod', lat: 17.6165, lng: 120.7590 },
+      { name: 'Taping', lat: 17.6180, lng: 120.7410 },
+    ];
+    LAGANGILANG_BARANGAYS_LIST.forEach(b => {
+      L.marker([b.lat, b.lng], {
+        icon: L.divIcon({
+          className: 'brgy-label-marker',
+          html: '<div style="font-size:10px; font-weight:700; color:#334155; background:rgba(255,255,255,0.88); padding:2px 6px; border-radius:10px; border:1px solid #cbd5e1; box-shadow:0 1px 3px rgba(0,0,0,0.15); white-space:nowrap; pointer-events:none;">Brgy. ' + b.name + '</div>',
+          iconSize: [80, 16],
+          iconAnchor: [40, 8]
+        }),
+        interactive: false
+      }).addTo(map);
+    });
+
     function getPinVisual(spot) {
       const name = (spot.name || '').toLowerCase();
       const cat = (spot.category || '').toLowerCase();
+      const customSelectedIcon = spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon;
 
       if (spot.isCheckpoint || cat.includes('checkpoint') || cat.includes('denr') || name.includes('checkpoint')) {
-        return { pinClass: 'pin-checkpoint', icon: '🌲', label: spot.category || 'DENR Checkpoint' };
+        return { pinClass: 'pin-checkpoint', icon: customSelectedIcon || '🌲', label: spot.category || 'DENR Checkpoint' };
       }
       if (cat.includes('emergency') || cat.includes('police') || cat.includes('rescue') || cat.includes('fire') || cat.includes('medical') || name.includes('police') || name.includes('mdrrmo')) {
         let icon = '🚨';
@@ -316,26 +350,30 @@ class OfflineCacheService {
         else if (name.includes('police')) icon = '👮';
         else if (name.includes('fire')) icon = '🚒';
         else if (name.includes('health') || name.includes('rhu')) icon = '🏥';
-        return { pinClass: 'pin-emergency', icon: icon, label: spot.category || 'Emergency Unit' };
+        return { pinClass: 'pin-emergency', icon: customSelectedIcon || icon, label: spot.category || 'Emergency Unit' };
+      }
+      if (cat.includes('cafe') || cat.includes('bakery') || cat.includes('coffee') || name.includes('cafe') || customSelectedIcon === '☕') {
+        return { pinClass: 'pin-cafe', icon: customSelectedIcon || '☕', label: spot.category || 'Cafe & Bakery' };
       }
       if (cat.includes('nature') || cat.includes('river') || cat.includes('cave') || cat.includes('spring') || cat.includes('viewpoint')) {
         let icon = '🏞️';
         if (cat.includes('cave') || name.includes('cave')) icon = '🧗';
         else if (cat.includes('spring') || name.includes('river')) icon = '🌊';
         else if (cat.includes('viewpoint')) icon = '🌄';
-        return { pinClass: 'pin-nature', icon: icon, label: spot.category || 'Nature & Eco-Tourism' };
+        return { pinClass: 'pin-nature', icon: customSelectedIcon || icon, label: spot.category || 'Nature & Eco-Tourism' };
       }
-      if (cat.includes('heritage') || cat.includes('religious') || cat.includes('church') || cat.includes('civic') || name.includes('university') || name.includes('school')) {
+      if (cat.includes('heritage') || cat.includes('religious') || cat.includes('church') || cat.includes('civic') || name.includes('university') || name.includes('school') || cat.includes('tourist')) {
         let icon = '🏛️';
-        if (cat.includes('religious') || name.includes('church')) icon = '⛪';
+        if (cat.includes('religious') || name.includes('church') || name.includes('parish')) icon = '⛪';
         else if (name.includes('university') || name.includes('school')) icon = '🏫';
-        return { pinClass: 'pin-heritage', icon: icon, label: spot.category || 'Heritage Landmark' };
+        return { pinClass: 'pin-heritage', icon: customSelectedIcon || icon, label: spot.category || 'Tourist & Heritage Landmark' };
       }
       let sIcon = '📍';
       if (cat.includes('transport') || cat.includes('terminal')) sIcon = '🚌';
       else if (cat.includes('gas')) sIcon = '⛽';
       else if (name.includes('water')) sIcon = '💧';
-      return { pinClass: 'pin-service', icon: spot.categoryIcon || sIcon, label: spot.category || 'Public Service & POI' };
+      else if (cat.includes('store') || cat.includes('market') || cat.includes('convenience')) sIcon = '🛒';
+      return { pinClass: 'pin-service', icon: customSelectedIcon || sIcon, label: spot.category || 'Public Service & POI' };
     }
 
     function open360Modal(spotId) {
@@ -382,7 +420,7 @@ class OfflineCacheService {
 
         const popupContent =
           '<div style="min-width:180px;">' +
-          '  <h4 style="margin:0 0 4px 0; color:#38bdf8; font-size:0.95rem;">' + iconChar + ' ' + s.name + '</h4>' +
+          '  <h4 style="margin:0 0 4px 0; color:#38bdf8; font-size:0.95rem;">' + visual.icon + ' ' + s.name + '</h4>' +
           '  <div style="font-size:0.75rem; color:#f59e0b; font-weight:700; margin-bottom:4px;">' + (s.category || 'Spot') + '</div>' +
           (s.description ? '<p style="margin:0 0 6px 0; font-size:0.75rem; color:#cbd5e1; line-height:1.3;">' + s.description + '</p>' : '') +
           '  <div style="font-size:0.7rem; color:#94a3b8;">📍 ' + Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5) + '</div>' +

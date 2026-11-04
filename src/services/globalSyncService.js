@@ -172,14 +172,10 @@ class GlobalSyncService {
   }
 
   /**
-   * Start 20-second automatic polling loop for instant multi-device sync
+   * Fetch global state once on startup (background polling loop deprecated per Phase 5)
    */
   startAutoSync() {
-    if (this.pollInterval) return;
     this.fetchGlobalState().catch(() => {});
-    this.pollInterval = setInterval(() => {
-      this.fetchGlobalState().catch(() => {});
-    }, 20000);
   }
 
   stopAutoSync() {

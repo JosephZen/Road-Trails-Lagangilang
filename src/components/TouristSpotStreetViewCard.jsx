@@ -60,7 +60,7 @@ export default function TouristSpotStreetViewCard({
   const isVerified = spot.sync_status === 'verified';
   const isPoi = (spot.spotType || spot.type) === 'poi';
   const categoryName = normalizeCategoryName(spot.category);
-  const displayIcon = spot.categoryIcon || (isPoi ? '🏪' : '⭐');
+  const displayIcon = spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon || (isPoi ? '🏪' : '⭐');
 
   const handleDescriptionClick = () => {
     // 1. If we have a steer heading handler, rotate the 360 camera toward the landmark
@@ -329,9 +329,9 @@ export default function TouristSpotStreetViewCard({
       {/* Image Banner: Only shown on 2D Map view so it never blocks the 360 viewer */}
       {!isViewerOpen && (
         <div style={{ marginBottom: '8px', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-          {spot.image ? (
+          {(!spot.useStylizedGraphic && (spot.imageUrl || spot.image)) ? (
             <img
-              src={spot.image}
+              src={spot.imageUrl || spot.image}
               alt={spot.name}
               style={{ width: '100%', height: '130px', objectFit: 'cover' }}
             />

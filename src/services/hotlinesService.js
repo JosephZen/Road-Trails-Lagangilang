@@ -188,6 +188,37 @@ class HotlinesService {
   }
 
   /**
+   * Update coordinates for a hotline or checkpoint and persist immediately
+   */
+  updateCoordinates(id, { lat, lng }) {
+    const list = this.getAll();
+    const parsedLat = parseFloat(Number(lat).toFixed(6));
+    const parsedLng = parseFloat(Number(lng).toFixed(6));
+    const idx = list.findIndex((h) => h.id === id);
+    if (idx >= 0) {
+      list[idx] = {
+        ...list[idx],
+        lat: parsedLat,
+        lng: parsedLng,
+        location: {
+          ...(list[idx].location || {}),
+          lat: parsedLat,
+          lng: parsedLng,
+        },
+      };
+      this.saveAll(list);
+
+      // Fast per-item location update to Neon PostgreSQL
+      const apiBase = import.meta.env.VITE_API_BASE || '';
+      fetch(`${apiBase}/api/item-location`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, lat: parsedLat, lng: parsedLng }),
+      }).catch((e) => console.warn('Hotline location sync warning:', e));
+    }
+  }
+
+  /**
    * Convert hotlines with valid coordinates into Map POI spots
    */
   asMapPois() {

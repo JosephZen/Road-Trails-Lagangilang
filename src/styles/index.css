@@ -1547,10 +1547,18 @@ body {
   border: 2px solid #ffffff !important;
 }
 
-/* Royal Blue Heritage & Cultural Landmark Pin */
-.poi-marker-pin.pin-heritage {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.6) !important;
+/* Vibrant Gold Tourist Spots & Heritage Sites (Holy Cross Parish, Landmarks) */
+.poi-marker-pin.pin-heritage,
+.poi-marker-pin.pin-tourist {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.75), 0 0 10px rgba(217, 119, 6, 0.4) !important;
+  border: 2px solid #b45309 !important;
+}
+
+/* Warm Terracotta / Orange Cafe & Bakery Pin */
+.poi-marker-pin.pin-cafe {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%) !important;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.65) !important;
   border: 2px solid #ffffff !important;
 }
 

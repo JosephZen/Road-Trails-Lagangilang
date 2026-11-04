@@ -9,6 +9,7 @@ import { streetviewAlignmentService } from '../services/streetviewAlignmentServi
 import { calculateAdvancedETAs, getRouteElevationProfile } from '../services/routeConditionService';
 import offlineMapManager from '../services/offlineMapManager';
 import { getPoiVisualConfig } from '../utils/poiIconRegistry';
+import { addBarangayLabelsLayer } from '../utils/barangayData';
 
 // MapLibre GL worker initialization
 setWorkerUrl(maplibreWorkerUrl);
@@ -444,6 +445,9 @@ export default function MapView({
       });
 
       coneLayerAdded.current = true;
+
+      // Overlay 17 Official Barangays of Lagangilang, Abra
+      addBarangayLabelsLayer(map);
 
       // Custom OSM Overlay (user's edited map.osm data)
       fetch('/data/lagangilang-custom.geojson')
@@ -1309,6 +1313,9 @@ export default function MapView({
           },
         });
       }
+
+      // Re-overlay 17 Official Barangays of Lagangilang, Abra
+      addBarangayLabelsLayer(mapRef.current);
 
       // Custom OSM Overlay
       fetch('/data/lagangilang-custom.geojson')

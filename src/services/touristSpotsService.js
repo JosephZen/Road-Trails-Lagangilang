@@ -31,16 +31,18 @@ export const CATEGORY_DEFINITIONS = {
   cat_religious: { id: 'cat_religious', name: 'Religious & Spiritual Site', icon: '⛪' },
   cat_nature: { id: 'cat_nature', name: 'Nature & Eco-Tourism', icon: '🏞️' },
   cat_heritage: { id: 'cat_heritage', name: 'Historical & Cultural Heritage', icon: '🏛️' },
+  cat_school: { id: 'cat_school', name: 'School & Campus Landmark', icon: '🏫' },
   cat_adventure: { id: 'cat_adventure', name: 'Adventure & Trekking Trail', icon: '🌉' },
   cat_agri: { id: 'cat_agri', name: 'Agri-Tourism & Cultural Handicrafts', icon: '🌾' },
   cat_civic: { id: 'cat_civic', name: 'Civic & Public Park', icon: '🌳' },
   cat_viewpoint: { id: 'cat_viewpoint', name: 'Scenic Viewpoint & Overlook', icon: '🌄' },
   // POI & Services
-  cat_gas: { id: 'cat_gas', name: 'Gas Station & Fuel', icon: '⛽' },
+  cat_cafe: { id: 'cat_cafe', name: 'Cafe & Bakery', icon: '☕' },
+  cat_store: { id: 'cat_store', name: 'Convenience Store & Market', icon: '🛒' },
+  cat_gas: { id: 'cat_gas', name: 'Gas & Water Station', icon: '⛽' },
   cat_dining: { id: 'cat_dining', name: 'Restaurant & Dining', icon: '🍽️' },
   cat_eatery: { id: 'cat_eatery', name: 'Local Eatery & Carinderia', icon: '🍲' },
   cat_hotel: { id: 'cat_hotel', name: 'Hotel & Accommodation', icon: '🏨' },
-  cat_store: { id: 'cat_store', name: 'Convenience Store & Market', icon: '🏪' },
   cat_pharmacy: { id: 'cat_pharmacy', name: 'Pharmacy & Health Clinic', icon: '💊' },
   cat_bank: { id: 'cat_bank', name: 'Bank & ATM', icon: '🏧' },
   cat_transport: { id: 'cat_transport', name: 'Transport Terminal', icon: '🚌' },
@@ -93,11 +95,14 @@ export function getDefaultCategoryIcon(category, spotType = 'tourist_spot') {
       return def.icon;
     }
   }
+  if (lower.includes('cafe') || lower.includes('coffee') || lower.includes('bakery')) return '☕';
+  if (lower.includes('school') || lower.includes('campus') || lower.includes('university')) return '🏫';
+  if (lower.includes('church') || lower.includes('religious') || lower.includes('spiritual')) return '⛪';
   if (lower.includes('gas') || lower.includes('fuel')) return '⛽';
   if (lower.includes('restaurant') || lower.includes('dining')) return '🍽️';
   if (lower.includes('eatery') || lower.includes('carinderia')) return '🍲';
   if (lower.includes('hotel') || lower.includes('accommodation')) return '🏨';
-  if (lower.includes('convenience') || lower.includes('store') || lower.includes('market')) return '🏪';
+  if (lower.includes('convenience') || lower.includes('store') || lower.includes('market')) return '🛒';
   if (lower.includes('pharmacy') || lower.includes('clinic') || lower.includes('health')) return '💊';
   if (lower.includes('bank') || lower.includes('atm')) return '🏧';
   if (lower.includes('terminal') || lower.includes('transport')) return '🚌';
@@ -747,6 +752,13 @@ export const touristSpotsService = {
     });
     this.saveAllSpots(updated);
 
+    // Fast granular update to serverless Neon API
+    fetch(`${API_BASE}/api/item-location`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: spotId, lat: parsedLat, lng: parsedLng }),
+    }).catch(() => {});
+
     // Asynchronously mirror update to local Express server (updates tourist_spots.json on disk)
     fetch(`${API_BASE}/api/tourist-spots/${spotId}/location`, {
       method: 'PATCH',
@@ -764,6 +776,29 @@ export const touristSpotsService = {
     ).catch((err) => console.warn('Neon direct location update error:', err));
 
     return updated.find((s) => s.id === spotId);
+  },
+
+  /**
+   * Save a single POI directly to Neon DB without sending full-state 43+ array
+   */
+  async saveSingleSpotToCloud(spot) {
+    if (!spot || !spot.id) return { success: false, error: 'No spot provided' };
+
+    // 1. Try lightweight edge endpoint /api/pois
+    try {
+      const res = await fetch(`${API_BASE}/api/pois`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(spot),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) return data;
+      }
+    } catch (_) {}
+
+    // 2. Direct Neon Cloud DB query fallback
+    return await this.syncToNeonCloud(spot.id);
   },
 
   /**

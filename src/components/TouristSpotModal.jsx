@@ -11,25 +11,30 @@ import { useMapillary } from '../hooks/useMapillary';
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 export const TOURIST_CATEGORIES = [
-  { name: 'Nature & Eco-Tourism', icon: '🏞️' },
   { name: 'Historical & Cultural Heritage', icon: '🏛️' },
+  { name: 'Religious & Spiritual Site', icon: '⛪' },
+  { name: 'Nature & Eco-Tourism', icon: '🏞️' },
   { name: 'Scenic Viewpoint & Overlook', icon: '🌄' },
   { name: 'Adventure & Trekking Trail', icon: '🌉' },
   { name: 'Agri-Tourism & Cultural Handicrafts', icon: '🌾' },
   { name: 'Civic & Public Park', icon: '🌳' },
-  { name: 'Religious & Spiritual Site', icon: '⛪' },
+  { name: 'School & Campus Landmark', icon: '🏫' },
+  { name: 'Cafe & Bakery', icon: '☕' },
 ];
 
 export const POI_CATEGORIES = [
-  { name: 'Gas Station & Fuel', icon: '⛽' },
-  { name: 'Restaurant & Dining', icon: '🍽️' },
+  { name: 'Cafe & Bakery', icon: '☕' },
+  { name: 'Convenience Store & Market', icon: '🛒' },
+  { name: 'Gas & Water Station', icon: '⛽' },
+  { name: 'School & Campus Landmark', icon: '🏫' },
   { name: 'Local Eatery & Carinderia', icon: '🍲' },
+  { name: 'Restaurant & Dining', icon: '🍽️' },
   { name: 'Hotel & Accommodation', icon: '🏨' },
-  { name: 'Convenience Store & Market', icon: '🏪' },
   { name: 'Pharmacy & Health Clinic', icon: '💊' },
   { name: 'Bank & ATM', icon: '🏧' },
   { name: 'Transport Terminal', icon: '🚌' },
   { name: 'Government & Emergency Services', icon: '🏛️' },
+  { name: 'DENR Environmental Checkpoint', icon: '🌲' },
 ];
 
 export const PRESET_ICONS = [
@@ -137,14 +142,17 @@ export default function TouristSpotModal({
           editingSpot.categoryIcon && editingSpot.categoryIcon !== '⭐'
             ? editingSpot.categoryIcon
             : defaultIcon,
-        cardVisualIcon: editingSpot.cardVisualIcon || null,
+        cardVisualIcon: editingSpot.cardVisualIcon || editingSpot.customIcon || editingSpot.icon || null,
         barangay: editingSpot.barangay || BARANGAYS[0],
         lat: String(editingSpot.location?.lat || editingSpot.lat || '17.6167'),
         lng: String(editingSpot.location?.lng || editingSpot.lng || '120.7333'),
         address: editingSpot.location?.address || 'Lagangilang, Abra',
         description: editingSpot.description || '',
-        image: editingSpot.image || '',
-        usePseudoImage: editingSpot.isPseudoImage ?? !editingSpot.image,
+        image: editingSpot.imageUrl || editingSpot.image || '',
+        usePseudoImage:
+          editingSpot.useStylizedGraphic !== undefined
+            ? Boolean(editingSpot.useStylizedGraphic)
+            : (editingSpot.isPseudoImage ?? !(editingSpot.imageUrl || editingSpot.image)),
         pseudoTheme: editingSpot.pseudoTheme || (isPoi ? 'cyan' : 'indigo'),
         connectedPanoId: targetId,
         connectedPanoType: isLocal ? 'local' : 'mapillary',
@@ -380,6 +388,8 @@ export default function TouristSpotModal({
       spotType,
       category: formData.category,
       categoryIcon: formData.categoryIcon,
+      customIcon: formData.cardVisualIcon || formData.categoryIcon,
+      icon: formData.cardVisualIcon || formData.categoryIcon,
       cardVisualIcon: formData.cardVisualIcon || null,
       barangay: formData.barangay,
       lat: latNum,
@@ -393,7 +403,9 @@ export default function TouristSpotModal({
       address: formData.address,
       description: formData.description,
       image: cleanImageUrl || null,
-      isPseudoImage: formData.usePseudoImage && !cleanImageUrl,
+      imageUrl: cleanImageUrl || null,
+      useStylizedGraphic: Boolean(formData.usePseudoImage),
+      isPseudoImage: Boolean(formData.usePseudoImage),
       pseudoTheme: formData.pseudoTheme,
       connected360: {
         type: isLocalPano ? 'local' : 'mapillary',
@@ -408,7 +420,7 @@ export default function TouristSpotModal({
       const saved = touristSpotsService.saveDraftLocally(spotPayload, []);
       // Immediately sync to Neon Cloud DB so localhost and Vercel stay 100% in sync
       try {
-        await touristSpotsService.syncToNeonCloud(saved.id);
+        await touristSpotsService.saveSingleSpotToCloud(saved);
         saved.sync_status = 'synced_cloud';
       } catch (syncErr) {
         console.warn('Sync to Neon warning:', syncErr);

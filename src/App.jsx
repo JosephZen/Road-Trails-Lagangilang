@@ -500,7 +500,20 @@ export default function App() {
     hotlinePois.forEach((hp) => {
       const idx = merged.findIndex((s) => s.id === hp.id);
       if (idx >= 0) {
-        merged[idx] = { ...merged[idx], ...hp };
+        const currentLat = merged[idx].location?.lat ?? merged[idx].lat;
+        const currentLng = merged[idx].location?.lng ?? merged[idx].lng;
+        merged[idx] = {
+          ...merged[idx],
+          ...hp,
+          lat: currentLat ?? hp.lat,
+          lng: currentLng ?? hp.lng,
+          location: {
+            ...(hp.location || {}),
+            ...(merged[idx].location || {}),
+            lat: currentLat ?? hp.lat,
+            lng: currentLng ?? hp.lng,
+          },
+        };
       } else {
         merged.push(hp);
       }
@@ -527,7 +540,20 @@ export default function App() {
           freshHotlines.forEach((hp) => {
             const idx = mergedCloud.findIndex((s) => s.id === hp.id);
             if (idx >= 0) {
-              mergedCloud[idx] = { ...mergedCloud[idx], ...hp };
+              const currentLat = mergedCloud[idx].location?.lat ?? mergedCloud[idx].lat;
+              const currentLng = mergedCloud[idx].location?.lng ?? mergedCloud[idx].lng;
+              mergedCloud[idx] = {
+                ...mergedCloud[idx],
+                ...hp,
+                lat: currentLat ?? hp.lat,
+                lng: currentLng ?? hp.lng,
+                location: {
+                  ...(hp.location || {}),
+                  ...(mergedCloud[idx].location || {}),
+                  lat: currentLat ?? hp.lat,
+                  lng: currentLng ?? hp.lng,
+                },
+              };
             } else {
               mergedCloud.push(hp);
             }
@@ -712,22 +738,15 @@ export default function App() {
     (spotId, newLat, newLng) => {
       const lat = parseFloat(Number(newLat).toFixed(6));
       const lng = parseFloat(Number(newLng).toFixed(6));
+      
+      // Fast granular updates
       touristSpotsService.updateSpotLocation(spotId, lat, lng);
+      hotlinesService.updateCoordinates(spotId, { lat, lng });
 
       const updatedSpots = touristSpots.map((s) =>
         s.id === spotId ? { ...s, location: { ...(s.location || {}), lat, lng }, lat, lng } : s
       );
       setTouristSpots(updatedSpots);
-
-      // Persist immediately to Neon PostgreSQL so Mobile, Desktop, and all Tourists update in real-time
-      globalSyncService.saveKey(GLOBAL_STATE_KEYS.POIS, updatedSpots).catch(() => {});
-
-      if (spotId.startsWith('hotline-') || spotId.startsWith('poi_lagangilang') || spotId.startsWith('poi_denr')) {
-        const currentHotlines = hotlinesService.getAll().map((h) =>
-          h.id === spotId ? { ...h, location: { ...(h.location || {}), lat, lng } } : h
-        );
-        hotlinesService.saveAll(currentHotlines);
-      }
 
       if (activeTouristSpot?.id === spotId) {
         setActiveTouristSpot((prev) =>
@@ -1036,31 +1055,6 @@ export default function App() {
             >
               <span>🌲</span>
               <span>Road & Trail</span>
-            </div>
-
-            {/* Real-Time Neon Cloud Sync Pill */}
-            <div
-              className="sync-pill"
-              title={`Neon PostgreSQL Database: ${cloudSyncStatus === 'syncing' ? 'Syncing...' : 'Real-time multi-device sync active'}`}
-              style={{
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                padding: '5px 10px',
-                borderRadius: 'var(--radius-full)',
-                background: cloudSyncStatus === 'syncing' ? 'rgba(59, 130, 246, 0.22)' : 'rgba(16, 185, 129, 0.18)',
-                border: cloudSyncStatus === 'syncing' ? '1px solid rgba(59, 130, 246, 0.45)' : '1px solid rgba(16, 185, 129, 0.4)',
-                color: cloudSyncStatus === 'syncing' ? '#93c5fd' : '#86efac',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              <span style={{ fontSize: '0.75rem' }}>{cloudSyncStatus === 'syncing' ? '🔄' : '☁️'}</span>
-              <span className="btn-label-text">{cloudSyncStatus === 'syncing' ? 'Syncing...' : 'Live Sync'}</span>
             </div>
 
             {/* Explore Spots Drawer Button */}
@@ -1750,38 +1744,23 @@ export default function App() {
                       >
                         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                           <div style={{ width: '60px', height: '60px', minWidth: '60px', maxWidth: '60px', flexShrink: 0 }}>
-                            {spot.isPseudoImage ? (
-                              <PseudoImage
-                                title={spot.name}
-                                category={spot.category}
-                                categoryIcon={spot.categoryIcon}
-                                theme={spot.pseudoTheme || (isPoi ? 'cyan' : 'indigo')}
-                                height="60px"
-                                width="60px"
-                                style={{ borderRadius: 'var(--radius-sm)' }}
-                              />
-                            ) : spot.image ? (
+                            {(!spot.useStylizedGraphic && (spot.imageUrl || spot.image)) ? (
                               <img
-                                src={spot.image}
+                                src={spot.imageUrl || spot.image}
                                 alt={spot.name}
                                 className="pano-thumb"
                                 style={{ width: '60px', height: '60px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }}
                               />
                             ) : (
-                              <div
-                                style={{
-                                  width: '60px',
-                                  height: '60px',
-                                  borderRadius: 'var(--radius-sm)',
-                                  background: isPoi ? 'rgba(6, 214, 160, 0.2)' : 'rgba(255, 215, 0, 0.2)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '1.5rem',
-                                }}
-                              >
-                                {spot.categoryIcon || (isPoi ? '🏪' : '⭐')}
-                              </div>
+                              <PseudoImage
+                                title={spot.name}
+                                category={spot.category}
+                                categoryIcon={spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon || (isPoi ? '🏪' : '⭐')}
+                                theme={spot.pseudoTheme || (isPoi ? 'cyan' : 'indigo')}
+                                height="60px"
+                                width="60px"
+                                style={{ borderRadius: 'var(--radius-sm)' }}
+                              />
                             )}
                           </div>
 
@@ -1795,7 +1774,7 @@ export default function App() {
                               )}
                             </div>
                             <p style={{ fontSize: '0.72rem', color: isPoi ? '#34d399' : '#ffd700', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {spot.categoryIcon || (isPoi ? '🏪' : '⭐')} {spot.category} • Brgy. {spot.barangay}
+                              {spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon || (isPoi ? '🏪' : '⭐')} {spot.category} • Brgy. {spot.barangay}
                             </p>
                             <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {spot.location?.address}
