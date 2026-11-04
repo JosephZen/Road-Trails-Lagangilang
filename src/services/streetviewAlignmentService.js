@@ -1,3 +1,5 @@
+import globalSyncService, { GLOBAL_STATE_KEYS } from './globalSyncService';
+
 /**
  * Streetview Line Alignment & Bending Service
  * Enables interactive line bending and re-alignment of Mapillary streetview sequences
@@ -378,11 +380,14 @@ class StreetviewAlignmentService {
       });
     }
 
-    // 2. Spatial proximity scan across other sequences
+    // 2. Spatial proximity scan across other sequences: at most ONE closest connection per sequence
     for (const [seqId, aligned] of Object.entries(this.alignedSequences)) {
       if (this.isSequenceExcluded(seqId)) continue;
       if (seqId === currentPos.sequenceId) continue;
-      if (!Array.isArray(aligned.images)) continue;
+      if (!Array.isArray(aligned.images) || aligned.images.length === 0) continue;
+
+      let closestImg = null;
+      let minSeqDist = Infinity;
 
       for (const img of aligned.images) {
         const imgIdStr = String(img.id);
@@ -390,19 +395,25 @@ class StreetviewAlignmentService {
         if (this.isImageExcluded(imgIdStr)) continue;
 
         const dist = getHaversineDistance(currentPos.lat, currentPos.lng, img.lat, img.lng);
-        if (dist <= maxDistanceMeters) {
-          seenTargetIds.add(imgIdStr);
-          const bearing = this.calculateBearing(currentPos.lat, currentPos.lng, img.lat, img.lng);
-          bridges.push({
-            targetImageId: imgIdStr,
-            targetSequenceId: seqId,
-            targetName: aligned.name || `Sequence ${seqId.slice(0, 6)}`,
-            distance: Math.round(dist),
-            bearing: bearing,
-            isManual: false,
-            label: `${aligned.name || 'Adjacent Trail'} (${Math.round(dist)}m)`,
-          });
+        if (dist <= maxDistanceMeters && dist < minSeqDist) {
+          minSeqDist = dist;
+          closestImg = img;
         }
+      }
+
+      if (closestImg) {
+        const imgIdStr = String(closestImg.id);
+        seenTargetIds.add(imgIdStr);
+        const bearing = this.calculateBearing(currentPos.lat, currentPos.lng, closestImg.lat, closestImg.lng);
+        bridges.push({
+          targetImageId: imgIdStr,
+          targetSequenceId: seqId,
+          targetName: aligned.name || `Sequence ${seqId.slice(0, 6)}`,
+          distance: Math.round(minSeqDist),
+          bearing: bearing,
+          isManual: false,
+          label: `${aligned.name || 'Adjacent Trail'} (${Math.round(minSeqDist)}m)`,
+        });
       }
     }
 
@@ -599,7 +610,35 @@ class StreetviewAlignmentService {
       });
     } catch (_) {}
 
+    // 3. Sync to Global Neon PostgreSQL state
+    globalSyncService.saveKey(GLOBAL_STATE_KEYS.TRAILS, {
+      alignedSequences: this.alignedSequences,
+      sequenceBridges: this.sequenceBridges,
+      nodeOverrides: this.nodeOverrides,
+      excludedSequences: Array.from(this.excludedSequences),
+      excludedImages: Array.from(this.excludedImages),
+    }).catch(() => {});
+
     return record;
+  }
+
+  /**
+   * Reset all image node coordinates back to raw GPS capture values
+   * without destroying the visual road line curve.
+   */
+  async resetSequenceNodesToOriginalGps(sequenceId) {
+    const record = this.alignedSequences[sequenceId];
+    if (!record) return null;
+
+    if (Array.isArray(record.images)) {
+      record.images = record.images.map((img) => ({
+        ...img,
+        lat: img.originalLat ?? img.lat,
+        lng: img.originalLng ?? img.lng,
+      }));
+    }
+
+    return await this.saveAlignedSequence(sequenceId, record);
   }
 
   async deleteAlignedSequence(sequenceId) {

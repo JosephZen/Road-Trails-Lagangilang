@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import { setWorkerUrl } from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
@@ -6,8 +6,9 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { calculateBearing } from '../utils/geoUtils';
 import { normalizeCategoryName, getDefaultCategoryIcon } from '../services/touristSpotsService';
 import { streetviewAlignmentService } from '../services/streetviewAlignmentService';
-import { calculateAdvancedETAs } from '../services/routeConditionService';
+import { calculateAdvancedETAs, getRouteElevationProfile } from '../services/routeConditionService';
 import offlineMapManager from '../services/offlineMapManager';
+import { getPoiVisualConfig } from '../utils/poiIconRegistry';
 
 // MapLibre GL worker initialization
 setWorkerUrl(maplibreWorkerUrl);
@@ -27,9 +28,10 @@ if (typeof window !== 'undefined' && maplibregl?.addProtocol && !window.__lagang
         }
       } catch (_) {}
 
-      // If tile is not cached in IndexedDB yet, fallback to OpenStreetMap live if online
+      // If tile is not cached in IndexedDB yet, fallback to Esri World Street Map (CORS-friendly, zero API key, no 403)
       try {
-        const res = await fetch(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`, {
+        const esriUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}`;
+        const res = await fetch(esriUrl, {
           signal: abortController.signal,
           mode: 'cors',
         });
@@ -143,6 +145,25 @@ export default function MapView({
   useEffect(() => {
     onMapContextMenuRef.current = onMapContextMenu;
   }, [onMapContextMenu]);
+
+  // Elevation profile state for accurate terrain/slope delay calculation
+  const [routeElevation, setRouteElevation] = useState(null);
+
+  useEffect(() => {
+    if (!routeData?.geometry?.coordinates) {
+      setRouteElevation(null);
+      return;
+    }
+    let isCurrent = true;
+    getRouteElevationProfile(routeData.geometry.coordinates)
+      .then((elev) => {
+        if (isCurrent) setRouteElevation(elev);
+      })
+      .catch(() => {});
+    return () => {
+      isCurrent = false;
+    };
+  }, [routeData]);
 
   // Update cursor when picking points on the map
   useEffect(() => {
@@ -1465,15 +1486,12 @@ export default function MapView({
       const lng = spot.location?.lng ?? spot.lng;
       if (lat === undefined || lng === undefined) return;
 
-      const isPoi = spot.spotType === 'poi' || spot.type === 'poi';
-      const cleanCategory = normalizeCategoryName(spot.category);
-      const isCheckpoint = Boolean(spot.isCheckpoint || cleanCategory.toLowerCase().includes('checkpoint') || cleanCategory.toLowerCase().includes('denr'));
-      const icon = isCheckpoint ? '🌲' : (spot.categoryIcon || getDefaultCategoryIcon(cleanCategory, spot.spotType) || (isPoi ? '📍' : '⭐'));
-
+      const visual = getPoiVisualConfig(spot);
+      const cleanCategory = spot.category || visual.label;
       const canDrag = !!isAdmin && !!isDraggable;
 
       const el = document.createElement('div');
-      el.className = `poi-marker ${isCheckpoint ? 'poi-checkpoint' : isPoi ? 'poi-service' : 'poi-attraction'} ${
+      el.className = `poi-marker ${visual.pinClass} ${
         spot.id === activeTouristSpotId ? 'active' : ''
       } ${spot.sync_status === 'staged_local' ? 'staged' : ''} ${canDrag ? 'is-admin-draggable' : ''}`;
       el.dataset.poiId = spot.id;
@@ -1481,8 +1499,8 @@ export default function MapView({
 
       el.innerHTML = `
         <div class="poi-marker-inner">
-          <div class="poi-marker-pin ${isCheckpoint ? 'pin-checkpoint' : isPoi ? 'pin-poi' : 'pin-tourist'}">
-            <span class="poi-marker-icon">${icon}</span>
+          <div class="poi-marker-pin ${visual.pinClass}">
+            <span class="poi-marker-icon">${visual.icon}</span>
           </div>
           <div class="poi-marker-label">${spot.name}</div>
           <div class="poi-marker-tooltip">${cleanCategory}</div>
@@ -1623,7 +1641,7 @@ export default function MapView({
     let etaString = '';
     if (routeData) {
       try {
-        const etas = calculateAdvancedETAs(routeData);
+        const etas = calculateAdvancedETAs(routeData, routeElevation);
         let cur = etas.car;
         if (routingProfile === 'walking' || routingProfile === 'foot') cur = etas.person;
         else if (routingProfile === 'motorcycle') cur = etas.motorcycle;
@@ -1731,7 +1749,7 @@ export default function MapView({
       routeMarkersRef.current.forEach((m) => m.remove());
       routeMarkersRef.current = [];
     };
-  }, [routeOrigin, routeDestination, routeData, routingProfile, touristSpots]);
+  }, [routeOrigin, routeDestination, routeData, routingProfile, touristSpots, routeElevation]);
 
   // Toggle Mapillary Streetview layers (Green sequence lines and image dots)
   useEffect(() => {

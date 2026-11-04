@@ -177,14 +177,33 @@ class OfflineCacheService {
     .hotline-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; font-size: 0.78rem; font-weight: 700; text-decoration: none; margin-top: 8px; margin-right: 6px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4); border: none; cursor: pointer; }
     .rule-item { display: flex; gap: 8px; margin-bottom: 10px; font-size: 0.8rem; line-height: 1.4; color: #cbd5e1; }
     
-    /* Custom Pin Badges */
+    /* Unified Teardrop Pin Badges */
     .leaflet-popup-content-wrapper { background: #1e293b !important; color: #f8fafc !important; border: 1px solid #38bdf8 !important; border-radius: 12px !important; }
     .leaflet-popup-tip { background: #1e293b !important; }
-    .custom-map-pin { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 2px solid #ffffff; }
-    .pin-tourist { background: #10b981; }
-    .pin-emergency { background: #ef4444; }
-    .pin-checkpoint { background: #15803d; border-color: #86efac; }
-    .pin-poi { background: #0284c7; }
+    .custom-map-pin {
+      width: 30px;
+      height: 30px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #ffffff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+      transition: all 0.2s ease;
+    }
+    .custom-map-pin span {
+      transform: rotate(45deg);
+      font-size: 14px;
+      display: inline-block;
+      line-height: 1;
+    }
+    .pin-checkpoint { background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important; border-color: #4ade80 !important; }
+    .pin-emergency { background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important; border-color: #f87171 !important; }
+    .pin-nature { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important; border-color: #5eead4 !important; }
+    .pin-heritage { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important; border-color: #93c5fd !important; }
+    .pin-service { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important; border-color: #7dd3fc !important; }
+    .pin-tourist { background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%) !important; border-color: #ffffff !important; }
 
     /* 360 Panorama Modal */
     #pano-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 10000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
@@ -258,7 +277,7 @@ class OfflineCacheService {
     // Initialize Leaflet Map centered on Lagangilang, Abra
     const map = L.map('map').setView([17.6142, 120.7340], 14);
 
-    // Custom Offline & CORS-Safe Tile Layer (Uses Base64 tiles when offline, CartoDB Voyager fallback)
+    // Custom Offline & CORS-Safe Tile Layer (Uses Base64 tiles when offline, Esri World Street Map fallback)
     const OfflineTileLayer = L.TileLayer.extend({
       createTile: function(coords, done) {
         const tile = document.createElement('img');
@@ -268,9 +287,8 @@ class OfflineCacheService {
           tile.src = window.OFFLINE_TILES[key];
           setTimeout(function() { done(null, tile); }, 0);
         } else {
-          const subdomains = ['a', 'b', 'c', 'd'];
-          const s = subdomains[Math.abs(coords.x + coords.y) % subdomains.length];
-          tile.src = 'https://' + s + '.basemaps.cartocdn.com/rastertiles/voyager/' + coords.z + '/' + coords.x + '/' + coords.y + '.png';
+          // Free, CORS-friendly Esri World Street Map (Order: z/y/x, Zero API Key, no watermarks, no 403)
+          tile.src = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/' + coords.z + '/' + coords.y + '/' + coords.x;
           tile.onload = function() { done(null, tile); };
           tile.onerror = function(err) { done(null, tile); };
         }
@@ -280,17 +298,44 @@ class OfflineCacheService {
 
     new OfflineTileLayer('', {
       maxZoom: 19,
-      attribution: '&copy; CartoDB &copy; OpenStreetMap contributors • Lagangilang Trails'
+      attribution: '&copy; Esri &copy; OpenStreetMap contributors • Lagangilang Trails'
     }).addTo(map);
 
     document.getElementById('all-count').textContent = spots.length;
 
-    function getPinClass(spot) {
+    function getPinVisual(spot) {
+      const name = (spot.name || '').toLowerCase();
       const cat = (spot.category || '').toLowerCase();
-      if (spot.isCheckpoint || cat.includes('checkpoint') || cat.includes('denr')) return 'pin-checkpoint';
-      if (cat.includes('emergency') || cat.includes('police') || cat.includes('rescue')) return 'pin-emergency';
-      if (spot.spotType === 'poi' || spot.type === 'poi') return 'pin-poi';
-      return 'pin-tourist';
+
+      if (spot.isCheckpoint || cat.includes('checkpoint') || cat.includes('denr') || name.includes('checkpoint')) {
+        return { pinClass: 'pin-checkpoint', icon: '🌲', label: spot.category || 'DENR Checkpoint' };
+      }
+      if (cat.includes('emergency') || cat.includes('police') || cat.includes('rescue') || cat.includes('fire') || cat.includes('medical') || name.includes('police') || name.includes('mdrrmo')) {
+        let icon = '🚨';
+        if (name.includes('mdrrmo') || cat.includes('rescue')) icon = '🚑';
+        else if (name.includes('police')) icon = '👮';
+        else if (name.includes('fire')) icon = '🚒';
+        else if (name.includes('health') || name.includes('rhu')) icon = '🏥';
+        return { pinClass: 'pin-emergency', icon: icon, label: spot.category || 'Emergency Unit' };
+      }
+      if (cat.includes('nature') || cat.includes('river') || cat.includes('cave') || cat.includes('spring') || cat.includes('viewpoint')) {
+        let icon = '🏞️';
+        if (cat.includes('cave') || name.includes('cave')) icon = '🧗';
+        else if (cat.includes('spring') || name.includes('river')) icon = '🌊';
+        else if (cat.includes('viewpoint')) icon = '🌄';
+        return { pinClass: 'pin-nature', icon: icon, label: spot.category || 'Nature & Eco-Tourism' };
+      }
+      if (cat.includes('heritage') || cat.includes('religious') || cat.includes('church') || cat.includes('civic') || name.includes('university') || name.includes('school')) {
+        let icon = '🏛️';
+        if (cat.includes('religious') || name.includes('church')) icon = '⛪';
+        else if (name.includes('university') || name.includes('school')) icon = '🏫';
+        return { pinClass: 'pin-heritage', icon: icon, label: spot.category || 'Heritage Landmark' };
+      }
+      let sIcon = '📍';
+      if (cat.includes('transport') || cat.includes('terminal')) sIcon = '🚌';
+      else if (cat.includes('gas')) sIcon = '⛽';
+      else if (name.includes('water')) sIcon = '💧';
+      return { pinClass: 'pin-service', icon: spot.categoryIcon || sIcon, label: spot.category || 'Public Service & POI' };
     }
 
     function open360Modal(spotId) {
@@ -320,15 +365,14 @@ class OfflineCacheService {
         const lng = s.lng || s.location?.lng;
         if (!lat || !lng) return;
 
-        const pinClass = getPinClass(s);
-        const iconChar = s.categoryIcon || (pinClass === 'pin-checkpoint' ? '🌲' : pinClass === 'pin-emergency' ? '🚨' : '📍');
+        const visual = getPinVisual(s);
 
         const customIcon = L.divIcon({
           className: 'custom-div-icon',
-          html: '<div class="custom-map-pin ' + pinClass + '">' + iconChar + '</div>',
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-          popupAnchor: [0, -14],
+          html: '<div class="custom-map-pin ' + visual.pinClass + '"><span>' + visual.icon + '</span></div>',
+          iconSize: [30, 30],
+          iconAnchor: [15, 30],
+          popupAnchor: [0, -28],
         });
 
         const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);

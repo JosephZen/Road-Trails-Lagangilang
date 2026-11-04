@@ -98,9 +98,8 @@ export default function GoogleStreetViewViewer({
       />
 
       {/* ===== BOTTOM-LEFT OF STREETVIEW: All transitions and engine controls (Responsive to device aspect ratio) ===== */}
-      {!hasDedicatedCard && (
-        <div className="streetview-bottom-left-controls">
-          {/* Transition prompt: Inside Campus Ground (No Google vehicle coverage) */}
+      <div className={`streetview-bottom-left-controls ${hasDedicatedCard ? 'has-spot-card' : ''}`}>
+        {/* Transition prompt: Inside Campus Ground (No Google vehicle coverage) */}
           {inCampus && onSwitchToMapillary && (
             <div className="streetview-transition-prompt campus-prompt">
               <span style={{ fontSize: '0.9rem' }}>🏫</span>
@@ -163,7 +162,6 @@ export default function GoogleStreetViewViewer({
             )}
           </div>
         </div>
-      )}
     </div>
   );
 }

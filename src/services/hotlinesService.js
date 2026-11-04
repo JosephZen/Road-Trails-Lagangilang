@@ -10,6 +10,8 @@
  * and the 2D Map POI pins.
  */
 
+import globalSyncService, { GLOBAL_STATE_KEYS } from './globalSyncService';
+
 const STORAGE_KEY = 'lagangilang_hotlines_checkpoints_v2';
 
 export const INITIAL_HOTLINES_AND_CHECKPOINTS = [
@@ -139,11 +141,14 @@ class HotlinesService {
     return INITIAL_HOTLINES_AND_CHECKPOINTS;
   }
 
-  saveAll(list) {
+  saveAll(list, syncToCloud = true) {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
       this.notify(list);
+      if (syncToCloud) {
+        globalSyncService.saveKey(GLOBAL_STATE_KEYS.HOTLINES, list).catch(() => {});
+      }
     } catch (e) {
       console.error('Failed to save hotlines to storage:', e);
     }

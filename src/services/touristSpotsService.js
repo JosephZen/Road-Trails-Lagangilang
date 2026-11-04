@@ -1,4 +1,5 @@
 import seedSpots from '../data/tourist_spots.json';
+import globalSyncService, { GLOBAL_STATE_KEYS } from './globalSyncService';
 
 const STORAGE_KEY = 'lagangilang_tourist_spots_v3';
 const LEGACY_V2_STORAGE_KEY = 'lagangilang_tourist_spots_v2';
@@ -458,6 +459,7 @@ export const touristSpotsService = {
       if (notify) {
         window.dispatchEvent(new Event('lagangilang_spots_updated'));
       }
+      globalSyncService.saveKey(GLOBAL_STATE_KEYS.POIS, sanitized).catch(() => {});
     } catch (err) {
       console.error('Failed to save spots to localStorage:', err);
       // Fallback: If still quota exceeded, strip image payloads entirely to save spot metadata

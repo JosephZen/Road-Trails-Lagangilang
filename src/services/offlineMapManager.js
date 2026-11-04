@@ -104,9 +104,25 @@ class OfflineMapManager {
   }
 
   /**
+   * Auto-migration: Purges any old corrupted watermarked CartoDB tiles from IndexedDB
+   */
+  async checkTileMigration() {
+    if (typeof localStorage === 'undefined') return;
+    const MIGRATION_KEY = 'lagangilang_clean_tiles_migrated_v3';
+    if (localStorage.getItem(MIGRATION_KEY) === 'true') return;
+    try {
+      const db = await openOfflineDB();
+      const tx = db.transaction(STORE_TILES, 'readwrite');
+      tx.objectStore(STORE_TILES).clear();
+      localStorage.setItem(MIGRATION_KEY, 'true');
+    } catch (_) {}
+  }
+
+  /**
    * Get cached offline metadata
    */
   async getStatus() {
+    await this.checkTileMigration();
     try {
       const db = await openOfflineDB();
       return new Promise((resolve) => {
@@ -377,7 +393,7 @@ class OfflineMapManager {
       }
 
       // Stage 5: Cache Map Tiles (Zooms 12 - maxZoom across Lagangilang BBox) (100%)
-      // Uses CORS-friendly CartoDB Voyager tiles (never throws 403 Access Blocked on file://, webviews or offline)
+      // Uses 100% free, CORS-friendly Esri World Street Map (zero API key, no watermarks, no 403 blocks)
       const tileList = getBboxTileList(LAGANGILANG_BBOX, 12, maxZoom);
       const totalTiles = tileList.length;
 
@@ -385,10 +401,9 @@ class OfflineMapManager {
         stage: 'tiles',
         percent: 58,
         mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
-        message: `Downloading ${totalTiles} High-Res CartoDB Voyager Tiles (Zoom 12-${maxZoom})...`,
+        message: `Downloading ${totalTiles} Clean Esri World Street Map Tiles (Zoom 12-${maxZoom})...`,
       });
 
-      const subdomains = ['a', 'b', 'c', 'd'];
       const batchSize = 12;
       let completedTiles = 0;
 
@@ -397,12 +412,12 @@ class OfflineMapManager {
         await Promise.all(
           batch.map(async (t) => {
             const tileKey = `${t.z}/${t.x}/${t.y}`;
-            const s = subdomains[(t.x + t.y) % subdomains.length];
-            const tileUrl = `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/${t.z}/${t.x}/${t.y}.png`;
+            // Esri World Street Map endpoint (order: z/y/x)
+            const tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${t.z}/${t.y}/${t.x}`;
 
             try {
               const res = await fetch(tileUrl, { mode: 'cors' });
-              if (res.ok) {
+              if (res.ok && res.status === 200) {
                 const blob = await res.blob();
                 totalBytes += blob.size;
                 const dataUri = await this.blobToDataUri(blob);
@@ -421,7 +436,7 @@ class OfflineMapManager {
           stage: 'tiles',
           percent: tilePercent,
           mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
-          message: `Caching CartoDB Tiles: ${completedTiles} of ${totalTiles} complete...`,
+          message: `Caching Esri World Street Tiles: ${completedTiles} of ${totalTiles} complete...`,
         });
       }
 

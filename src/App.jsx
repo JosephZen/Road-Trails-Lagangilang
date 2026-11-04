@@ -27,6 +27,7 @@ import ThemeSelector from './components/ThemeSelector';
 import WeatherWidget from './components/WeatherWidget';
 import OfflineGuideModal from './components/OfflineGuideModal';
 import hotlinesService from './services/hotlinesService';
+import globalSyncService, { GLOBAL_STATE_KEYS } from './services/globalSyncService';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -91,6 +92,7 @@ export default function App() {
   // Connectivity & 2-Step Sync State (Research Objective 3: ISO/IEC 25010 Reliability)
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState('synced'); // 'syncing' | 'synced' | 'error'
 
   // Theme & Auth State
   const [mapTheme, setMapTheme] = useState(() => localStorage.getItem('lagangilang_map_theme') || 'light'); // 'dark' | 'light' | 'beige' | 'satellite'
@@ -353,6 +355,17 @@ export default function App() {
     showToast(`🗑️ Alignment deleted for sequence ${sequenceId.slice(0, 8)}... (reverted to raw)`);
   }, [isAdmin, aligningSequence, showToast]);
 
+  const handleResetNodesToGps = useCallback(async (sequenceId) => {
+    if (!isAdmin || !sequenceId) return;
+    try {
+      await streetviewAlignmentService.resetSequenceNodesToOriginalGps(sequenceId);
+      setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+      showToast(`↩️ Sequence ${sequenceId.slice(0, 8)}... 360 photo nodes restored to camera GPS`);
+    } catch (e) {
+      showToast(`⚠️ Could not reset nodes: ${e.message}`);
+    }
+  }, [isAdmin, showToast]);
+
   const handleToggleExcludeSequence = useCallback((sequenceId) => {
     if (!isAdmin) return;
     if (streetviewAlignmentService.isSequenceExcluded(sequenceId)) {
@@ -557,6 +570,32 @@ export default function App() {
     loadTouristSpots();
   }, [loadTouristSpots]);
 
+  // Master Real-Time Global Cloud Sync with Neon PostgreSQL (One Global Truth across devices)
+  useEffect(() => {
+    globalSyncService.startAutoSync();
+    const unsub = globalSyncService.subscribe((evt) => {
+      if (evt.type === 'status_change') {
+        setCloudSyncStatus(evt.status);
+      } else if (evt.type === 'state_updated') {
+        const state = evt.state;
+        if (state && Array.isArray(state[GLOBAL_STATE_KEYS.POIS]) && state[GLOBAL_STATE_KEYS.POIS].length > 0) {
+          setTouristSpots(state[GLOBAL_STATE_KEYS.POIS]);
+        }
+        if (state && Array.isArray(state[GLOBAL_STATE_KEYS.HOTLINES]) && state[GLOBAL_STATE_KEYS.HOTLINES].length > 0) {
+          hotlinesService.saveAll(state[GLOBAL_STATE_KEYS.HOTLINES], false);
+        }
+        if (state && state[GLOBAL_STATE_KEYS.TRAILS]) {
+          setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+        }
+      }
+    });
+
+    return () => {
+      unsub();
+      globalSyncService.stopAutoSync();
+    };
+  }, []);
+
   // Helper: check if a tourist spot has a dedicated local 360 panorama (either in Neon Cloud DB, local files, or explicit type)
   const spotHasDedicatedPano = useCallback(
     (spot) => {
@@ -675,9 +714,20 @@ export default function App() {
       const lng = parseFloat(Number(newLng).toFixed(6));
       touristSpotsService.updateSpotLocation(spotId, lat, lng);
 
-      setTouristSpots((prev) =>
-        prev.map((s) => (s.id === spotId ? { ...s, location: { ...(s.location || {}), lat, lng }, lat, lng } : s))
+      const updatedSpots = touristSpots.map((s) =>
+        s.id === spotId ? { ...s, location: { ...(s.location || {}), lat, lng }, lat, lng } : s
       );
+      setTouristSpots(updatedSpots);
+
+      // Persist immediately to Neon PostgreSQL so Mobile, Desktop, and all Tourists update in real-time
+      globalSyncService.saveKey(GLOBAL_STATE_KEYS.POIS, updatedSpots).catch(() => {});
+
+      if (spotId.startsWith('hotline-') || spotId.startsWith('poi_lagangilang') || spotId.startsWith('poi_denr')) {
+        const currentHotlines = hotlinesService.getAll().map((h) =>
+          h.id === spotId ? { ...h, location: { ...(h.location || {}), lat, lng } } : h
+        );
+        hotlinesService.saveAll(currentHotlines);
+      }
 
       if (activeTouristSpot?.id === spotId) {
         setActiveTouristSpot((prev) =>
@@ -694,7 +744,7 @@ export default function App() {
 
       const spot = touristSpots.find((s) => s.id === spotId);
       const spotName = spot?.name || 'Landmark';
-      showToast(`📍 ${spotName} moved to [${lat.toFixed(5)}, ${lng.toFixed(5)}] — Saved`);
+      showToast(`📍 ${spotName} moved to [${lat.toFixed(5)}, ${lng.toFixed(5)}] — Synced to Cloud`);
     },
     [activeTouristSpot, touristSpots, showToast]
   );
@@ -986,6 +1036,31 @@ export default function App() {
             >
               <span>🌲</span>
               <span>Road & Trail</span>
+            </div>
+
+            {/* Real-Time Neon Cloud Sync Pill */}
+            <div
+              className="sync-pill"
+              title={`Neon PostgreSQL Database: ${cloudSyncStatus === 'syncing' ? 'Syncing...' : 'Real-time multi-device sync active'}`}
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                padding: '5px 10px',
+                borderRadius: 'var(--radius-full)',
+                background: cloudSyncStatus === 'syncing' ? 'rgba(59, 130, 246, 0.22)' : 'rgba(16, 185, 129, 0.18)',
+                border: cloudSyncStatus === 'syncing' ? '1px solid rgba(59, 130, 246, 0.45)' : '1px solid rgba(16, 185, 129, 0.4)',
+                color: cloudSyncStatus === 'syncing' ? '#93c5fd' : '#86efac',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              <span style={{ fontSize: '0.75rem' }}>{cloudSyncStatus === 'syncing' ? '🔄' : '☁️'}</span>
+              <span className="btn-label-text">{cloudSyncStatus === 'syncing' ? 'Syncing...' : 'Live Sync'}</span>
             </div>
 
             {/* Explore Spots Drawer Button */}
@@ -1464,6 +1539,7 @@ export default function App() {
             aligningSequence={aligningSequence}
             onSave={handleSaveAlignment}
             onResetOriginal={handleResetAlignmentOriginal}
+            onResetNodesGps={handleResetNodesToGps}
             onCancel={() => setAligningSequence(null)}
             onDeleteAlignment={handleDeleteAlignment}
             onExcludeSequence={handleToggleExcludeSequence}

@@ -8,6 +8,7 @@ export default function StreetviewLineAligner({
   aligningSequence,
   onSave,
   onResetOriginal,
+  onResetNodesGps,
   onCancel,
   onDeleteAlignment,
   onExcludeSequence,
@@ -96,6 +97,17 @@ export default function StreetviewLineAligner({
         >
           ↺ Reset GPS
         </button>
+
+        {onResetNodesGps && (
+          <button
+            className="btn-secondary aligner-btn-reset-nodes"
+            onClick={() => onResetNodesGps(sequenceId)}
+            title="Revert all 360 photo coordinates back to original GPS while keeping visual road line"
+            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+          >
+            ↩️ Reset Nodes to GPS
+          </button>
+        )}
 
         {isAlreadyAligned && onDeleteAlignment && (
           <button

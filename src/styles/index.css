@@ -1523,6 +1523,44 @@ body {
   animation: pulse-checkpoint 2.5s infinite ease-in-out;
 }
 
+/* Crimson Red Emergency Pin (MDRRMO, Police, Fire, RHU) */
+.poi-marker-pin.pin-emergency {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.7), 0 0 0 2px rgba(248, 113, 113, 0.6) !important;
+  border: 2px solid #ffffff !important;
+  animation: pulse-emergency 2.5s infinite ease-in-out;
+}
+
+@keyframes pulse-emergency {
+  0%, 100% {
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.7), 0 0 0 2px rgba(248, 113, 113, 0.6);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(220, 38, 38, 0.95), 0 0 0 5px rgba(248, 113, 113, 0.3);
+  }
+}
+
+/* Emerald Nature & Eco-Tourism Pin */
+.poi-marker-pin.pin-nature {
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.6) !important;
+  border: 2px solid #ffffff !important;
+}
+
+/* Royal Blue Heritage & Cultural Landmark Pin */
+.poi-marker-pin.pin-heritage {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.6) !important;
+  border: 2px solid #ffffff !important;
+}
+
+/* Sky Blue Transport & Services Pin */
+.poi-marker-pin.pin-service {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.6) !important;
+  border: 2px solid #ffffff !important;
+}
+
 @keyframes pulse-checkpoint {
   0%, 100% {
     box-shadow: 0 4px 14px rgba(22, 101, 52, 0.7), 0 0 0 2px rgba(74, 222, 128, 0.6);

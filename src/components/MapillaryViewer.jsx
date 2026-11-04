@@ -511,10 +511,9 @@ export default function MapillaryViewer({
       />
 
       {/* ===== BOTTOM-LEFT OF MAPILLARY: Highway transition & Google Switch (Aspect Ratio Adaptive) ===== */}
-      {!hasDedicatedCard && (
-        <div className="streetview-bottom-left-controls">
-          {/* Inter-Sequence Proximity & Manual Transition Prompts (Workstream 8) */}
-          {proximityBridges.map((b, idx) => (
+      <div className={`streetview-bottom-left-controls ${hasDedicatedCard ? 'has-spot-card' : ''}`}>
+        {/* Deduplicated Inter-Sequence Proximity Bridge (At most ONE clean pill) */}
+          {proximityBridges.slice(0, 1).map((b, idx) => (
             <div
               key={idx}
               className="streetview-transition-prompt bridge-prompt"
@@ -542,21 +541,6 @@ export default function MapillaryViewer({
             </div>
           ))}
 
-          {/* Step Out to Highway Junction Prompt */}
-          {currentPos && isNearCampusJunction(currentPos.lat, currentPos.lng) && onSwitchToGoogle && (
-            <div className="streetview-transition-prompt junction-prompt">
-              <span style={{ fontSize: '0.9rem' }}>🌐</span>
-              <span className="prompt-label">Highway Connection:</span>
-              <button
-                onClick={() => onSwitchToGoogle({ lat: UA_HIGHWAY_JUNCTION.lat, lng: UA_HIGHWAY_JUNCTION.lng })}
-                className="prompt-btn"
-              >
-                <span>Step Out to Highway (Google)</span>
-                <span>→</span>
-              </button>
-            </div>
-          )}
-
           {/* Omnipresent Switch Capsule: Mapillary to Google Street View */}
           <div className="streetview-engine-switch-pill">
             <span style={{ fontSize: '0.95rem' }}>🚗</span>
@@ -578,7 +562,6 @@ export default function MapillaryViewer({
             )}
           </div>
         </div>
-      )}
 
       {/* Street View Viewer container with native 3D spatial arrows */}
       <div ref={containerRef} className="panorama-container" style={{ width: '100%', height: '100%' }} />

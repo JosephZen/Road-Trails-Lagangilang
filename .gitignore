@@ -28,3 +28,5 @@ dist-ssr
 .expo
 mobile-app/.expo
 mobile-app/dist
+mobile-app/android
+scratch
