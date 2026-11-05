@@ -78,10 +78,11 @@ export default function PanoramaViewer({
       setIsLoading(true);
 
       // 1. If explicit data URI texture was passed (from Neon upload or state)
+      // Guard: strictly ignore tiny thumbnails (< 50KB) to prevent 50p pixelated blur on the 360 sphere
       let finalImageUrl =
-        panorama.imageData ||
-        (panorama.imageUrl?.startsWith('data:') ? panorama.imageUrl : null) ||
-        (panorama.image?.startsWith('data:') && panorama.image.length > 35000 ? panorama.image : null);
+        (panorama.imageData && panorama.imageData.length > 50000 ? panorama.imageData : null) ||
+        (panorama.imageUrl?.startsWith('data:') && panorama.imageUrl.length > 50000 ? panorama.imageUrl : null) ||
+        (panorama.image?.startsWith('data:') && panorama.image.length > 50000 ? panorama.image : null);
 
       // 2. Offline IndexedDB check (cached 360 landmark media for web & APK offline usage)
       if (!finalImageUrl) {
@@ -96,7 +97,7 @@ export default function PanoramaViewer({
         for (const candidate of idCandidates) {
           try {
             const offlineMedia = await offlineMapManager.get360Media(candidate);
-            if (offlineMedia && !isCancelled) {
+            if (offlineMedia && offlineMedia.length > 50000 && !isCancelled) {
               finalImageUrl = offlineMedia;
               break;
             }
@@ -114,7 +115,7 @@ export default function PanoramaViewer({
           if (!cloudTexture && panorama.targetId) {
             cloudTexture = await touristSpotsService.fetchPanoramaImageData(panorama.targetId);
           }
-          if (cloudTexture && !isCancelled) {
+          if (cloudTexture && cloudTexture.length > 50000 && !isCancelled) {
             finalImageUrl = cloudTexture;
             // Auto-persist to IndexedDB for seamless zero-signal offline recall later
             offlineMapManager.save360Media(panorama.id, cloudTexture, panorama.spotId).catch(() => {});
@@ -124,14 +125,22 @@ export default function PanoramaViewer({
         }
       }
 
-      // 3. Fallback to static URL
+      // 4. Fallback to static URL (only full panorama files, NEVER low-res thumbnails)
       if (!finalImageUrl) {
-        finalImageUrl =
-          panorama.imageUrl ||
-          panorama.image ||
-          (getCachedUrl
-            ? getCachedUrl(panorama.id) || `${API_BASE}/panoramas/${panorama.filename}`
-            : `${API_BASE}/panoramas/${panorama.filename}`);
+        const candidateUrl =
+          (panorama.imageUrl && !panorama.imageUrl.includes('_thumb.') && !panorama.imageUrl.startsWith('data:') ? panorama.imageUrl : null) ||
+          (panorama.filename && !panorama.filename.includes('_thumb.') ? `${API_BASE}/panoramas/${panorama.filename}` : null) ||
+          (getCachedUrl ? getCachedUrl(panorama.id) : null);
+
+        if (candidateUrl && !candidateUrl.includes('_thumb.')) {
+          finalImageUrl = candidateUrl;
+        }
+      }
+
+      // 5. High-Definition Bundled Fallback: If cloud texture is locked (e.g. Neon 402 Quota)
+      if (!finalImageUrl) {
+        // Fall back to clean equirectangular HD asset rather than broken 50p thumbnail
+        finalImageUrl = '/assets/road_trail_360_concept_ai.jpg';
       }
 
       if (isCancelled) return;

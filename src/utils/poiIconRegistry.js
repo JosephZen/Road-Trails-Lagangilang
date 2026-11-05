@@ -139,18 +139,22 @@ export function getPoiVisualConfig(spot = {}) {
   }
 
   // 4. Tourist Spots, Historical & Cultural Heritage, Religious & Spiritual Sites (GOLD #F59E0B)
+  // Only applies to tourist landmarks; NEVER overrides when explicitly marked as a POI / Local Service!
   if (
-    cat.includes('heritage') ||
-    cat.includes('history') ||
-    cat.includes('religious') ||
-    cat.includes('church') ||
-    cat.includes('parish') ||
-    cat.includes('spiritual') ||
-    name.includes('church') ||
-    name.includes('parish') ||
-    name.includes('holy cross') ||
-    spotType === 'tourist_spot' ||
-    cat.includes('tourist')
+    spotType !== 'poi' &&
+    (
+      cat.includes('heritage') ||
+      cat.includes('history') ||
+      cat.includes('religious') ||
+      cat.includes('church') ||
+      cat.includes('parish') ||
+      cat.includes('spiritual') ||
+      name.includes('church') ||
+      name.includes('parish') ||
+      name.includes('holy cross') ||
+      spotType === 'tourist_spot' ||
+      cat.includes('tourist')
+    )
   ) {
     let icon = '🏛️';
     if (cat.includes('religious') || cat.includes('church') || name.includes('church') || name.includes('parish')) {
@@ -192,14 +196,16 @@ export function getPoiVisualConfig(spot = {}) {
     };
   }
 
-  // 6. Terminals, Transport & Local Services (Sky Blue #0284C7)
+  // 6. Terminals, Transport, Campus & Local Services (Sky Blue #0284C7)
   let serviceIcon = '📍';
-  if (cat.includes('transport') || cat.includes('terminal') || name.includes('terminal')) serviceIcon = '🚌';
+  if (cat.includes('school') || cat.includes('campus') || name.includes('university') || name.includes('school')) serviceIcon = '🏫';
+  else if (cat.includes('transport') || cat.includes('terminal') || name.includes('terminal')) serviceIcon = '🚌';
   else if (cat.includes('gas') || name.includes('gas')) serviceIcon = '⛽';
   else if (name.includes('water')) serviceIcon = '💧';
   else if (cat.includes('store') || cat.includes('market') || cat.includes('convenience')) serviceIcon = '🛒';
   else if (cat.includes('dining') || cat.includes('eatery')) serviceIcon = '🍲';
   else if (cat.includes('hotel')) serviceIcon = '🏨';
+  else if (cat.includes('bank') || cat.includes('atm')) serviceIcon = '🏧';
 
   return {
     typeKey: 'service',

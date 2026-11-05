@@ -184,20 +184,23 @@
   },
   {
     "id": "poi_ua_main_campus",
-    "name": "University of Abra Main Campus",
-    "spotType": "tourist_spot",
-    "category": "Historical & Cultural Heritage",
-    "categoryIcon": "🎓",
+    "name": "University of Abra - Admin Building",
+    "spotType": "poi",
+    "category": "School & Campus Landmark",
+    "categoryIcon": "🏫",
+    "customIcon": "🏛️",
+    "cardVisualIcon": "🏛️",
+    "icon": "🏛️",
     "barangay": "Poblacion",
     "location": {
       "lat": 17.60825,
       "lng": 120.738083,
-      "address": "University of Abra Main Campus, Poblacion, Lagangilang, Abra"
+      "address": "University of Abra Administration Building, Poblacion, Lagangilang, Abra"
     },
-    "description": "The premier higher education institution in Abra (formerly ASIST), featuring historic academic quadrangles, lush provincial green spaces, and cultural research archives.",
+    "description": "Administrative headquarters and central governance building of the University of Abra (formerly ASIST), managing academic admissions, student records, and campus operations.",
     "image": null,
     "isPseudoImage": true,
-    "pseudoTheme": "indigo",
+    "pseudoTheme": "cyan",
     "connected360": {
       "type": "local",
       "targetId": "pano_1785434840169_sqgpeq",

@@ -173,15 +173,15 @@ export default function OfflineGuideModal({
               : 'Download the offline map bundle before heading out to remote trails with zero cellular coverage in Lagangilang (Ugiao River, Mt. Bullagao, BANAT Caves, Quirsodan Dam).'}
           </p>
 
-          {/* Storage Estimate Pill */}
-          {storageEstimate && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.7rem', color: '#38bdf8' }}>
-              <span>💾 Device Storage:</span>
-              <span style={{ fontWeight: 600 }}>{storageEstimate.quotaGB} GB Available</span>
-              <span style={{ color: '#64748b' }}>•</span>
-              <span style={{ color: '#94a3b8' }}>App Used: {storageEstimate.usageMB} MB ({storageEstimate.percentUsed}%)</span>
-            </div>
-          )}
+          {/* Offline Download Size Specification */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '0.74rem', color: '#38bdf8' }}>
+            <span>📦 Offline Package Size:</span>
+            <span style={{ fontWeight: 700, color: '#f8fafc' }}>
+              {offlineStatus?.isReady ? `${offlineStatus.sizeMB} MB Downloaded & Stored` : '~55–65 MB Full Package'}
+            </span>
+            <span style={{ color: '#64748b' }}>•</span>
+            <span style={{ color: '#94a3b8' }}>Zooms 12–18 Tiles, Road Graph & 360° Panos</span>
+          </div>
         </div>
 
         {/* Unified Complete HD Offline Package Info */}

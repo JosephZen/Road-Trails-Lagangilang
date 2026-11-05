@@ -712,18 +712,19 @@ class OfflineMapManager {
     }
   }
 
-  async clearOfflineData() {
+  async clearOfflineData(clearPanos = false) {
     try {
       const db = await openOfflineDB();
-      const tx = db.transaction(
-        [STORE_TILES, STORE_CUSTOM_MAP, STORE_ROUTING, STORE_METADATA, STORE_360_MEDIA],
-        'readwrite'
-      );
+      const storesToClear = [STORE_TILES, STORE_CUSTOM_MAP, STORE_ROUTING, STORE_METADATA];
+      if (clearPanos && db.objectStoreNames.contains(STORE_360_MEDIA)) {
+        storesToClear.push(STORE_360_MEDIA);
+      }
+      const tx = db.transaction(storesToClear, 'readwrite');
       tx.objectStore(STORE_TILES).clear();
       tx.objectStore(STORE_CUSTOM_MAP).clear();
       tx.objectStore(STORE_ROUTING).clear();
       tx.objectStore(STORE_METADATA).clear();
-      if (tx.objectStoreNames.contains(STORE_360_MEDIA)) {
+      if (clearPanos && tx.objectStoreNames.contains(STORE_360_MEDIA)) {
         tx.objectStore(STORE_360_MEDIA).clear();
       }
       return new Promise((resolve) => {

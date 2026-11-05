@@ -224,10 +224,14 @@ export default function TouristSpotModal({
   const handleTypeChange = (newType) => {
     setSpotType(newType);
     const catList = newType === 'tourist_spot' ? TOURIST_CATEGORIES : POI_CATEGORIES;
+    const existingMatch = catList.find((c) => c.name === formData.category);
+    const newCategory = existingMatch ? existingMatch.name : catList[0].name;
+    const newIcon = existingMatch ? existingMatch.icon : catList[0].icon;
+
     setFormData((prev) => ({
       ...prev,
-      category: catList[0].name,
-      categoryIcon: catList[0].icon,
+      category: newCategory,
+      categoryIcon: prev.categoryIcon && prev.categoryIcon !== '⭐' ? prev.categoryIcon : newIcon,
       pseudoTheme: newType === 'poi' ? 'cyan' : 'indigo',
     }));
   };

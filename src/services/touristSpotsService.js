@@ -892,9 +892,9 @@ export const touristSpotsService = {
           .filter((r) => !deletedIds.has(r.id) && !isObsoleteSpot(r))
           .map((r) => {
             const seedMatch = Array.isArray(seedSpots) ? seedSpots.find((seed) => seed.id === r.id) : null;
-            const categoryName = normalizeCategoryName(seedMatch?.category || r.category_id);
-            const categoryIcon = seedMatch?.categoryIcon || getDefaultCategoryIcon(categoryName, r.id.startsWith('poi_') ? 'tourist_spot' : 'poi');
-            const spotType = seedMatch?.spotType || (r.id.startsWith('poi_ua_') || r.id.startsWith('poi_holy_') || r.id.startsWith('poi_ugiao') || r.id.startsWith('poi_quirsodan') || r.id.startsWith('poi_talinawen') || r.id.startsWith('poi_galangugong') || r.id.startsWith('poi_banat') || r.id.startsWith('poi_dj_') || r.id.startsWith('poi_rizalista') ? 'tourist_spot' : 'poi');
+            const spotType = r.spot_type || r.spotType || seedMatch?.spotType || (r.id.startsWith('poi_holy_') || r.id.startsWith('poi_ugiao') || r.id.startsWith('poi_quirsodan') || r.id.startsWith('poi_talinawen') || r.id.startsWith('poi_galangugong') || r.id.startsWith('poi_banat') || r.id.startsWith('poi_dj_') || r.id.startsWith('poi_rizalista') ? 'tourist_spot' : 'poi');
+            const categoryName = normalizeCategoryName(r.category || r.category_id || seedMatch?.category || 'General POI');
+            const categoryIcon = r.category_icon || r.categoryIcon || seedMatch?.categoryIcon || getDefaultCategoryIcon(categoryName, spotType);
 
             const isDedicatedLocal = Boolean(
               r.registered_pano_id ||
