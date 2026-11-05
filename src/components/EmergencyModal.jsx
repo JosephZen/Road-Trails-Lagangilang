@@ -649,10 +649,9 @@ export default function EmergencyModal({
                         <button
                           onClick={() => {
                             const spot = touristSpots.find((s) => s.id === h.id);
-                            const finalCoords = spot
-                              ? [spot.location?.lng ?? spot.lng, spot.location?.lat ?? spot.lat]
-                              : [h.location.lng, h.location.lat];
-                            onRouteToSpot(finalCoords);
+                            const finalLat = spot?.location?.lat ?? spot?.lat ?? h.location?.lat;
+                            const finalLng = spot?.location?.lng ?? spot?.lng ?? h.location?.lng;
+                            onRouteToSpot([finalLng, finalLat]);
                             onClose();
                           }}
                           style={{

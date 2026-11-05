@@ -410,10 +410,19 @@ class OfflineCacheService {
       border: 1px solid rgba(255,255,255,0.05);
     }
 
-    /* MapLibre Teardrop Pin Markers */
+    /* Standalone Teardrop Marker Pin & Wrapper Anchor Fix */
+    .standalone-marker-wrapper {
+      width: 36px;
+      height: 42px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      pointer-events: auto;
+      cursor: pointer;
+    }
     .custom-map-pin {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       border-radius: 50% 50% 50% 0;
       transform: rotate(-45deg);
       display: flex;
@@ -421,17 +430,18 @@ class OfflineCacheService {
       justify-content: center;
       border: 2px solid #ffffff;
       box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-      cursor: pointer;
       transition: transform 0.2s ease;
     }
-    .custom-map-pin:hover {
-      transform: rotate(-45deg) scale(1.18);
+    .standalone-marker-wrapper:hover .custom-map-pin {
+      transform: rotate(-45deg) scale(1.15);
       z-index: 1000;
     }
     .custom-map-pin span {
       transform: rotate(45deg);
       font-size: 15px;
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       line-height: 1;
     }
     .pin-tourist {
@@ -861,10 +871,10 @@ class OfflineCacheService {
         const vis = getVisual(s);
         const has360 = Boolean(getSpot360Media(s));
 
-        // Create Custom Pin DOM element
-        const el = document.createElement('div');
-        el.className = 'custom-map-pin ' + vis.pinClass;
-        el.innerHTML = '<span>' + vis.icon + '</span>';
+        // Create Custom Pin DOM element with bottom anchor wrapper
+        const wrapper = document.createElement('div');
+        wrapper.className = 'standalone-marker-wrapper';
+        wrapper.innerHTML = '<div class="custom-map-pin ' + vis.pinClass + '"><span>' + vis.icon + '</span></div>';
 
         const popupHtml =
           '<div>' +
@@ -878,9 +888,9 @@ class OfflineCacheService {
           '  </div>' +
           '</div>';
 
-        const popup = new maplibregl.Popup({ offset: 25 }).setHTML(popupHtml);
+        const popup = new maplibregl.Popup({ offset: [0, -36] }).setHTML(popupHtml);
 
-        const marker = new maplibregl.Marker({ element: el })
+        const marker = new maplibregl.Marker({ element: wrapper, anchor: 'bottom' })
           .setLngLat([lng, lat])
           .setPopup(popup)
           .addTo(map);

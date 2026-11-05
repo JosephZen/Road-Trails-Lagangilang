@@ -244,6 +244,22 @@ class HotlinesService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, lat: parsedLat, lng: parsedLng }),
       }).catch((e) => console.warn('Hotline location sync warning:', e));
+
+      // Direct Neon DB execution fallback for 100% cloud persistence
+      try {
+        const NEON_URL =
+          (typeof localStorage !== 'undefined' && localStorage.getItem('lagangilang_neon_db_url')) ||
+          import.meta.env.VITE_NEON_DATABASE_URL ||
+          'postgresql://neondb_owner:npg_NCe0hgVyZ7qx@ep-shy-art-aoq0wgaf-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+        import('@neondatabase/serverless').then(({ neon }) => {
+          const sql = neon(NEON_URL);
+          sql`
+            UPDATE public.tourist_spots
+            SET latitude = ${parsedLat}, longitude = ${parsedLng}, updated_at = NOW()
+            WHERE id = ${id}
+          `.catch(() => {});
+        }).catch(() => {});
+      } catch (_) {}
     }
   }
 

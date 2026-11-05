@@ -448,7 +448,7 @@ export default function RoutePlanner({
                           : 'rgba(255, 215, 0, 0.15)',
                       }}
                     >
-                      ⭐
+                      {spot.customIcon || spot.icon || spot.categoryIcon || (spot.category?.includes('Police') ? '👮' : spot.category?.includes('Fire') ? '🚒' : spot.category?.includes('MDRRMO') ? '🚑' : spot.category?.includes('DENR') ? '🌲' : '📍')}
                     </div>
                     <div className="destination-item-info">
                       <div className="destination-item-name">{spot.name}</div>

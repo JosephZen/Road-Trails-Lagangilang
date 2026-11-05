@@ -21,6 +21,7 @@ export default function GoogleStreetViewViewer({
   onClose,
   onSwitchToMapillary,
   hasDedicatedCard = false,
+  showBridgePrompts = false,
 }) {
   const [isLoading, setIsLoading] = useState(true);
 
@@ -114,8 +115,8 @@ export default function GoogleStreetViewViewer({
             </div>
           )}
 
-          {/* Transition prompt: Near UA Campus Entrance Highway Junction */}
-          {!inCampus && nearJunction && onSwitchToMapillary && (
+          {/* Transition prompt: Near UA Campus Entrance Highway Junction (Admin Gated via showBridgePrompts) */}
+          {showBridgePrompts && !inCampus && nearJunction && onSwitchToMapillary && (
             <div className="streetview-transition-prompt junction-prompt">
               <span style={{ fontSize: '0.9rem' }}>🚗</span>
               <span className="prompt-label">Junction Connected:</span>

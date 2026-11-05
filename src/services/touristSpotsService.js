@@ -775,14 +775,63 @@ export const touristSpotsService = {
       body: JSON.stringify({ lat: parsedLat, lng: parsedLng }),
     }).catch(() => {});
 
-    // Asynchronously mirror update to Neon Cloud DB
-    this.executeNeonQuery((sql) =>
-      sql`
+    // Asynchronously mirror update to Neon Cloud DB (tables: tourist_spots, lagangilang_pois, lagangilang_global_state)
+    this.executeNeonQuery(async (sql) => {
+      // 1. Update public.tourist_spots
+      await sql`
         UPDATE public.tourist_spots
         SET latitude = ${parsedLat}, longitude = ${parsedLng}, updated_at = NOW()
         WHERE id = ${spotId}
-      `
-    ).catch((err) => console.warn('Neon direct location update error:', err));
+      `.catch(() => {});
+
+      // 2. Update lagangilang_pois
+      await sql.query(
+        `UPDATE lagangilang_pois
+         SET data = jsonb_set(
+                      jsonb_set(data, '{lat}', to_jsonb($2::numeric)),
+                      '{lng}', to_jsonb($3::numeric)
+                    ),
+             updated_at = NOW()
+         WHERE id = $1`,
+        [spotId, parsedLat, parsedLng]
+      ).catch(() => {});
+
+      // 3. Update in lagangilang_global_state
+      const rows = await sql.query(
+        `SELECT state_key, payload FROM lagangilang_global_state
+         WHERE state_key IN ('pois_and_landmarks', 'hotlines_and_checkpoints')`
+      ).catch(() => []);
+
+      for (const row of rows) {
+        if (Array.isArray(row.payload)) {
+          let hasChange = false;
+          const newList = row.payload.map((item) => {
+            if (item.id === spotId) {
+              hasChange = true;
+              return {
+                ...item,
+                lat: parsedLat,
+                lng: parsedLng,
+                location: {
+                  ...(item.location || {}),
+                  lat: parsedLat,
+                  lng: parsedLng,
+                },
+              };
+            }
+            return item;
+          });
+          if (hasChange) {
+            await sql.query(
+              `UPDATE lagangilang_global_state
+               SET payload = $2, updated_at = NOW()
+               WHERE state_key = $1`,
+              [row.state_key, JSON.stringify(newList)]
+            ).catch(() => {});
+          }
+        }
+      }
+    }).catch((err) => console.warn('Neon direct location update error:', err));
 
     return updated.find((s) => s.id === spotId);
   },
@@ -985,8 +1034,9 @@ export const touristSpotsService = {
   _panoCache: new Map(),
 
   /**
-   * Client-side equirectangular compressor for WebGL compatibility & fast cloud storage.
-   * Generates a 2560x1280 WebGL texture (~500KB base64) and a 400x200 card thumbnail (~18KB base64).
+   * Client-side equirectangular compressor for WebGL compatibility & crisp HD rendering.
+   * Generates a high-definition 4096x2048 (or native <= 4K) WebGL texture (JPEG quality 0.90, ~2.5-4MB)
+   * and a 600x300 card thumbnail (~28KB base64).
    */
   async compressEquirectangular(fileOrDataUrl) {
     return new Promise((resolve, reject) => {
@@ -996,23 +1046,41 @@ export const touristSpotsService = {
       img.onload = () => {
         if (createdUrl) URL.revokeObjectURL(createdUrl);
         try {
-          // 1. Generate WebGL-safe 360 equirectangular texture (max 2560 x 1280)
-          const targetW = 2560;
-          const targetH = 1280;
+          // 1. High-definition 4096x2048 (4K) or native equirectangular resolution (2:1 aspect ratio)
+          let targetW = img.width || 4096;
+          let targetH = img.height || 2048;
+
+          if (targetW > 4096) {
+            targetW = 4096;
+            targetH = 2048;
+          } else if (targetW < 1920) {
+            targetW = 3840;
+            targetH = 1920;
+          } else {
+            // Round to even dimensions preserving 2:1 equirectangular spherical ratio
+            targetW = Math.round(targetW / 2) * 2;
+            targetH = Math.round(targetW / 2);
+          }
+
           const canvas = document.createElement('canvas');
           canvas.width = targetW;
           canvas.height = targetH;
           const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, targetW, targetH);
-          const fullDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          // Crisp HD quality 0.90 (2.5 - 4 MB high-definition budget)
+          const fullDataUrl = canvas.toDataURL('image/jpeg', 0.90);
 
-          // 2. Generate crisp 400x200 thumbnail
+          // 2. Generate crisp 600x300 card thumbnail
           const thumbCanvas = document.createElement('canvas');
-          thumbCanvas.width = 400;
-          thumbCanvas.height = 200;
+          thumbCanvas.width = 600;
+          thumbCanvas.height = 300;
           const tCtx = thumbCanvas.getContext('2d');
-          tCtx.drawImage(img, 0, 0, 400, 200);
-          const thumbDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.75);
+          tCtx.imageSmoothingEnabled = true;
+          tCtx.imageSmoothingQuality = 'high';
+          tCtx.drawImage(img, 0, 0, 600, 300);
+          const thumbDataUrl = thumbCanvas.toDataURL('image/jpeg', 0.82);
 
           resolve({
             fullDataUrl,

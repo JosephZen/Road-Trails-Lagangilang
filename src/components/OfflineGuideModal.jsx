@@ -39,12 +39,6 @@ export default function OfflineGuideModal({
 
   if (!isOpen) return null;
 
-  const maxZoomMap = {
-    standard: 16,
-    hd: 17,
-    ultra: 18,
-  };
-
   const handleStartDownload = async () => {
     setIsDownloading(true);
     setDownloadProgress({
@@ -54,15 +48,13 @@ export default function OfflineGuideModal({
       message: 'Initializing Offline Map Downloader...',
     });
 
-    const targetMaxZoom = maxZoomMap[selectedQuality] || 17;
-
     try {
       const hotlines = hotlinesService.getAll();
       const bundleInfo = await offlineMapManager.downloadFullOfflineBundle({
         touristSpots,
         customGeoJSON,
         hotlines,
-        maxZoom: targetMaxZoom,
+        maxZoom: 18, // Complete offline map with full street & building detail (Zooms 12-18)
         onProgress: (p) => setDownloadProgress(p),
       });
 
@@ -70,7 +62,7 @@ export default function OfflineGuideModal({
       setOfflineStatus(updated);
       const est = await offlineMapManager.getStorageEstimate();
       setStorageEstimate(est);
-      showToast?.(`📥 Full Offline Bundle Ready! ${bundleInfo.sizeMB} MB saved to device (${bundleInfo.cached360Count || 29} 360° panoramas).`);
+      showToast?.(`📥 Complete Offline Bundle Ready! ${bundleInfo.sizeMB} MB saved to device (${bundleInfo.cached360Count || 29} HD 360° panoramas).`);
     } catch (e) {
       console.error('Offline download failed:', e);
       showToast?.(`⚠️ Offline download failed: ${e.message}`);
@@ -192,74 +184,32 @@ export default function OfflineGuideModal({
           )}
         </div>
 
-        {/* Quality / Resolution Selector */}
+        {/* Unified Complete HD Offline Package Info */}
         {!isDownloading && (
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Select Offline Package Resolution:
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-              <button
-                type="button"
-                onClick={() => setSelectedQuality('standard')}
-                style={{
-                  padding: '8px 6px',
-                  borderRadius: '8px',
-                  background: selectedQuality === 'standard' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.03)',
-                  border: selectedQuality === 'standard' ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
-                  color: selectedQuality === 'standard' ? '#34d399' : '#cbd5e1',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  fontSize: '0.74rem',
-                  fontWeight: selectedQuality === 'standard' ? 700 : 500,
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <div>Standard</div>
-                <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '2px' }}>~60 MB • Z12-16</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedQuality('hd')}
-                style={{
-                  padding: '8px 6px',
-                  borderRadius: '8px',
-                  background: selectedQuality === 'hd' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.03)',
-                  border: selectedQuality === 'hd' ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
-                  color: selectedQuality === 'hd' ? '#34d399' : '#cbd5e1',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  fontSize: '0.74rem',
-                  fontWeight: selectedQuality === 'hd' ? 700 : 500,
-                  transition: 'all 0.15s ease',
-                  position: 'relative',
-                }}
-              >
-                <div>⭐ HD (Best)</div>
-                <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '2px' }}>~140 MB • Z12-17</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedQuality('ultra')}
-                style={{
-                  padding: '8px 6px',
-                  borderRadius: '8px',
-                  background: selectedQuality === 'ultra' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.03)',
-                  border: selectedQuality === 'ultra' ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.08)',
-                  color: selectedQuality === 'ultra' ? '#34d399' : '#cbd5e1',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  fontSize: '0.74rem',
-                  fontWeight: selectedQuality === 'ultra' ? 700 : 500,
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <div>Ultra Max</div>
-                <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '2px' }}>~470 MB • Z12-18</div>
-              </button>
+          <div
+            style={{
+              marginBottom: '14px',
+              padding: '10px 14px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#34d399' }}>
+                ⭐ Unified Complete Offline Package
+              </div>
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
+                Includes Zooms 12–18 street tiles, 43+ landmarks, emergency hotlines, and HD 360° panoramas
+              </div>
             </div>
+            <span style={{ fontSize: '0.72rem', background: '#059669', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }}>
+              Full HD
+            </span>
           </div>
         )}
 
@@ -321,7 +271,7 @@ export default function OfflineGuideModal({
               }}
             >
               <span>{isDownloading ? '⏳' : '📥'}</span>
-              <span>{isDownloading ? 'Downloading Bundle...' : 'Download Full Offline Map & Data'}</span>
+              <span>{isDownloading ? 'Downloading Bundle...' : 'Download Complete Offline Map & HD 360° Spots'}</span>
             </button>
 
             {offlineStatus?.isReady && (

@@ -54,6 +54,7 @@ export default function MapillaryViewer({
   showToast,
   viewerLayout = 'split',
   mapWidth = 50,
+  showBridgePrompts = false,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
@@ -512,8 +513,8 @@ export default function MapillaryViewer({
 
       {/* ===== BOTTOM-LEFT OF MAPILLARY: Highway transition & Google Switch (Aspect Ratio Adaptive) ===== */}
       <div className={`streetview-bottom-left-controls ${hasDedicatedCard ? 'has-spot-card' : ''}`}>
-        {/* Deduplicated Inter-Sequence Proximity Bridge (At most ONE clean pill) */}
-          {proximityBridges.slice(0, 1).map((b, idx) => (
+        {/* Deduplicated Inter-Sequence Proximity Bridge (Admin Gated via showBridgePrompts, at most ONE clean pill) */}
+          {showBridgePrompts && proximityBridges.slice(0, 1).map((b, idx) => (
             <div
               key={idx}
               className="streetview-transition-prompt bridge-prompt"

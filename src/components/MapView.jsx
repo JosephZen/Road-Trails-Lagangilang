@@ -1490,10 +1490,23 @@ export default function MapView({
       const cleanCategory = spot.category || visual.label;
       const canDrag = !!isAdmin && !!isDraggable;
 
+      // Check if spot is near route endpoints (within ~25 meters) to prevent obscuring Point A / B cards
+      let isNearEndpoint = false;
+      if (routeOrigin && typeof routeOrigin[0] === 'number' && typeof routeOrigin[1] === 'number') {
+        const dOrigin = Math.hypot(lng - routeOrigin[0], lat - routeOrigin[1]);
+        if (dOrigin < 0.00025) isNearEndpoint = true;
+      }
+      if (!isNearEndpoint && routeDestination && typeof routeDestination[0] === 'number' && typeof routeDestination[1] === 'number') {
+        const dDest = Math.hypot(lng - routeDestination[0], lat - routeDestination[1]);
+        if (dDest < 0.00025) isNearEndpoint = true;
+      }
+
       const el = document.createElement('div');
       el.className = `poi-marker ${visual.pinClass} ${
         spot.id === activeTouristSpotId ? 'active' : ''
-      } ${spot.sync_status === 'staged_local' ? 'staged' : ''} ${canDrag ? 'is-admin-draggable' : ''}`;
+      } ${spot.sync_status === 'staged_local' ? 'staged' : ''} ${canDrag ? 'is-admin-draggable' : ''} ${
+        isNearEndpoint ? 'is-endpoint-underlay' : ''
+      }`;
       el.dataset.poiId = spot.id;
       el.title = canDrag ? `${spot.name} • Drag to reposition` : spot.name;
 
@@ -1551,7 +1564,7 @@ export default function MapView({
       poiMarkersRef.current.forEach((m) => m.remove());
       poiMarkersRef.current = [];
     };
-  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot, onSpotLocationChange, isAdmin, isDraggable, routingMode, pickingMode]);
+  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot, onSpotLocationChange, isAdmin, isDraggable, routingMode, pickingMode, routeOrigin, routeDestination]);
 
   // Fly to active tourist spot when selected
   useEffect(() => {

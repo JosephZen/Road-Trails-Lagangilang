@@ -120,6 +120,15 @@ export default function App() {
   const [mapCenterPos, setMapCenterPos] = useState(null);
   const { searchNearby } = useMapillary();
 
+  // Admin Master Toggle for Sequence & Junction Bridges (Default OFF / Hidden per Phase 6)
+  const [showBridgePrompts, setShowBridgePrompts] = useState(() => {
+    try {
+      return localStorage.getItem('lagangilang_show_bridge_prompts') === 'true';
+    } catch (_) {
+      return false;
+    }
+  });
+
   // Clean up any alignment fixture keys from localStorage to ensure standard Mapillary placement
   useEffect(() => {
     try {
@@ -507,21 +516,23 @@ export default function App() {
     hotlinePois.forEach((hp) => {
       const idx = merged.findIndex((s) => s.id === hp.id);
       if (idx >= 0) {
-        const spotLat = merged[idx].location?.lat ?? merged[idx].lat;
-        const spotLng = merged[idx].location?.lng ?? merged[idx].lng;
+        const hpTime = new Date(hp.updated_at || 0).getTime();
+        const spotTime = new Date(merged[idx].updated_at || 0).getTime();
+        const preferredLat = hpTime > spotTime ? hp.lat : (merged[idx].location?.lat ?? merged[idx].lat ?? hp.lat);
+        const preferredLng = hpTime > spotTime ? hp.lng : (merged[idx].location?.lng ?? merged[idx].lng ?? hp.lng);
         merged[idx] = {
           ...hp,
           ...merged[idx],
           phone: merged[idx].phone || hp.phone,
           altPhone: merged[idx].altPhone || hp.altPhone,
           operatingHours: merged[idx].operatingHours || hp.operatingHours,
-          lat: spotLat ?? hp.lat,
-          lng: spotLng ?? hp.lng,
+          lat: preferredLat,
+          lng: preferredLng,
           location: {
             ...(hp.location || {}),
             ...(merged[idx].location || {}),
-            lat: spotLat ?? hp.lat,
-            lng: spotLng ?? hp.lng,
+            lat: preferredLat,
+            lng: preferredLng,
           },
         };
       } else {
@@ -530,7 +541,19 @@ export default function App() {
     });
     setTouristSpots(merged);
 
-    // 2. Fetch local panoramas list from Neon Cloud
+    // True zero-network offline mode: If offline, block all cloud network fetches!
+    if (!isOnline) {
+      import('./services/offlineMapManager').then(({ default: mgr }) => {
+        mgr.getBundleData().then((bundle) => {
+          if (bundle && Array.isArray(bundle.touristSpots) && bundle.touristSpots.length > 0) {
+            setTouristSpots(bundle.touristSpots);
+          }
+        }).catch(() => {});
+      }).catch(() => {});
+      return;
+    }
+
+    // 2. Fetch local panoramas list from Neon Cloud (online only)
     touristSpotsService
       .fetchPanoramasList()
       .then((panos) => {
@@ -540,7 +563,7 @@ export default function App() {
       })
       .catch(() => {});
 
-    // 3. Background cloud synchronization with Neon PostgreSQL
+    // 3. Background cloud synchronization with Neon PostgreSQL (online only)
     touristSpotsService
       .fetchFromCloud()
       .then((cloudSpots) => {
@@ -550,21 +573,23 @@ export default function App() {
           freshHotlines.forEach((hp) => {
             const idx = mergedCloud.findIndex((s) => s.id === hp.id);
             if (idx >= 0) {
-              const spotLat = mergedCloud[idx].location?.lat ?? mergedCloud[idx].lat;
-              const spotLng = mergedCloud[idx].location?.lng ?? mergedCloud[idx].lng;
+              const hpTime = new Date(hp.updated_at || 0).getTime();
+              const cloudTime = new Date(mergedCloud[idx].updated_at || 0).getTime();
+              const preferredLat = hpTime > cloudTime ? hp.lat : (mergedCloud[idx].location?.lat ?? mergedCloud[idx].lat ?? hp.lat);
+              const preferredLng = hpTime > cloudTime ? hp.lng : (mergedCloud[idx].location?.lng ?? mergedCloud[idx].lng ?? hp.lng);
               mergedCloud[idx] = {
                 ...hp,
                 ...mergedCloud[idx],
                 phone: mergedCloud[idx].phone || hp.phone,
                 altPhone: mergedCloud[idx].altPhone || hp.altPhone,
                 operatingHours: mergedCloud[idx].operatingHours || hp.operatingHours,
-                lat: spotLat ?? hp.lat,
-                lng: spotLng ?? hp.lng,
+                lat: preferredLat,
+                lng: preferredLng,
                 location: {
                   ...(hp.location || {}),
                   ...(mergedCloud[idx].location || {}),
-                  lat: spotLat ?? hp.lat,
-                  lng: spotLng ?? hp.lng,
+                  lat: preferredLat,
+                  lng: preferredLng,
                 },
               };
             } else {
@@ -752,14 +777,38 @@ export default function App() {
       const lat = parseFloat(Number(newLat).toFixed(6));
       const lng = parseFloat(Number(newLng).toFixed(6));
       
-      // Fast granular updates
+      // Fast granular updates to local and Neon DB
       touristSpotsService.updateSpotLocation(spotId, lat, lng);
       hotlinesService.updateCoordinates(spotId, { lat, lng });
 
       const updatedSpots = touristSpots.map((s) =>
-        s.id === spotId ? { ...s, location: { ...(s.location || {}), lat, lng }, lat, lng } : s
+        s.id === spotId ? { ...s, location: { ...(s.location || {}), lat, lng }, lat, lng, updated_at: new Date().toISOString() } : s
       );
       setTouristSpots(updatedSpots);
+
+      // Keep active routing destination in sync if user dragged the destination pin
+      if (routeDestination && typeof routeDestination[0] === 'number' && typeof routeDestination[1] === 'number') {
+        const prev = touristSpots.find((s) => s.id === spotId);
+        if (prev) {
+          const prevLat = prev.location?.lat ?? prev.lat;
+          const prevLng = prev.location?.lng ?? prev.lng;
+          if (Math.hypot(routeDestination[0] - prevLng, routeDestination[1] - prevLat) < 0.0006) {
+            setRouteDestination([lng, lat]);
+          }
+        }
+      }
+
+      // Keep active routing origin in sync if user dragged the origin pin
+      if (routeOrigin && typeof routeOrigin[0] === 'number' && typeof routeOrigin[1] === 'number') {
+        const prev = touristSpots.find((s) => s.id === spotId);
+        if (prev) {
+          const prevLat = prev.location?.lat ?? prev.lat;
+          const prevLng = prev.location?.lng ?? prev.lng;
+          if (Math.hypot(routeOrigin[0] - prevLng, routeOrigin[1] - prevLat) < 0.0006) {
+            setRouteOrigin([lng, lat]);
+          }
+        }
+      }
 
       if (activeTouristSpot?.id === spotId) {
         setActiveTouristSpot((prev) =>
@@ -1115,10 +1164,10 @@ export default function App() {
               <span className="btn-label-text">Explore</span>
             </button>
 
-            {/* Live Weather & Trail Advisory Pill */}
-            <WeatherWidget isCompact={true} />
+            {/* Live Weather & Trail Advisory Pill (Online only) */}
+            {isOnline && <WeatherWidget isCompact={true} />}
 
-            {/* Emergency Hotlines Button */}
+            {/* Emergency Hotlines Button (Available 100% Online & Offline) */}
             <button
               className="btn btn-secondary btn-emergency-top"
               onClick={() => setShowEmergencyModal(true)}
@@ -1143,30 +1192,32 @@ export default function App() {
               <span className="btn-label-text">Hotlines</span>
             </button>
 
-            {/* Route Button (Tourist prominent) */}
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                setSidebarTab('routing');
-                setSidebarOpen(true);
-              }}
-              style={{
-                fontSize: '0.8rem',
-                padding: '6px 14px',
-                borderRadius: 'var(--radius-full)',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                border: 'none',
-                color: '#fff',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <span>🧭</span>
-              <span className="btn-label-text">Route</span>
-            </button>
+            {/* Route Button (Tourist prominent, Online only per Phase 6) */}
+            {isOnline && (
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setSidebarTab('routing');
+                  setSidebarOpen(true);
+                }}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  border: 'none',
+                  color: '#fff',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span>🧭</span>
+                <span className="btn-label-text">Route</span>
+              </button>
+            )}
 
             {/* High-Capacity Offline Map & Data Packager Button */}
             <button
@@ -1386,6 +1437,41 @@ export default function App() {
                 >
                   <span>{pinsDraggable ? '🔓' : '🔒'}</span>
                   <span className="btn-label-text">{pinsDraggable ? 'Reposition ON' : 'Pins Locked'}</span>
+                </button>
+
+                {/* Admin Master Toggle for Sequence & Junction Bridges */}
+                <button
+                  className={`btn btn-sm ${showBridgePrompts ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    const next = !showBridgePrompts;
+                    setShowBridgePrompts(next);
+                    try {
+                      localStorage.setItem('lagangilang_show_bridge_prompts', String(next));
+                    } catch (_) {}
+                    showToast(next ? '🔗 Sequence & Junction Bridges: ON' : '🔗 Sequence & Junction Bridges: OFF (Hidden)');
+                  }}
+                  title={showBridgePrompts ? 'Bridge Prompts are VISIBLE in 360 viewer. Click to hide.' : 'Bridge Prompts are HIDDEN. Click to turn ON.'}
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-full)',
+                    background: showBridgePrompts
+                      ? 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)'
+                      : 'rgba(0,0,0,0.6)',
+                    border: showBridgePrompts
+                      ? '1px solid #c084fc'
+                      : '1px solid rgba(255,255,255,0.15)',
+                    color: '#ffffff',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span>🔗</span>
+                  <span className="btn-label-text">Bridges: {showBridgePrompts ? 'ON' : 'OFF'}</span>
                 </button>
 
                 {/* Online/Offline indicator & DB configuration */}
@@ -2295,6 +2381,7 @@ export default function App() {
                   }
                 }}
                 hasDedicatedCard={!!activeTouristSpot}
+                showBridgePrompts={showBridgePrompts}
               />
             ) : (
               <GoogleStreetViewViewer
@@ -2305,6 +2392,7 @@ export default function App() {
                 title={activeTouristSpot?.name || 'Lagangilang, Abra'}
                 onClose={handleCloseViewer}
                 hasDedicatedCard={!!activeTouristSpot}
+                showBridgePrompts={showBridgePrompts}
                 onSwitchToMapillary={(opts) => {
                   setViewerPanoMode('mapillary');
                   if (opts?.imageId) setMapillaryImageId(opts.imageId);
@@ -2431,8 +2519,8 @@ export default function App() {
             </button>
           </div>
 
-          {/* Mapillary Image Key Badge & Copy Button (Admin Accessible) */}
-          {contextMenu.imageId && (
+          {/* Mapillary Image Key Badge & Copy Button (Admin Only per Phase 6) */}
+          {isAdmin && contextMenu.imageId && (
             <div
               style={{
                 display: 'flex',
@@ -2528,14 +2616,16 @@ export default function App() {
               🟢 View Mapillary 360 Photo ({contextMenu.imageId.slice(0, 8)}...)
             </button>
           )}
-          <button
-            onClick={() => {
-              handleStartAligningAtCoord(contextMenu.lat, contextMenu.lng, contextMenu.sequenceId);
-              setContextMenu(null);
-            }}
-          >
-            📐 Bend / Re-align Streetview Line {contextMenu.sequenceId ? `(${contextMenu.sequenceId.slice(0, 8)}...)` : ''}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                handleStartAligningAtCoord(contextMenu.lat, contextMenu.lng, contextMenu.sequenceId);
+                setContextMenu(null);
+              }}
+            >
+              📐 Bend / Re-align Streetview Line {contextMenu.sequenceId ? `(${contextMenu.sequenceId.slice(0, 8)}...)` : ''}
+            </button>
+          )}
           {isAdmin && contextMenu.sequenceId && (
             <>
               {streetviewAlignmentService.getAlignedSequence(contextMenu.sequenceId) && (
@@ -2849,6 +2939,7 @@ export default function App() {
         touristSpots={touristSpots}
         onRouteToSpot={(coords) => {
           setRouteDestination(coords);
+          setRouteData(null);
           setSidebarTab('routing');
           setSidebarOpen(true);
           if (userLocation) {
