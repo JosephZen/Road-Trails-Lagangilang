@@ -14,7 +14,7 @@ const INTERSECTION_LINKS_STORAGE_KEY = 'mapillary_intersection_links_v1';
 const SEQUENCE_BRIDGES_STORAGE_KEY = 'mapillary_sequence_bridges_v1';
 const NEON_URL_KEY = 'lagangilang_neon_db_url';
 const DEFAULT_NEON_URL =
-  'postgresql://neondb_owner:npg_NCe0hgVyZ7qx@ep-shy-art-aoq0wgaf-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+  'postgresql://neondb_owner:npg_lHhZV7o5xvMt@ep-silent-heart-azsxtkkj-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
 const MAPILLARY_GRAPH_API = 'https://graph.mapillary.com';
 const ACCESS_TOKEN = 'MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9';
 

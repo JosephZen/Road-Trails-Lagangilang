@@ -250,7 +250,7 @@ class HotlinesService {
         const NEON_URL =
           (typeof localStorage !== 'undefined' && localStorage.getItem('lagangilang_neon_db_url')) ||
           import.meta.env.VITE_NEON_DATABASE_URL ||
-          'postgresql://neondb_owner:npg_NCe0hgVyZ7qx@ep-shy-art-aoq0wgaf-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+          'postgresql://neondb_owner:npg_lHhZV7o5xvMt@ep-silent-heart-azsxtkkj-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
         import('@neondatabase/serverless').then(({ neon }) => {
           const sql = neon(NEON_URL);
           sql`

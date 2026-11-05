@@ -7,7 +7,7 @@ export const config = {
 const DB_URL =
   process.env.VITE_NEON_DATABASE_URL ||
   process.env.NEON_DATABASE_URL ||
-  'postgresql://neondb_owner:npg_NCe0hgVyZ7qx@ep-shy-art-aoq0wgaf-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+  'postgresql://neondb_owner:npg_lHhZV7o5xvMt@ep-silent-heart-azsxtkkj-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

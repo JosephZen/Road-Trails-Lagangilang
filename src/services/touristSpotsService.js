@@ -8,7 +8,7 @@ const DELETED_KEY = 'lagangilang_deleted_spot_ids_v1';
 const NEON_URL_KEY = 'lagangilang_neon_db_url';
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 const DEFAULT_NEON_URL =
-  'postgresql://neondb_owner:npg_NCe0hgVyZ7qx@ep-shy-art-aoq0wgaf-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+  'postgresql://neondb_owner:npg_lHhZV7o5xvMt@ep-silent-heart-azsxtkkj-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
 
 // Obsolete spot IDs from previous seed prototypes that must never be shown
 const OBSOLETE_SPOT_IDS = new Set([
