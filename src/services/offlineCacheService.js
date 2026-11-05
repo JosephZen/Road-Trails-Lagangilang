@@ -489,6 +489,24 @@ class OfflineCacheService {
       color: #ffffff !important;
     }
 
+    /* MapLibre Attribution & Accuracy Disclaimer Note */
+    .maplibregl-ctrl-attrib {
+      background-color: rgba(255, 255, 255, 0.94) !important;
+      color: #1e293b !important;
+      font-size: 11px !important;
+      line-height: 1.4 !important;
+      padding: 3px 10px !important;
+      border-radius: 6px 0 0 0 !important;
+      max-width: 95vw !important;
+      white-space: normal !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+    }
+    .maplibregl-ctrl-attrib em, .offline-map-accuracy-note {
+      font-style: italic !important;
+      color: #334155 !important;
+      font-weight: 500 !important;
+    }
+
     /* 360 Panorama Modal */
     #pano-modal {
       position: fixed;
@@ -670,6 +688,7 @@ class OfflineCacheService {
       container: 'map',
       center: [120.7340, 17.6142],
       zoom: 13.8,
+      attributionControl: false,
       style: {
         version: 8,
         sources: {
@@ -693,6 +712,10 @@ class OfflineCacheService {
     });
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    map.addControl(new maplibregl.AttributionControl({
+      compact: false,
+      customAttribution: '<em>This Offline Map may not reflect to the actual locations indicated, please cross reference the online version for more accurate information</em>'
+    }), 'bottom-right');
     document.getElementById('all-count').textContent = spots.length;
 
     // Helper: determine pin icon, class, label, and category group

@@ -185,7 +185,7 @@ export default function MapView({
               type: 'raster',
               tiles: ['lagangilang-offline://{z}/{x}/{y}'],
               tileSize: 256,
-              attribution: 'Offline Map &copy; Lagangilang Eco-Trails',
+              attribution: 'Offline Map &copy; Lagangilang Eco-Trails &bull; <em>This Offline Map may not reflect to the actual locations indicated, please cross reference the online version for more accurate information</em>',
             },
           },
           layers: [
