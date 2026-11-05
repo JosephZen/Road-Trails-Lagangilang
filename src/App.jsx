@@ -1035,6 +1035,58 @@ export default function App() {
     showToast('🛡️ Admin Panel unlocked — Marker dragging & location marking enabled');
   }, [showToast]);
 
+  // Secret 5-tap developer mode gesture on "Road & Trail" to access Admin Mode
+  const brandTapCountRef = useRef(0);
+  const brandTapTimerRef = useRef(null);
+
+  const handleBrandPillTap = useCallback(() => {
+    if (brandTapTimerRef.current) {
+      clearTimeout(brandTapTimerRef.current);
+    }
+
+    brandTapCountRef.current += 1;
+    const currentTaps = brandTapCountRef.current;
+
+    // Reset tap sequence after 2.5 seconds of inactivity
+    brandTapTimerRef.current = setTimeout(() => {
+      brandTapCountRef.current = 0;
+    }, 2500);
+
+    // Subtle tactile feedback on supported mobile/touch devices
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(35);
+      } catch (_) {}
+    }
+
+    if (isAdmin) {
+      if (currentTaps >= 5) {
+        brandTapCountRef.current = 0;
+        showToast('🛡️ Admin Panel is already active');
+      }
+      return;
+    }
+
+    // Android Developer Options style progressive feedback
+    if (currentTaps === 3) {
+      showToast('🛠️ 2 taps away from Admin Access...');
+    } else if (currentTaps === 4) {
+      showToast('🛠️ 1 tap away from Admin Access...');
+    } else if (currentTaps >= 5) {
+      brandTapCountRef.current = 0;
+      if (brandTapTimerRef.current) clearTimeout(brandTapTimerRef.current);
+      setIsChangePasswordMode(false);
+      setShowAdminPasswordModal(true);
+      showToast('🔐 Enter Admin Password to unlock');
+    }
+  }, [isAdmin, showToast]);
+
+  useEffect(() => {
+    return () => {
+      if (brandTapTimerRef.current) clearTimeout(brandTapTimerRef.current);
+    };
+  }, []);
+
   const stagedCount = touristSpots.filter((s) => s.sync_status === 'staged_local').length;
 
   return (
@@ -1118,9 +1170,19 @@ export default function App() {
           ) : (
             /* Horizontally scrollable/dynamic action bar across all aspect ratios */
             <div className="nav-scroll-container">
-            {/* Tourism Brand Header Pill */}
+            {/* Tourism Brand Header Pill (5-tap secret Admin Access) */}
             <div
               className="brand-pill"
+              onClick={handleBrandPillTap}
+              role="button"
+              tabIndex={0}
+              title="Road & Trail • Lagangilang Tourism System"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleBrandPillTap();
+                }
+              }}
               style={{
                 fontSize: '0.82rem',
                 fontWeight: 700,
@@ -1135,6 +1197,23 @@ export default function App() {
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
                 backdropFilter: 'blur(8px)',
+                cursor: 'pointer',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                touchAction: 'manipulation',
+                transition: 'transform 0.1s ease, background 0.15s ease',
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = 'scale(0.95)';
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              onTouchStart={(e) => {
+                e.currentTarget.style.transform = 'scale(0.95)';
+              }}
+              onTouchEnd={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
               }}
             >
               <span>🌲</span>
@@ -1903,30 +1982,33 @@ export default function App() {
           {/* Tab: Tools (Tablet & Mobile Optimized Quick-Access Hub) */}
           {sidebarTab === 'tools' && (
             <div className="sidebar-body sidebar-tools-container" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
-                  User Role & Permissions
-                </span>
-                <button
-                  className={`btn ${isAdmin ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={handleRoleToggle}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 14px',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
-                    width: '100%',
-                  }}
-                >
-                  <span>{isAdmin ? '🛡️ Admin Panel Active' : '🌴 Tourist Explorer Active'}</span>
-                  <span style={{ fontSize: '0.78rem', opacity: 0.8 }}>
-                    {isAdmin ? 'Switch to Tourist' : 'Switch to Admin (PW)'}
+              {/* Discrete Role Switch: Only visible when Admin is already unlocked */}
+              {isAdmin && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
+                    User Role & Permissions
                   </span>
-                </button>
-              </div>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleRoleToggle}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '0.88rem',
+                      fontWeight: 600,
+                      width: '100%',
+                    }}
+                  >
+                    <span>🛡️ Admin Panel Active</span>
+                    <span style={{ fontSize: '0.78rem', opacity: 0.85 }}>
+                      Switch to Tourist (Logout)
+                    </span>
+                  </button>
+                </div>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
@@ -2202,50 +2284,7 @@ export default function App() {
                     <span>{isOnline ? '🟢 Connected ⚙️' : '🟡 Offline Buffer ⚙️'}</span>
                   </div>
                 </div>
-              ) : (
-                <div style={{
-                  padding: '16px',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'rgba(15, 23, 42, 0.65)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  fontSize: '0.82rem',
-                  color: 'var(--text-secondary)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px',
-                  marginTop: '6px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.1rem' }}>🛡️</span>
-                    <span style={{ fontWeight: 700, color: '#f8fafc' }}>Administrative Portal</span>
-                  </div>
-                  <span style={{ color: '#94a3b8', fontSize: '0.78rem', lineHeight: '1.4' }}>
-                    Authorized municipal tourism staff can authenticate to add attractions, reposition pins, re-align street view trails, and manage excluded nodes.
-                  </span>
-                  <button
-                    className="btn btn-secondary btn-block"
-                    onClick={() => {
-                      setIsChangePasswordMode(false);
-                      setShowAdminPasswordModal(true);
-                      setSidebarOpen(false);
-                    }}
-                    style={{
-                      background: 'rgba(59, 130, 246, 0.15)',
-                      border: '1px solid rgba(59, 130, 246, 0.35)',
-                      color: '#93c5fd',
-                      fontWeight: 600,
-                      padding: '10px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <span>🔐</span>
-                    <span>Admin Login</span>
-                  </button>
-                </div>
-              )}
+              ) : null}
             </div>
           )}
 
