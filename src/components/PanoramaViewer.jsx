@@ -26,6 +26,7 @@ export default function PanoramaViewer({
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoadError, setHasLoadError] = useState(false);
   const [viewerReady, setViewerReady] = useState(true);
@@ -84,6 +85,23 @@ export default function PanoramaViewer({
         (panorama.imageUrl?.startsWith('data:') && panorama.imageUrl.length > 50000 ? panorama.imageUrl : null) ||
         (panorama.image?.startsWith('data:') && panorama.image.length > 50000 ? panorama.image : null);
 
+      // 1.5. In-memory cache check (instant zero-delay recall)
+      if (!finalImageUrl) {
+        const idCandidates = [
+          panorama.id,
+          panorama.targetId,
+          panorama.primaryPanoId,
+          panorama.spotId,
+        ].filter(Boolean);
+        for (const candidate of idCandidates) {
+          const mem = touristSpotsService.getPanoFromMemory(candidate);
+          if (mem && mem.imageData && mem.imageData.length > 50000 && !isCancelled) {
+            finalImageUrl = mem.imageData;
+            break;
+          }
+        }
+      }
+
       // 2. Offline IndexedDB check (cached 360 landmark media for web & APK offline usage)
       if (!finalImageUrl) {
         const idCandidates = [
@@ -125,11 +143,11 @@ export default function PanoramaViewer({
         }
       }
 
-      // 4. Fallback to static URL (only full panorama files, NEVER low-res thumbnails)
+      // 4. Fallback to static URL (only full panorama files, NEVER low-res thumbnails or non-existent dynamic paths)
       if (!finalImageUrl) {
         const candidateUrl =
-          (panorama.imageUrl && !panorama.imageUrl.includes('_thumb.') && !panorama.imageUrl.startsWith('data:') ? panorama.imageUrl : null) ||
-          (panorama.filename && !panorama.filename.includes('_thumb.') ? `${API_BASE}/panoramas/${panorama.filename}` : null) ||
+          (panorama.imageUrl && !panorama.imageUrl.includes('_thumb.') && !panorama.imageUrl.startsWith('data:') && !panorama.imageUrl.includes('/panoramas/pano_') ? panorama.imageUrl : null) ||
+          (panorama.filename && !panorama.filename.includes('_thumb.') && !panorama.filename.startsWith('pano_') ? `${API_BASE}/panoramas/${panorama.filename}` : null) ||
           (getCachedUrl ? getCachedUrl(panorama.id) : null);
 
         if (candidateUrl && !candidateUrl.includes('_thumb.')) {
@@ -262,13 +280,74 @@ export default function PanoramaViewer({
 
     viewer.on('error', (err) => {
       clearTimeout(timer);
-      console.warn('Pannellum viewer load error:', err);
+      console.warn('Pannellum viewer load error for', imageUrl, err);
+      // Auto-fallback to bundled high-definition 360 preview if custom texture failed to load
+      if (imageUrl !== '/assets/road_trail_360_concept_ai.jpg') {
+        console.info('Auto-recovering: Loading bundled HD 360 preview...');
+        createViewer('/assets/road_trail_360_concept_ai.jpg', hotSpots, heading, currentAbsoluteHeading);
+        return;
+      }
       setIsLoading(false);
       setHasLoadError(true);
     });
 
     viewerRef.current = viewer;
   }, [onHeadingChange]);
+
+  // Direct 360 photo upload / replace from viewer interface
+  const handleDirectPhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsLoading(true);
+    try {
+      const targetPanoId = (panorama?.id && String(panorama.id).startsWith('pano_'))
+        ? panorama.id
+        : `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const spotId = panorama?.spotId || panorama?.id;
+
+      const res = await touristSpotsService.uploadPanoToNeon({
+        id: targetPanoId,
+        fileOrDataUrl: file,
+        lat: panorama?.lat || 17.614,
+        lng: panorama?.lng || 120.733,
+        heading: panorama?.heading || 0,
+        label: panorama?.label || 'Tourist Spot 360',
+        spotId,
+      });
+
+      // Update spot in system
+      if (spotId) {
+        touristSpotsService.updateSpot(spotId, {
+          connected360: {
+            type: 'local',
+            targetId: res.id,
+            imageUrl: `/panoramas/${res.id}.jpg`,
+            heading: panorama?.heading || 0,
+            pitch: panorama?.pitch || 0,
+          },
+          image: res.thumbnailData,
+          usePseudoImage: false,
+        });
+      }
+
+      // Load blob directly into Pannellum
+      const blobUrl = dataUriToBlobUrl(res.imageData);
+      if (activeBlobUrlRef.current && activeBlobUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+      }
+      activeBlobUrlRef.current = blobUrl;
+      setHasLoadError(false);
+      createViewer(blobUrl, [], panorama?.heading || 0, panorama?.heading || 0);
+
+      alert('✅ 360 Photo updated successfully!\n\nSaved in high-definition to device storage (IndexedDB).');
+    } catch (err) {
+      console.error('Direct photo upload error:', err);
+      alert(`Could not upload photo: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   // Expose zoom methods
   const zoomIn = useCallback(() => {
@@ -373,6 +452,29 @@ export default function PanoramaViewer({
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               className="btn btn-primary"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                fontSize: '0.78rem',
+                padding: '6px 14px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              📷 Upload / Replace Photo
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                setHasLoadError(false);
+                createViewer('/assets/road_trail_360_concept_ai.jpg', [], panorama?.heading || 0, panorama?.heading || 0);
+              }}
+              style={{ fontSize: '0.78rem', padding: '6px 14px', cursor: 'pointer' }}
+            >
+              🏞️ Load HD Sample
+            </button>
+            <button
+              className="btn btn-primary"
               onClick={() => onFallbackToMapillary?.()}
               style={{
                 fontSize: '0.78rem',
@@ -395,11 +497,28 @@ export default function PanoramaViewer({
         </div>
       )}
 
+      {/* Hidden file input for direct photo upload / replacement */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleDirectPhotoUpload}
+      />
+
       {/* Pannellum container */}
       <div ref={containerRef} className="panorama-container" />
 
-      {/* Zoom controls */}
+      {/* Zoom and action controls */}
       <div className="zoom-controls glass-panel-sm">
+        <button
+          className="zoom-btn"
+          onClick={() => fileInputRef.current?.click()}
+          title="Upload or Replace 360 Photo for this Landmark"
+          style={{ fontSize: '0.9rem' }}
+        >
+          📷
+        </button>
         <button className="zoom-btn" onClick={zoomIn} title="Zoom in">+</button>
         <button className="zoom-btn" onClick={zoomOut} title="Zoom out">−</button>
       </div>

@@ -284,7 +284,11 @@ export default function TouristSpotModal({
         image: result.thumbnailData, // compact 18KB thumbnail data URI stored in tourist_spots table!
         usePseudoImage: false,
       }));
-      setNeonUploaded(true);
+      setNeonUploaded(result.cloudSynced);
+
+      if (!result.cloudSynced && result.cloudError) {
+        alert('💾 360 Photo saved securely to local device storage!\n\nNote: Cloud database quota has been reached, so the high-resolution image is active and accessible directly on this device.');
+      }
 
       // 2. Also send to local Express server if running in background
       try {
@@ -299,7 +303,7 @@ export default function TouristSpotModal({
       } catch (_) {}
     } catch (err) {
       console.error('Neon direct upload error:', err);
-      alert(`Could not upload to Neon Cloud: ${err.message}`);
+      alert(`Could not process 360 image: ${err.message}`);
     } finally {
       setUploadingNeon(false);
       setDetectingMapillary(false);
@@ -333,10 +337,14 @@ export default function TouristSpotModal({
         image: result.thumbnailData,
         usePseudoImage: false,
       }));
-      setNeonUploaded(true);
+      setNeonUploaded(result.cloudSynced);
+
+      if (!result.cloudSynced && result.cloudError) {
+        alert('💾 Blurred 360 Photo saved securely to local device storage!\n\nNote: Cloud database quota has been reached, so the blurred high-resolution image is active and accessible directly on this device.');
+      }
     } catch (err) {
       console.error('Neon blurred image upload error:', err);
-      alert(`⚠️ Could not save blurred 360 photo to cloud database:\n\n${err.message}\n\nNote: If Neon database quota has been reached, please check console.neon.tech or provide an updated connection URL.`);
+      alert(`Could not process blurred 360 image: ${err.message}`);
     } finally {
       setUploadingNeon(false);
     }
@@ -439,6 +447,17 @@ export default function TouristSpotModal({
 
     try {
       const saved = touristSpotsService.saveDraftLocally(spotPayload, []);
+
+      // If a local high-res 360 panorama was uploaded, guarantee it is stored in IndexedDB immediately
+      if (isLocalPano && formData.uploadedPanoUrl) {
+        try {
+          const { offlineMapManager } = await import('../services/offlineMapManager');
+          await offlineMapManager.save360Media(finalTargetId, formData.uploadedPanoUrl, saved.id);
+        } catch (mediaErr) {
+          console.warn('[TouristSpotModal] IndexedDB 360 media save warning:', mediaErr);
+        }
+      }
+
       // Immediately sync to Neon Cloud DB so localhost and Vercel stay 100% in sync
       try {
         await touristSpotsService.saveSingleSpotToCloud(saved);

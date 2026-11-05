@@ -366,13 +366,16 @@ class OfflineMapManager {
       for (const s of touristSpots) {
         const spotImg = s.imageUrl || s.image;
         if (spotImg && typeof spotImg === 'string' && spotImg.startsWith('data:')) {
-          await this.put360Media(db, s.id, { dataUri: spotImg, spotId: s.id });
           await this.put360Media(db, `${s.id}_cover`, { dataUri: spotImg, spotId: s.id });
-          if (s.primary_pano_id) {
-            await this.put360Media(db, s.primary_pano_id, { dataUri: spotImg, spotId: s.id });
-          }
-          if (s.connected360?.targetId) {
-            await this.put360Media(db, s.connected360.targetId, { dataUri: spotImg, spotId: s.id });
+          // Strictly only cache as 360 sphere texture if > 50KB to prevent low-res card thumbnails from polluting the viewer
+          if (spotImg.length > 50000) {
+            await this.put360Media(db, s.id, { dataUri: spotImg, spotId: s.id });
+            if (s.primary_pano_id) {
+              await this.put360Media(db, s.primary_pano_id, { dataUri: spotImg, spotId: s.id });
+            }
+            if (s.connected360?.targetId) {
+              await this.put360Media(db, s.connected360.targetId, { dataUri: spotImg, spotId: s.id });
+            }
           }
         }
       }

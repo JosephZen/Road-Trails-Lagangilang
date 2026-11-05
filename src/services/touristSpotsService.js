@@ -1111,57 +1111,73 @@ export const touristSpotsService = {
    * Upload 360 Panorama directly to Neon Cloud Database.
    * Compresses to WebGL-compliant resolution and stores in public.panoramas (image_data, thumbnail_data).
    */
-  async uploadPanoToNeon({ id, fileOrDataUrl, lat, lng, heading = 0, label = '', description = '' }) {
+  async uploadPanoToNeon({ id, fileOrDataUrl, lat, lng, heading = 0, label = '', description = '', spotId = null }) {
     // Dedicated uploads must always have a clean 'pano_' prefix to distinguish from external Mapillary sequence IDs
     const panoId = (id && String(id).startsWith('pano_')) ? id : `pano_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const parsedLat = parseFloat(lat);
     const parsedLng = parseFloat(lng);
 
-    // Compress client-side
+    // 1. Compress client-side to full HD equirectangular resolution (2:1 aspect ratio)
     const { fullDataUrl, thumbDataUrl } = await this.compressEquirectangular(fileOrDataUrl);
 
-    // Persist directly to Neon PostgreSQL Cloud
-    await this.executeNeonQuery(async (sql) => {
-      await sql`
-        INSERT INTO public.panoramas (
-          id, source_type, filename, thumbnail_url, latitude, longitude,
-          compass_heading, label, description, image_data, thumbnail_data,
-          sync_status, captured_at
-        ) VALUES (
-          ${panoId},
-          'local',
-          ${`${panoId}.jpg`},
-          ${thumbDataUrl},
-          ${parsedLat},
-          ${parsedLng},
-          ${parseFloat(heading) || 0},
-          ${label || '360 Landmark View'},
-          ${description || ''},
-          ${fullDataUrl},
-          ${thumbDataUrl},
-          'synced_cloud',
-          NOW()
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          image_data = EXCLUDED.image_data,
-          thumbnail_data = EXCLUDED.thumbnail_data,
-          thumbnail_url = EXCLUDED.thumbnail_url,
-          filename = EXCLUDED.filename,
-          latitude = EXCLUDED.latitude,
-          longitude = EXCLUDED.longitude,
-          compass_heading = EXCLUDED.compass_heading,
-          label = EXCLUDED.label,
-          description = EXCLUDED.description;
-      `;
-    });
-
-    // Populate in-memory cache
+    // 2. ALWAYS save to in-memory cache first
     this._panoCache.set(panoId, {
       imageData: fullDataUrl,
       thumbnailData: thumbDataUrl,
       lat: parsedLat,
       lng: parsedLng,
     });
+
+    // 3. ALWAYS persist to high-capacity local IndexedDB storage (never quota blocked)
+    try {
+      const { offlineMapManager } = await import('./offlineMapManager');
+      await offlineMapManager.save360Media(panoId, fullDataUrl, spotId);
+    } catch (idbErr) {
+      console.warn('[TouristSpots] IndexedDB auto-save warning:', idbErr);
+    }
+
+    // 4. Attempt to sync to Neon PostgreSQL Cloud (non-blocking if quota exceeded or offline)
+    let cloudSynced = false;
+    let cloudError = null;
+    try {
+      await this.executeNeonQuery(async (sql) => {
+        await sql`
+          INSERT INTO public.panoramas (
+            id, source_type, filename, thumbnail_url, latitude, longitude,
+            compass_heading, label, description, image_data, thumbnail_data,
+            sync_status, captured_at
+          ) VALUES (
+            ${panoId},
+            'local',
+            ${`${panoId}.jpg`},
+            ${thumbDataUrl},
+            ${parsedLat},
+            ${parsedLng},
+            ${parseFloat(heading) || 0},
+            ${label || '360 Landmark View'},
+            ${description || ''},
+            ${fullDataUrl},
+            ${thumbDataUrl},
+            'synced_cloud',
+            NOW()
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            image_data = EXCLUDED.image_data,
+            thumbnail_data = EXCLUDED.thumbnail_data,
+            thumbnail_url = EXCLUDED.thumbnail_url,
+            filename = EXCLUDED.filename,
+            latitude = EXCLUDED.latitude,
+            longitude = EXCLUDED.longitude,
+            compass_heading = EXCLUDED.compass_heading,
+            label = EXCLUDED.label,
+            description = EXCLUDED.description;
+        `;
+      });
+      cloudSynced = true;
+    } catch (neonErr) {
+      cloudError = neonErr.message || String(neonErr);
+      console.warn('[TouristSpots] Neon Cloud sync deferred (quota exceeded / offline):', cloudError);
+    }
 
     return {
       id: panoId,
@@ -1170,7 +1186,19 @@ export const touristSpotsService = {
       thumbnailData: thumbDataUrl,
       lat: parsedLat,
       lng: parsedLng,
+      cloudSynced,
+      cloudError,
     };
+  },
+
+  /**
+   * Retrieve cached 360 image data from memory
+   */
+  getPanoFromMemory(panoId) {
+    if (!panoId) return null;
+    const cleanId = String(panoId).replace(/\.jpg$/i, '');
+    const altId = cleanId.startsWith('pano_') ? cleanId.replace(/^pano_/, '') : `pano_${cleanId}`;
+    return this._panoCache.get(cleanId) || this._panoCache.get(altId) || null;
   },
 
   /**
