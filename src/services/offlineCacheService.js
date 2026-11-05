@@ -128,8 +128,8 @@ class OfflineCacheService {
 
   /**
    * Generate and trigger download of a self-contained interactive offline HTML map file
-   * Built with real interactive Leaflet & embedded Base64 tile dictionary + full POIs, Checkpoints, 360° Panoramas, and Hotlines.
-   * Completely immune to OpenStreetMap 403 blocks and works 100% offline with zero external tile dependencies.
+   * Built with official MapLibre GL JS & embedded Base64 tile dictionary + full POIs, Checkpoints, 360° Panoramas, and Hotlines.
+   * Completely immune to 403 blocks, 100% offline capable, with categorized spot cards (no search box) matching hotlines.
    */
   downloadOfflineMapHtml(spots = [], tileDictionary = {}, media360Dictionary = {}) {
     const spotsData = JSON.stringify(spots || []);
@@ -144,45 +144,276 @@ class OfflineCacheService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0">
-  <title>Lagangilang Road & Trail • Interactive Offline Map Guide</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <title>Lagangilang Road & Trail • MapLibre Standalone Offline Map Guide</title>
+  
+  <!-- MapLibre GL JS -->
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+  <!-- Pannellum 360 Panorama Viewer -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; flex-direction: column; min-height: 100vh; }
-    header { background: #1e293b; padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; position: sticky; top: 0; z-index: 1000; }
-    header h1 { font-size: 1.05rem; color: #38bdf8; display: flex; align-items: center; gap: 8px; font-weight: 800; }
-    .badge-offline { background: #10b981; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0b1120;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    header {
+      background: #0f172a;
+      padding: 12px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    header h1 {
+      font-size: 1.1rem;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+    .badge-offline {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 999px;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
     
-    /* Real Leaflet Map Container */
-    #map { width: 100%; height: 55vh; min-height: 380px; z-index: 10; border-bottom: 2px solid #334155; }
+    /* Interactive MapLibre Container */
+    #map {
+      width: 100%;
+      height: 52vh;
+      min-height: 380px;
+      z-index: 10;
+      border-bottom: 2px solid #1e293b;
+      position: relative;
+    }
     
-    /* Filter Bar */
-    .filter-bar { background: #1e293b; padding: 10px 18px; display: flex; gap: 6px; overflow-x: auto; border-bottom: 1px solid rgba(255,255,255,0.06); }
-    .filter-btn { padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
-    .filter-btn.active { background: #0284c7; color: #ffffff; border-color: #38bdf8; }
+    /* Category Filter Bar */
+    .filter-bar {
+      background: #0f172a;
+      padding: 10px 18px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .filter-btn {
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #94a3b8;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .filter-btn:hover {
+      background: rgba(255,255,255,0.08);
+      color: #f1f5f9;
+    }
+    .filter-btn.active {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #ffffff;
+      border-color: #38bdf8;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4);
+    }
     
-    /* Content Columns */
-    .content-container { padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; flex: 1; }
-    .card { background: #1e293b; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
-    .card h2 { font-size: 0.95rem; font-weight: 700; color: #f1f5f9; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px; }
-    .search-input { width: 100%; padding: 8px 12px; border-radius: 8px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.82rem; margin-bottom: 12px; outline: none; }
-    
-    .spot-item { padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,0.03); margin-bottom: 8px; cursor: pointer; transition: all 0.15s; border: 1px solid transparent; }
-    .spot-item:hover, .spot-item.active { background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.4); transform: translateX(2px); }
-    .spot-title { font-weight: 700; font-size: 0.86rem; color: #ffffff; display: flex; justify-content: space-between; align-items: center; }
-    .spot-meta { font-size: 0.73rem; color: #94a3b8; margin-top: 3px; line-height: 1.3; }
-    
-    .hotline-item { padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); margin-bottom: 10px; }
-    .hotline-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; font-size: 0.78rem; font-weight: 700; text-decoration: none; margin-top: 8px; margin-right: 6px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4); border: none; cursor: pointer; }
-    .rule-item { display: flex; gap: 8px; margin-bottom: 10px; font-size: 0.8rem; line-height: 1.4; color: #cbd5e1; }
-    
-    /* Unified Teardrop Pin Badges */
-    .leaflet-popup-content-wrapper { background: #1e293b !important; color: #f8fafc !important; border: 1px solid #38bdf8 !important; border-radius: 12px !important; }
-    .leaflet-popup-tip { background: #1e293b !important; }
+    /* 3-Column Content Container */
+    .content-container {
+      padding: 16px 18px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      flex: 1;
+    }
+    .card {
+      background: #0f172a;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+    }
+    .card h2 {
+      font-size: 0.96rem;
+      font-weight: 800;
+      color: #f1f5f9;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 10px;
+      letter-spacing: -0.2px;
+    }
+
+    /* Categorized Spots Section */
+    .category-group {
+      margin-bottom: 16px;
+    }
+    .category-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(255,255,255,0.04);
+      border-left: 3px solid #38bdf8;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: #38bdf8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .category-count {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
+    /* Spot & Hotline Items (Card Format matching hotlines) */
+    .spot-card-item {
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.07);
+      margin-bottom: 10px;
+      transition: all 0.2s ease;
+    }
+    .spot-card-item:hover {
+      background: rgba(56, 189, 248, 0.06);
+      border-color: rgba(56, 189, 248, 0.35);
+      transform: translateY(-1px);
+    }
+    .spot-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .spot-card-title {
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .spot-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .spot-badge-tourist { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .spot-badge-poi { background: rgba(56, 189, 248, 0.18); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+    .spot-badge-checkpoint { background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .spot-badge-emergency { background: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+
+    .spot-card-sub {
+      font-size: 0.72rem;
+      color: #94a3b8;
+      margin: 4px 0 6px 0;
+      line-height: 1.35;
+    }
+    .spot-card-desc {
+      font-size: 0.74rem;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .action-btn-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+    }
+    .btn-focus {
+      background: rgba(255,255,255,0.08);
+      color: #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .btn-focus:hover {
+      background: rgba(255,255,255,0.15);
+      color: #ffffff;
+    }
+    .btn-call {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);
+    }
+    .btn-pano {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+    }
+
+    .rule-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      color: #cbd5e1;
+      padding: 10px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* MapLibre Teardrop Pin Markers */
     .custom-map-pin {
-      width: 30px;
-      height: 30px;
+      width: 32px;
+      height: 32px;
       border-radius: 50% 50% 50% 0;
       transform: rotate(-45deg);
       display: flex;
@@ -190,42 +421,145 @@ class OfflineCacheService {
       justify-content: center;
       border: 2px solid #ffffff;
       box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-      transition: all 0.2s ease;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .custom-map-pin:hover {
+      transform: rotate(-45deg) scale(1.18);
+      z-index: 1000;
     }
     .custom-map-pin span {
       transform: rotate(45deg);
-      font-size: 14px;
+      font-size: 15px;
       display: inline-block;
       line-height: 1;
     }
-    .pin-checkpoint { background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important; border-color: #4ade80 !important; }
-    .pin-emergency { background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important; border-color: #f87171 !important; }
-    .pin-nature { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important; border-color: #5eead4 !important; }
-    .pin-heritage { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; border-color: #b45309 !important; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.7) !important; }
-    .pin-cafe { background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%) !important; border-color: #fb923c !important; }
-    .pin-service { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important; border-color: #7dd3fc !important; }
-    .pin-tourist { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; border-color: #b45309 !important; }
+    .pin-tourist {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+      border-color: #ffd700 !important;
+      box-shadow: 0 0 14px rgba(245, 158, 11, 0.7) !important;
+    }
+    .pin-checkpoint {
+      background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important;
+      border-color: #4ade80 !important;
+    }
+    .pin-emergency {
+      background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important;
+      border-color: #f87171 !important;
+    }
+    .pin-nature {
+      background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important;
+      border-color: #5eead4 !important;
+    }
+    .pin-service {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+      border-color: #7dd3fc !important;
+    }
+
+    /* MapLibre Popup Styles */
+    .maplibregl-popup-content {
+      background: #0f172a !important;
+      color: #f8fafc !important;
+      border: 1.5px solid #38bdf8 !important;
+      border-radius: 12px !important;
+      padding: 14px !important;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
+      min-width: 220px !important;
+    }
+    .maplibregl-popup-tip {
+      border-top-color: #38bdf8 !important;
+      border-bottom-color: #38bdf8 !important;
+    }
+    .maplibregl-popup-close-button {
+      color: #94a3b8 !important;
+      font-size: 1.2rem !important;
+      padding: 4px 8px !important;
+    }
+    .maplibregl-popup-close-button:hover {
+      color: #ffffff !important;
+    }
 
     /* 360 Panorama Modal */
-    #pano-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 10000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
-    #pano-modal.active { display: flex; }
-    #pano-img-container { width: 100%; max-width: 900px; height: 70vh; background: #000; border-radius: 12px; overflow: hidden; position: relative; border: 1.5px solid #38bdf8; display: flex; align-items: center; justify-content: center; }
-    #pano-img { width: 100%; height: 100%; object-fit: cover; }
-    .pano-close-btn { position: absolute; top: 14px; right: 14px; background: rgba(15,23,42,0.85); border: 1px solid rgba(255,255,255,0.3); color: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    #pano-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.94);
+      z-index: 10000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      backdrop-filter: blur(8px);
+    }
+    #pano-modal.active {
+      display: flex;
+    }
+    #pano-container {
+      width: 100%;
+      max-width: 950px;
+      height: 72vh;
+      background: #000;
+      border-radius: 14px;
+      overflow: hidden;
+      position: relative;
+      border: 1.5px solid #38bdf8;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.9);
+    }
+    .pano-close-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: rgba(15,23,42,0.85);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10002;
+    }
+    .pano-title-badge {
+      position: absolute;
+      bottom: 14px;
+      left: 16px;
+      background: rgba(15,23,42,0.88);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      color: #38bdf8;
+      font-weight: 700;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      z-index: 10002;
+    }
+    #pano-viewer-div {
+      width: 100%;
+      height: 100%;
+    }
+    #pano-fallback-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>🌲 Road & Trail • Lagangilang, Abra</h1>
     <div>
-      <span class="badge-offline">Interactive Offline Map (${generatedDate})</span>
+      <span class="badge-offline">🗺️ MapLibre Offline Guide (${generatedDate})</span>
     </div>
   </header>
 
-  <!-- Interactive Real Map Container -->
+  <!-- Interactive MapLibre GL Map -->
   <div id="map"></div>
 
-  <!-- Category Filters -->
+  <!-- Category Filter Bar -->
   <div class="filter-bar">
     <button class="filter-btn active" onclick="filterCategory('all', this)">All Landmarks (<span id="all-count">0</span>)</button>
     <button class="filter-btn" onclick="filterCategory('tourist_spot', this)">🏞️ Tourist Spots</button>
@@ -234,33 +568,43 @@ class OfflineCacheService {
     <button class="filter-btn" onclick="filterCategory('services', this)">🏪 Local Services & POIs</button>
   </div>
 
-  <!-- Directory & Emergency Content -->
+  <!-- 3-Column Content Container -->
   <div class="content-container">
+    <!-- Column 1: POIs & Tourist Spots (Categorized list, no search box) -->
     <div class="card">
-      <h2>📍 Directory (<span id="list-count">0</span>)</h2>
-      <input type="text" id="search-box" class="search-input" placeholder="🔍 Search spots, caves, rivers, stations..." oninput="handleSearch()">
-      <div id="spots-list" style="max-height: 480px; overflow-y: auto;"></div>
+      <h2>
+        <span>📍 Landmarks & Tourist Spots</span>
+        <span id="spots-count-badge" class="category-count">0</span>
+      </h2>
+      <div id="spots-categorized-list" style="max-height: 580px; overflow-y: auto; padding-right: 4px;"></div>
     </div>
 
+    <!-- Column 2: Emergency Hotlines & DENR Checkpoint -->
     <div class="card">
-      <h2>🚨 Official Emergency Hotlines & DENR Checkpoint</h2>
-      <div id="hotlines-list"></div>
+      <h2>
+        <span>🚨 Official Emergency Hotlines</span>
+        <span class="category-count">24/7</span>
+      </h2>
+      <div id="hotlines-list" style="max-height: 580px; overflow-y: auto; padding-right: 4px;"></div>
     </div>
 
+    <!-- Column 3: Trail Safety Guidelines -->
     <div class="card">
-      <h2>🛡️ Trail Safety Guidelines</h2>
+      <h2>
+        <span>🛡️ Trail Safety Guidelines</span>
+        <span class="category-count">Official</span>
+      </h2>
       <div id="guidelines-list"></div>
     </div>
   </div>
 
   <!-- 360 Panorama Viewer Modal -->
   <div id="pano-modal" onclick="closePanoModal()">
-    <div id="pano-img-container" onclick="event.stopPropagation()">
+    <div id="pano-container" onclick="event.stopPropagation()">
       <button class="pano-close-btn" onclick="closePanoModal()">✕</button>
-      <img id="pano-img" src="" alt="360 Panorama Landmark" />
-      <div style="position: absolute; bottom: 12px; left: 14px; background: rgba(15,23,42,0.85); padding: 6px 12px; border-radius: 8px; font-size: 0.75rem; color: #38bdf8;">
-        📷 Offline 360° Landmark Panorama
-      </div>
+      <div id="pano-viewer-div"></div>
+      <img id="pano-fallback-img" alt="360 Landmark Panorama" />
+      <div class="pano-title-badge" id="pano-title">📷 360° Landmark View</div>
     </div>
   </div>
 
@@ -272,170 +616,282 @@ class OfflineCacheService {
     const guidelines = ${guidelinesData};
 
     let activeFilter = 'all';
-    let searchQuery = '';
     const markers = [];
+    let currentPannellumViewer = null;
 
-    // Initialize Leaflet Map centered on Lagangilang, Abra
-    const map = L.map('map').setView([17.6142, 120.7340], 14);
+    // Register MapLibre GL custom protocol for 100% offline tile loading with live fallback
+    if (typeof maplibregl !== 'undefined' && maplibregl.addProtocol) {
+      maplibregl.addProtocol('offline-tile', function(params, abortController) {
+        const match = params.url.match(/offline-tile:\\/\\/(\\d+)\\/(\\d+)\\/(\\d+)/);
+        if (match) {
+          const z = match[1], x = match[2], y = match[3];
+          const key = z + '/' + x + '/' + y;
 
-    // Custom Offline & CORS-Safe Tile Layer (Uses Base64 tiles when offline, Esri World Street Map fallback)
-    const OfflineTileLayer = L.TileLayer.extend({
-      createTile: function(coords, done) {
-        const tile = document.createElement('img');
-        const key = coords.z + '/' + coords.x + '/' + coords.y;
+          // 1. Check offline tile dictionary
+          if (window.OFFLINE_TILES && window.OFFLINE_TILES[key]) {
+            const dataUri = window.OFFLINE_TILES[key];
+            try {
+              const base64 = dataUri.split(',')[1];
+              const binary = atob(base64);
+              const bytes = new Uint8Array(binary.length);
+              for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+              return Promise.resolve({ data: bytes.buffer });
+            } catch (err) {
+              console.warn('Tile decode error:', err);
+            }
+          }
 
-        if (window.OFFLINE_TILES && window.OFFLINE_TILES[key]) {
-          tile.src = window.OFFLINE_TILES[key];
-          setTimeout(function() { done(null, tile); }, 0);
-        } else {
-          // Free, CORS-friendly Esri World Street Map (Order: z/y/x, Zero API Key, no watermarks, no 403)
-          tile.src = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/' + coords.z + '/' + coords.y + '/' + coords.x;
-          tile.onload = function() { done(null, tile); };
-          tile.onerror = function(err) { done(null, tile); };
+          // 2. Fallback to Esri World Street Map if connected (Order: z/y/x)
+          const fallbackUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/' + z + '/' + y + '/' + x;
+          return fetch(fallbackUrl, { mode: 'cors' })
+            .then(function(res) {
+              if (!res.ok) throw new Error('Offline tile unavailable');
+              return res.arrayBuffer();
+            })
+            .then(function(buf) { return { data: buf }; })
+            .catch(function() { return { data: new ArrayBuffer(0) }; });
         }
-        return tile;
-      }
-    });
-
-    new OfflineTileLayer('', {
-      maxZoom: 19,
-      attribution: '&copy; Esri &copy; OpenStreetMap contributors • Lagangilang Trails'
-    }).addTo(map);
-
-    document.getElementById('all-count').textContent = spots.length;
-
-    // 17 Official Barangays of Lagangilang, Abra
-    const LAGANGILANG_BARANGAYS_LIST = [
-      { name: 'Aguet', lat: 17.6335, lng: 120.7810 },
-      { name: 'Bacooc', lat: 17.6015, lng: 120.7650 },
-      { name: 'Balais', lat: 17.5850, lng: 120.7580 },
-      { name: 'Cayapa', lat: 17.5920, lng: 120.8050 },
-      { name: 'Dalaguisen', lat: 17.5755, lng: 120.7425 },
-      { name: 'Laang', lat: 17.6145, lng: 120.7285 },
-      { name: 'Lagben', lat: 17.6250, lng: 120.8120 },
-      { name: 'Laguiben', lat: 17.6080, lng: 120.7485 },
-      { name: 'Nagtipulan', lat: 17.6280, lng: 120.7520 },
-      { name: 'Nagtupacan', lat: 17.5945, lng: 120.7450 },
-      { name: 'Paganao', lat: 17.6190, lng: 120.7950 },
-      { name: 'Pawa', lat: 17.5985, lng: 120.7330 },
-      { name: 'Poblacion', lat: 17.6115, lng: 120.7335 },
-      { name: 'Presentar', lat: 17.6045, lng: 120.7310 },
-      { name: 'San Isidro', lat: 17.5890, lng: 120.7690 },
-      { name: 'Tagodtod', lat: 17.6165, lng: 120.7590 },
-      { name: 'Taping', lat: 17.6180, lng: 120.7410 },
-    ];
-    LAGANGILANG_BARANGAYS_LIST.forEach(b => {
-      L.marker([b.lat, b.lng], {
-        icon: L.divIcon({
-          className: 'brgy-label-marker',
-          html: '<div style="font-size:10px; font-weight:700; color:#334155; background:rgba(255,255,255,0.88); padding:2px 6px; border-radius:10px; border:1px solid #cbd5e1; box-shadow:0 1px 3px rgba(0,0,0,0.15); white-space:nowrap; pointer-events:none;">Brgy. ' + b.name + '</div>',
-          iconSize: [80, 16],
-          iconAnchor: [40, 8]
-        }),
-        interactive: false
-      }).addTo(map);
-    });
-
-    function getPinVisual(spot) {
-      const name = (spot.name || '').toLowerCase();
-      const cat = (spot.category || '').toLowerCase();
-      const customSelectedIcon = spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon;
-
-      if (spot.isCheckpoint || cat.includes('checkpoint') || cat.includes('denr') || name.includes('checkpoint')) {
-        return { pinClass: 'pin-checkpoint', icon: customSelectedIcon || '🌲', label: spot.category || 'DENR Checkpoint' };
-      }
-      if (cat.includes('emergency') || cat.includes('police') || cat.includes('rescue') || cat.includes('fire') || cat.includes('medical') || name.includes('police') || name.includes('mdrrmo')) {
-        let icon = '🚨';
-        if (name.includes('mdrrmo') || cat.includes('rescue')) icon = '🚑';
-        else if (name.includes('police')) icon = '👮';
-        else if (name.includes('fire')) icon = '🚒';
-        else if (name.includes('health') || name.includes('rhu')) icon = '🏥';
-        return { pinClass: 'pin-emergency', icon: customSelectedIcon || icon, label: spot.category || 'Emergency Unit' };
-      }
-      if (cat.includes('cafe') || cat.includes('bakery') || cat.includes('coffee') || name.includes('cafe') || customSelectedIcon === '☕') {
-        return { pinClass: 'pin-cafe', icon: customSelectedIcon || '☕', label: spot.category || 'Cafe & Bakery' };
-      }
-      if (cat.includes('nature') || cat.includes('river') || cat.includes('cave') || cat.includes('spring') || cat.includes('viewpoint')) {
-        let icon = '🏞️';
-        if (cat.includes('cave') || name.includes('cave')) icon = '🧗';
-        else if (cat.includes('spring') || name.includes('river')) icon = '🌊';
-        else if (cat.includes('viewpoint')) icon = '🌄';
-        return { pinClass: 'pin-nature', icon: customSelectedIcon || icon, label: spot.category || 'Nature & Eco-Tourism' };
-      }
-      if (cat.includes('heritage') || cat.includes('religious') || cat.includes('church') || cat.includes('civic') || name.includes('university') || name.includes('school') || cat.includes('tourist')) {
-        let icon = '🏛️';
-        if (cat.includes('religious') || name.includes('church') || name.includes('parish')) icon = '⛪';
-        else if (name.includes('university') || name.includes('school')) icon = '🏫';
-        return { pinClass: 'pin-heritage', icon: customSelectedIcon || icon, label: spot.category || 'Tourist & Heritage Landmark' };
-      }
-      let sIcon = '📍';
-      if (cat.includes('transport') || cat.includes('terminal')) sIcon = '🚌';
-      else if (cat.includes('gas')) sIcon = '⛽';
-      else if (name.includes('water')) sIcon = '💧';
-      else if (cat.includes('store') || cat.includes('market') || cat.includes('convenience')) sIcon = '🛒';
-      return { pinClass: 'pin-service', icon: customSelectedIcon || sIcon, label: spot.category || 'Public Service & POI' };
+        return Promise.resolve({ data: new ArrayBuffer(0) });
+      });
     }
 
+    // Initialize MapLibre GL Map centered on Lagangilang, Abra
+    const map = new maplibregl.Map({
+      container: 'map',
+      center: [120.7340, 17.6142],
+      zoom: 13.8,
+      style: {
+        version: 8,
+        sources: {
+          'offline-raster': {
+            type: 'raster',
+            tiles: ['offline-tile://{z}/{x}/{y}'],
+            tileSize: 256,
+            attribution: '© Esri • Lagangilang Eco-Trails'
+          }
+        },
+        layers: [
+          {
+            id: 'offline-raster-layer',
+            type: 'raster',
+            source: 'offline-raster',
+            minzoom: 0,
+            maxzoom: 19
+          }
+        ]
+      }
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    document.getElementById('all-count').textContent = spots.length;
+
+    // Helper: determine pin icon, class, label, and category group
+    function getVisual(spot) {
+      const name = (spot.name || '').toLowerCase();
+      const cat = (spot.category || '').toLowerCase();
+      const customIcon = spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon;
+
+      if (spot.isCheckpoint || cat.includes('checkpoint') || cat.includes('denr') || name.includes('checkpoint')) {
+        return {
+          pinClass: 'pin-checkpoint',
+          badgeClass: 'spot-badge-checkpoint',
+          icon: customIcon || '🌲',
+          categoryGroup: '🌲 DENR Environmental Checkpoints',
+          label: spot.category || 'DENR Checkpoint'
+        };
+      }
+      if (cat.includes('emergency') || cat.includes('police') || cat.includes('rescue') || cat.includes('fire') || cat.includes('medical') || name.includes('police') || name.includes('mdrrmo')) {
+        let ic = '🚨';
+        if (name.includes('mdrrmo') || cat.includes('rescue')) ic = '🚑';
+        else if (name.includes('police')) ic = '👮';
+        else if (name.includes('fire')) ic = '🚒';
+        else if (name.includes('health') || name.includes('rhu')) ic = '🏥';
+        return {
+          pinClass: 'pin-emergency',
+          badgeClass: 'spot-badge-emergency',
+          icon: customIcon || ic,
+          categoryGroup: '🚨 Emergency Units & Stations',
+          label: spot.category || 'Emergency Unit'
+        };
+      }
+      if (cat.includes('nature') || cat.includes('river') || cat.includes('cave') || cat.includes('spring') || cat.includes('viewpoint')) {
+        let ic = '🏞️';
+        if (cat.includes('cave') || name.includes('cave')) ic = '🧗';
+        else if (cat.includes('spring') || name.includes('river')) ic = '🌊';
+        return {
+          pinClass: 'pin-nature',
+          badgeClass: 'spot-badge-tourist',
+          icon: customIcon || ic,
+          categoryGroup: '🏞️ Tourist Spots & Nature Trails',
+          label: spot.category || 'Nature & Eco-Tourism'
+        };
+      }
+      if (cat.includes('heritage') || cat.includes('religious') || cat.includes('church') || cat.includes('civic') || name.includes('university') || name.includes('school') || cat.includes('tourist')) {
+        let ic = '🏛️';
+        if (cat.includes('religious') || name.includes('church') || name.includes('parish')) ic = '⛪';
+        else if (name.includes('university') || name.includes('school')) ic = '🏫';
+        return {
+          pinClass: 'pin-tourist',
+          badgeClass: 'spot-badge-tourist',
+          icon: customIcon || ic,
+          categoryGroup: '🏛️ Heritage & Campus Landmarks',
+          label: spot.category || 'Tourist & Heritage'
+        };
+      }
+
+      let sIcon = '📍';
+      if (cat.includes('transport') || cat.includes('terminal')) sIcon = '🚌';
+      else if (cat.includes('gas') || cat.includes('fuel')) sIcon = '⛽';
+      else if (name.includes('water')) sIcon = '💧';
+      else if (cat.includes('store') || cat.includes('market') || cat.includes('commercial')) sIcon = '🛒';
+      else if (cat.includes('cafe') || cat.includes('bakery')) sIcon = '☕';
+
+      return {
+        pinClass: 'pin-service',
+        badgeClass: 'spot-badge-poi',
+        icon: customIcon || sIcon,
+        categoryGroup: '🏪 Local Services, Terminals & POIs',
+        label: spot.category || 'Local Service & POI'
+      };
+    }
+
+    // Check if spot has 360 photo available
+    function getSpot360Media(spot) {
+      if (!spot) return null;
+      const targetId = spot.primary_pano_id || spot.connected360?.targetId || spot.id;
+      const cleanTarget = String(targetId).replace(/^pano_/, '');
+      const fullTarget = String(targetId).startsWith('pano_') ? String(targetId) : ('pano_' + targetId);
+
+      return (
+        window.OFFLINE_360_MEDIA[targetId] ||
+        window.OFFLINE_360_MEDIA[cleanTarget] ||
+        window.OFFLINE_360_MEDIA[fullTarget] ||
+        window.OFFLINE_360_MEDIA[spot.id] ||
+        window.OFFLINE_360_MEDIA[spot.id + '_cover'] ||
+        (spot.imageUrl && spot.imageUrl.startsWith('data:') ? spot.imageUrl : null) ||
+        (spot.image && spot.image.startsWith('data:') ? spot.image : null) ||
+        spot.connected360?.imageUrl ||
+        spot.imageUrl ||
+        spot.image
+      );
+    }
+
+    // Open 360 Viewer Modal
     function open360Modal(spotId) {
-      const spot = spots.find(s => s.id === spotId);
-      const targetId = spot?.connected360?.targetId || spotId;
-      const media = window.OFFLINE_360_MEDIA[spotId] || window.OFFLINE_360_MEDIA[targetId] || spot?.image || spot?.connected360?.imageUrl;
-      if (media) {
-        document.getElementById('pano-img').src = media;
-        document.getElementById('pano-modal').classList.add('active');
+      const spot = spots.find(function(s) { return s.id === spotId; });
+      const media = getSpot360Media(spot);
+      if (!media) return;
+
+      const modal = document.getElementById('pano-modal');
+      const title = document.getElementById('pano-title');
+      const viewerDiv = document.getElementById('pano-viewer-div');
+      const fallbackImg = document.getElementById('pano-fallback-img');
+
+      title.textContent = '📷 360° View: ' + (spot ? spot.name : 'Landmark');
+      modal.classList.add('active');
+
+      if (currentPannellumViewer) {
+        try { currentPannellumViewer.destroy(); } catch (_) {}
+        currentPannellumViewer = null;
+      }
+      viewerDiv.innerHTML = '';
+      viewerDiv.style.display = 'block';
+      fallbackImg.style.display = 'none';
+
+      if (window.pannellum && window.pannellum.viewer) {
+        try {
+          currentPannellumViewer = window.pannellum.viewer('pano-viewer-div', {
+            type: 'equirectangular',
+            panorama: media,
+            autoLoad: true,
+            autoRotate: -2,
+            compass: false,
+            showZoomCtrl: true,
+            showFullscreenCtrl: true
+          });
+        } catch (e) {
+          viewerDiv.style.display = 'none';
+          fallbackImg.src = media;
+          fallbackImg.style.display = 'block';
+        }
+      } else {
+        viewerDiv.style.display = 'none';
+        fallbackImg.src = media;
+        fallbackImg.style.display = 'block';
       }
     }
 
     function closePanoModal() {
-      document.getElementById('pano-modal').classList.remove('active');
-      document.getElementById('pano-img').src = '';
+      const modal = document.getElementById('pano-modal');
+      modal.classList.remove('active');
+      if (currentPannellumViewer) {
+        try { currentPannellumViewer.destroy(); } catch (_) {}
+        currentPannellumViewer = null;
+      }
     }
 
+    // Focus on marker from list item
+    function focusSpot(spotId) {
+      const spot = spots.find(function(s) { return s.id === spotId; });
+      if (!spot) return;
+      const lat = spot.lat || spot.location?.lat;
+      const lng = spot.lng || spot.location?.lng;
+      if (!lat || !lng) return;
+
+      map.flyTo({ center: [lng, lat], zoom: 16, essential: true });
+      const m = markers.find(function(item) { return item.spotId === spotId; });
+      if (m && m.marker) {
+        m.marker.togglePopup();
+      }
+    }
+
+    // Render MapLibre Markers
     function renderMapMarkers() {
-      markers.forEach(m => map.removeLayer(m));
+      markers.forEach(function(m) { m.marker.remove(); });
       markers.length = 0;
 
       const filtered = getFilteredSpots();
-      document.getElementById('list-count').textContent = filtered.length;
+      document.getElementById('spots-count-badge').textContent = filtered.length;
 
-      filtered.forEach((s) => {
+      filtered.forEach(function(s) {
         const lat = s.lat || s.location?.lat;
         const lng = s.lng || s.location?.lng;
         if (!lat || !lng) return;
 
-        const visual = getPinVisual(s);
+        const vis = getVisual(s);
+        const has360 = Boolean(getSpot360Media(s));
 
-        const customIcon = L.divIcon({
-          className: 'custom-div-icon',
-          html: '<div class="custom-map-pin ' + visual.pinClass + '"><span>' + visual.icon + '</span></div>',
-          iconSize: [30, 30],
-          iconAnchor: [15, 30],
-          popupAnchor: [0, -28],
-        });
+        // Create Custom Pin DOM element
+        const el = document.createElement('div');
+        el.className = 'custom-map-pin ' + vis.pinClass;
+        el.innerHTML = '<span>' + vis.icon + '</span>';
 
-        const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
-
-        const targetPanoId = s.connected360?.targetId || s.id;
-        const has360 = Boolean(window.OFFLINE_360_MEDIA[s.id] || window.OFFLINE_360_MEDIA[targetPanoId] || s.connected360?.imageUrl || s.image);
-
-        const popupContent =
-          '<div style="min-width:180px;">' +
-          '  <h4 style="margin:0 0 4px 0; color:#38bdf8; font-size:0.95rem;">' + visual.icon + ' ' + s.name + '</h4>' +
-          '  <div style="font-size:0.75rem; color:#f59e0b; font-weight:700; margin-bottom:4px;">' + (s.category || 'Spot') + '</div>' +
-          (s.description ? '<p style="margin:0 0 6px 0; font-size:0.75rem; color:#cbd5e1; line-height:1.3;">' + s.description + '</p>' : '') +
-          '  <div style="font-size:0.7rem; color:#94a3b8;">📍 ' + Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5) + '</div>' +
-          (s.phone ? '<a href="tel:' + s.phone.replace(/[^0-9+]/g, '') + '" class="hotline-btn">📞 ' + s.phone + '</a>' : '') +
-          (has360 ? '<button onclick="open360Modal(\\'' + s.id + '\\')" class="hotline-btn" style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">📷 View 360° Panorama</button>' : '') +
+        const popupHtml =
+          '<div>' +
+          '  <h4 style="margin:0 0 4px 0; color:#38bdf8; font-size:0.95rem; font-weight:800;">' + vis.icon + ' ' + s.name + '</h4>' +
+          '  <div style="font-size:0.72rem; color:#f59e0b; font-weight:700; margin-bottom:6px;">' + (s.category || 'Spot') + ' • Brgy. ' + (s.barangay || 'Lagangilang') + '</div>' +
+          (s.description ? '<p style="margin:0 0 8px 0; font-size:0.75rem; color:#cbd5e1; line-height:1.35;">' + s.description + '</p>' : '') +
+          '  <div style="font-size:0.7rem; color:#94a3b8; margin-bottom:8px;">📍 ' + Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5) + '</div>' +
+          '  <div style="display:flex; gap:6px; flex-wrap:wrap;">' +
+          (s.phone ? '    <a href="tel:' + s.phone.replace(/[^0-9+]/g, '') + '" class="btn-action btn-call">📞 ' + s.phone + '</a>' : '') +
+          (has360 ? '    <button onclick="open360Modal(\\'' + s.id + '\\')" class="btn-action btn-pano">📷 360° Photo</button>' : '') +
+          '  </div>' +
           '</div>';
 
-        marker.bindPopup(popupContent);
-        marker.spotId = s.id;
-        markers.push(marker);
+        const popup = new maplibregl.Popup({ offset: 25 }).setHTML(popupHtml);
+
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([lng, lat])
+          .setPopup(popup)
+          .addTo(map);
+
+        markers.push({ spotId: s.id, marker: marker });
       });
     }
 
+    // Filter spots by category
     function getFilteredSpots() {
-      return spots.filter((s) => {
+      return spots.filter(function(s) {
         const cat = (s.category || '').toLowerCase();
         const isCheckpoint = s.isCheckpoint || cat.includes('checkpoint') || cat.includes('denr');
         const isEmergency = cat.includes('emergency') || cat.includes('police') || cat.includes('rescue');
@@ -446,93 +902,121 @@ class OfflineCacheService {
         if (activeFilter === 'checkpoint' && !isCheckpoint) return false;
         if (activeFilter === 'emergency' && !isEmergency) return false;
         if (activeFilter === 'services' && !isPoi) return false;
-
-        if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          const matchName = (s.name || '').toLowerCase().includes(q);
-          const matchDesc = (s.description || '').toLowerCase().includes(q);
-          const matchBrgy = (s.barangay || '').toLowerCase().includes(q);
-          if (!matchName && !matchDesc && !matchBrgy) return false;
-        }
-
         return true;
       });
     }
 
-    function renderList() {
-      const container = document.getElementById('spots-list');
+    // Render Categorized Spots list (Matching Hotlines card UI, no search box)
+    function renderCategorizedList() {
+      const container = document.getElementById('spots-categorized-list');
       container.innerHTML = '';
       const list = getFilteredSpots();
 
-      list.forEach((s) => {
-        const lat = s.lat || s.location?.lat;
-        const lng = s.lng || s.location?.lng;
-        const pinClass = getPinClass(s);
+      // Group spots by categoryGroup
+      const groups = {};
+      list.forEach(function(s) {
+        const vis = getVisual(s);
+        const grp = vis.categoryGroup;
+        if (!groups[grp]) groups[grp] = [];
+        groups[grp].push({ spot: s, visual: vis });
+      });
 
-        const div = document.createElement('div');
-        div.className = 'spot-item';
-        div.id = 'list-item-' + s.id;
-        div.innerHTML =
-          '<div class="spot-title"><span>' + (s.categoryIcon || '📍') + ' ' + s.name + '</span><span style="font-size:0.68rem; padding:2px 6px; border-radius:999px; background:rgba(255,255,255,0.08); color:#38bdf8;">' + (s.category || 'Spot') + '</span></div>' +
-          '<div class="spot-meta">' + (s.description ? s.description.slice(0, 110) + '...' : '') + '</div>' +
-          (lat && lng ? '<div class="spot-meta">📍 ' + Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5) + '</div>' : '');
+      // Sort categories logically
+      const order = [
+        '🏞️ Tourist Spots & Nature Trails',
+        '🏛️ Heritage & Campus Landmarks',
+        '🌲 DENR Environmental Checkpoints',
+        '🚨 Emergency Units & Stations',
+        '🏪 Local Services, Terminals & POIs'
+      ];
 
-        div.onclick = () => {
-          if (lat && lng) {
-            map.flyTo([lat, lng], 16, { duration: 0.8 });
-            const m = markers.find(mk => mk.spotId === s.id);
-            if (m) m.openPopup();
-          }
-        };
+      const sortedGroupKeys = Object.keys(groups).sort(function(a, b) {
+        const idxA = order.indexOf(a);
+        const idxB = order.indexOf(b);
+        if (idxA >= 0 && idxB >= 0) return idxA - idxB;
+        if (idxA >= 0) return -1;
+        if (idxB >= 0) return 1;
+        return a.localeCompare(b);
+      });
 
-        container.appendChild(div);
+      sortedGroupKeys.forEach(function(grpName) {
+        const items = groups[grpName];
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'category-group';
+
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'category-header';
+        headerDiv.innerHTML = '<span>' + grpName + '</span><span class="category-count">' + items.length + '</span>';
+        groupDiv.appendChild(headerDiv);
+
+        items.forEach(function(entry) {
+          const s = entry.spot;
+          const vis = entry.visual;
+          const lat = s.lat || s.location?.lat;
+          const lng = s.lng || s.location?.lng;
+          const has360 = Boolean(getSpot360Media(s));
+
+          const itemDiv = document.createElement('div');
+          itemDiv.className = 'spot-card-item';
+          itemDiv.innerHTML =
+            '<div class="spot-card-header">' +
+            '  <div class="spot-card-title">' + vis.icon + ' ' + s.name + '</div>' +
+            '  <span class="spot-badge ' + vis.badgeClass + '">' + (s.category || 'Spot') + '</span>' +
+            '</div>' +
+            '<div class="spot-card-sub">📍 Brgy. ' + (s.barangay || 'Lagangilang') + (s.location?.address ? ' • ' + s.location.address : '') + '</div>' +
+            (s.description ? '<div class="spot-card-desc">' + s.description + '</div>' : '') +
+            '<div class="action-btn-row">' +
+            (lat && lng ? '  <button class="btn-action btn-focus" onclick="focusSpot(\\'' + s.id + '\\')">🧭 Focus on Map</button>' : '') +
+            (s.phone ? '  <a href="tel:' + s.phone.replace(/[^0-9+]/g, '') + '" class="btn-action btn-call">📞 ' + s.phone + '</a>' : '') +
+            (has360 ? '  <button class="btn-action btn-pano" onclick="open360Modal(\\'' + s.id + '\\')">📷 View 360° Photo</button>' : '') +
+            '</div>';
+
+          groupDiv.appendChild(itemDiv);
+        });
+
+        container.appendChild(groupDiv);
       });
     }
 
+    // Filter button clicked
     function filterCategory(cat, btn) {
       activeFilter = cat;
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       renderMapMarkers();
-      renderList();
-    }
-
-    function handleSearch() {
-      searchQuery = document.getElementById('search-box').value.trim();
-      renderMapMarkers();
-      renderList();
+      renderCategorizedList();
     }
 
     // Populate Emergency Hotlines
-    const hotlinesList = document.getElementById('hotlines-list');
-    hotlines.forEach(h => {
+    const hotlinesContainer = document.getElementById('hotlines-list');
+    hotlines.forEach(function(h) {
       const div = document.createElement('div');
-      div.className = 'hotline-item';
+      div.className = 'spot-card-item';
       div.innerHTML =
-        '<div style="display:flex; justify-content:space-between; align-items:center;">' +
-        '  <strong>' + (h.icon || '📞') + ' ' + h.name + '</strong>' +
-        '  <span style="font-size:0.68rem; font-weight:700; color:#34d399; background:rgba(16,185,129,0.15); padding:2px 8px; border-radius:999px;">' + (h.category || 'Hotline') + '</span>' +
+        '<div class="spot-card-header">' +
+        '  <strong class="spot-card-title">' + (h.icon || '📞') + ' ' + h.name + '</strong>' +
+        '  <span class="spot-badge spot-badge-emergency">' + (h.category || 'Hotline') + '</span>' +
         '</div>' +
-        '<div style="font-size:0.73rem; color:#94a3b8; margin: 4px 0;">' + (h.description || '') + '</div>' +
-        '<div style="display:flex; gap:6px; flex-wrap:wrap;">' +
-        '  <a href="tel:' + (h.number || h.phone || '').replace(/[^0-9+]/g, '') + '" class="hotline-btn">📞 ' + (h.number || h.phone || 'Call') + '</a>' +
-        (h.altNumber ? '  <a href="tel:' + h.altNumber.replace(/[^0-9+]/g, '') + '" class="hotline-btn" style="background:#475569;">Alt: ' + h.altNumber + '</a>' : '') +
+        '<div class="spot-card-sub">' + (h.description || 'Emergency Dispatch & Response') + '</div>' +
+        '<div class="action-btn-row">' +
+        '  <a href="tel:' + (h.number || h.phone || '').replace(/[^0-9+]/g, '') + '" class="btn-action btn-call">📞 ' + (h.number || h.phone || 'Call') + '</a>' +
+        (h.altNumber ? '  <a href="tel:' + h.altNumber.replace(/[^0-9+]/g, '') + '" class="btn-action btn-focus">Alt: ' + h.altNumber + '</a>' : '') +
         '</div>';
-      hotlinesList.appendChild(div);
+      hotlinesContainer.appendChild(div);
     });
 
     // Populate Trail Guidelines
-    const guidelinesList = document.getElementById('guidelines-list');
-    guidelines.forEach(g => {
+    const guidelinesContainer = document.getElementById('guidelines-list');
+    guidelines.forEach(function(g) {
       const div = document.createElement('div');
       div.className = 'rule-item';
-      div.innerHTML = '<span style="font-size:1.1rem;">' + g.icon + '</span><div><strong>' + g.title + '</strong><br>' + g.detail + '</div>';
-      guidelinesList.appendChild(div);
+      div.innerHTML = '<span style="font-size:1.2rem;">' + g.icon + '</span><div><strong style="color:#ffffff;">' + g.title + '</strong><br>' + g.detail + '</div>';
+      guidelinesContainer.appendChild(div);
     });
 
     // Initial render
     renderMapMarkers();
-    renderList();
+    renderCategorizedList();
   </script>
 </body>
 </html>`;
@@ -541,7 +1025,7 @@ class OfflineCacheService {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Lagangilang-Offline-Map-Guide-${new Date().toISOString().slice(0, 10)}.html`;
+    link.download = `Lagangilang-MapLibre-Offline-Map-${new Date().toISOString().slice(0, 10)}.html`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -612,6 +1096,15 @@ export const EMERGENCY_HOTLINES = [
     description: 'Trail Information, Tourist Assistance, Tour Guide Accreditation',
     category: 'Tourism',
     icon: '🌴',
+  },
+  {
+    spotId: 'poi_denr_checkpoint_lagangilang',
+    name: 'DENR Environmental Checkpoint - Lagangilang',
+    number: '0917-889-3321',
+    altNumber: '(074) 752-8234',
+    description: 'Timber & Wildlife Monitoring, Trail Registration & Environmental Safety',
+    category: 'DENR Checkpoint',
+    icon: '🌲',
   },
 ];
 

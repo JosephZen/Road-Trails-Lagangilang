@@ -430,14 +430,17 @@
     "category": "Government & Emergency Services",
     "categoryIcon": "🚑",
     "barangay": "Poblacion",
+    "phone": "0917-829-4501",
+    "altPhone": "0920-948-2311",
+    "operatingHours": "24/7 Disaster Operations Center",
     "location": {
-      "lat": 17.61305,
-      "lng": 120.73412,
+      "lat": 17.612657,
+      "lng": 120.733619,
       "address": "MDRRMO Rescue Base, Poblacion, Lagangilang, Abra"
     },
-    "lat": 17.61305,
-    "lng": 120.73412,
-    "description": "Lagangilang Municipal Disaster Risk Reduction & Management Office (MDRRMO). 24/7 Search & Rescue, Medical Evacuation, Flood/Typhoon Emergency Assistance. Hotlines: 0917-829-4501 / 0920-948-2311.",
+    "lat": 17.612657,
+    "lng": 120.733619,
+    "description": "Lagangilang Municipal Disaster Risk Reduction & Management Office (MDRRMO). 24/7 Search & Rescue, Medical Evacuation, Flood/Typhoon Emergency Assistance.",
     "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
     "isPseudoImage": false,
     "pseudoTheme": "cyan",
@@ -458,24 +461,27 @@
     "category": "Government & Emergency Services",
     "categoryIcon": "👮",
     "barangay": "Poblacion",
+    "phone": "0998-598-7742",
+    "altPhone": "0917-123-7670",
+    "operatingHours": "24/7 Police Desk & Mobile Patrols",
     "location": {
-      "lat": 17.61245,
-      "lng": 120.73348,
-      "address": "PNP Police Station, Poblacion, Lagangilang, Abra"
+      "lat": 17.606696,
+      "lng": 120.736523,
+      "address": "Kalinga Road, Poblacion, Lagangilang, Abra"
     },
-    "lat": 17.61245,
-    "lng": 120.73348,
-    "description": "Philippine National Police (PNP) - Lagangilang Municipal Police Station. Public Safety, Law Enforcement, Tourist Security & Foot Patrols. Hotlines: 0998-598-7742 / 0917-123-7670.",
+    "lat": 17.606696,
+    "lng": 120.736523,
+    "description": "Philippine National Police (PNP) - Lagangilang Municipal Police Station. Public Safety, Law Enforcement, Tourist Security & Highway Patrols.",
     "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
     "isPseudoImage": false,
     "pseudoTheme": "cyan",
     "sync_status": "synced_cloud",
     "trail_difficulty": "Easy",
-    "trail_condition": "Paved Town Center - 24/7 Police Post",
+    "trail_condition": "Paved Road - 24/7 Police Post",
     "operating_hours": "24/7 Police Assistance",
     "estimated_travel_time": {
-      "foot": "2-3 mins from Town Hall",
-      "vehicle": "1 min"
+      "foot": "6-8 mins from Town Hall",
+      "vehicle": "2 mins"
     },
     "safety_guidelines": "Dial 0998-598-7742 for tourist assistance and immediate police emergency response."
   },
@@ -486,14 +492,17 @@
     "category": "Government & Emergency Services",
     "categoryIcon": "🚒",
     "barangay": "Poblacion",
+    "phone": "0915-432-8921",
+    "altPhone": "(074) 752-8111",
+    "operatingHours": "24/7 Emergency Dispatch",
     "location": {
-      "lat": 17.61328,
-      "lng": 120.73435,
-      "address": "BFP Fire Station, Poblacion, Lagangilang, Abra"
+      "lat": 17.60848,
+      "lng": 120.735801,
+      "address": "Kalinga Road, Poblacion, Lagangilang, Abra"
     },
-    "lat": 17.61328,
-    "lng": 120.73435,
-    "description": "Bureau of Fire Protection (BFP) - Lagangilang Fire Station. Fire Emergency, Mountain/Forest Fire Response, Vehicular Extrication, Road Clearing. Hotlines: 0915-432-8921 / (074) 752-8111.",
+    "lat": 17.60848,
+    "lng": 120.735801,
+    "description": "Bureau of Fire Protection (BFP) - Lagangilang Fire Station. Fire Emergency, Mountain/Forest Fire Response, Vehicular Extrication, Road Clearing.",
     "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
     "isPseudoImage": false,
     "pseudoTheme": "cyan",
@@ -502,8 +511,8 @@
     "trail_condition": "Paved Road - Fire Station",
     "operating_hours": "24/7 Fire & Rescue",
     "estimated_travel_time": {
-      "foot": "3-5 mins from Town Hall",
-      "vehicle": "1 min"
+      "foot": "5-6 mins from Town Hall",
+      "vehicle": "1-2 mins"
     },
     "safety_guidelines": "Call 0915-432-8921 immediately for grass fires, structural fires, or trail rescue support."
   },
@@ -514,14 +523,17 @@
     "category": "Government & Emergency Services",
     "categoryIcon": "🏥",
     "barangay": "Poblacion",
+    "phone": "(074) 752-8012",
+    "altPhone": "0977-802-3490",
+    "operatingHours": "8:00 AM - 5:00 PM (24/7 On-Call Emergency)",
     "location": {
-      "lat": 17.61215,
-      "lng": 120.73318,
-      "address": "Municipal Rural Health Unit (RHU), Poblacion, Lagangilang, Abra"
+      "lat": 17.607668,
+      "lng": 120.735759,
+      "address": "Health Center, Poblacion, Lagangilang, Abra"
     },
-    "lat": 17.61215,
-    "lng": 120.73318,
-    "description": "Lagangilang Rural Health Unit (RHU) & Municipal Health Office. Emergency First Aid, Outpatient Consultations, Medical Supplies & Ambulance Dispatch. Hotlines: (074) 752-8012 / 0977-802-3490.",
+    "lat": 17.607668,
+    "lng": 120.735759,
+    "description": "Lagangilang Rural Health Unit (RHU) & Municipal Health Office. Emergency First Aid, Outpatient Consultations, Medical Supplies & Ambulance Dispatch.",
     "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
     "isPseudoImage": false,
     "pseudoTheme": "cyan",
@@ -530,8 +542,8 @@
     "trail_condition": "Paved Town Center - Clinic & Ambulance Base",
     "operating_hours": "8:00 AM - 5:00 PM Mon-Fri (Emergency First Aid 24/7)",
     "estimated_travel_time": {
-      "foot": "3-4 mins from Town Hall",
-      "vehicle": "1 min"
+      "foot": "5-7 mins from Town Hall",
+      "vehicle": "2 mins"
     },
     "safety_guidelines": "Ambulance on-call 24/7. First aid station for injured trail hikers and visitors."
   },
@@ -542,14 +554,17 @@
     "category": "Government & Emergency Services",
     "categoryIcon": "🌴",
     "barangay": "Poblacion",
+    "phone": "0917-504-2299",
+    "altPhone": "(074) 752-8001",
+    "operatingHours": "8:00 AM - 5:00 PM Monday to Friday",
     "location": {
-      "lat": 17.612711,
-      "lng": 120.733756,
+      "lat": 17.61267,
+      "lng": 120.733661,
       "address": "Municipal Tourism Office, Town Hall Ground Floor, Poblacion, Lagangilang, Abra"
     },
-    "lat": 17.612711,
-    "lng": 120.733756,
-    "description": "Official Municipal Tourism & Information Office. Trail maps, accredited local eco-guides, cave exploration permits, and tourist assistance. Hotlines: 0917-504-2299 / (074) 752-8001.",
+    "lat": 17.61267,
+    "lng": 120.733661,
+    "description": "Official Municipal Tourism & Information Office. Trail maps, accredited local eco-guides, cave exploration permits, and tourist assistance.",
     "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
     "isPseudoImage": false,
     "pseudoTheme": "cyan",
@@ -562,5 +577,36 @@
       "vehicle": "0 min"
     },
     "safety_guidelines": "Please register at the Tourism Office before hiking to BANAT Caves or remote river gorges."
+  },
+  {
+    "id": "poi_denr_checkpoint_lagangilang",
+    "name": "DENR Environmental Checkpoint - Lagangilang",
+    "spotType": "poi",
+    "category": "DENR Environmental Checkpoint",
+    "categoryIcon": "🌲",
+    "barangay": "Poblacion",
+    "phone": "0917-889-3321",
+    "altPhone": "(074) 752-8234",
+    "operatingHours": "24/7 Official Monitoring & Registration Desk",
+    "location": {
+      "lat": 17.60386,
+      "lng": 120.741372,
+      "address": "Abra-Kalinga National Highway, Poblacion, Lagangilang, Abra"
+    },
+    "lat": 17.60386,
+    "lng": 120.741372,
+    "description": "Timber & Wildlife Monitoring, Watershed Protection, Mountain Trail Registration & Environmental Safety Inspection. Required registration point for hikers traversing upland eco-trails.",
+    "image": "/panoramas/thumbnails/pano_1792907342452_r26dib_thumb.jpg",
+    "isPseudoImage": false,
+    "pseudoTheme": "emerald",
+    "sync_status": "synced_cloud",
+    "trail_difficulty": "Easy",
+    "trail_condition": "Paved Highway Checkpoint",
+    "operating_hours": "24/7 Monitoring Desk",
+    "estimated_travel_time": {
+      "foot": "10-15 mins from Town Hall",
+      "vehicle": "3 mins"
+    },
+    "safety_guidelines": "All hikers heading to upland forest trails must register at this checkpoint."
   }
 ]

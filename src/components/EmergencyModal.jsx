@@ -13,6 +13,7 @@ export default function EmergencyModal({
   onRouteToSpot,
   isAdmin = false,
   showToast,
+  touristSpots = [],
 }) {
   const [activeTab, setActiveTab] = useState('hotlines'); // 'hotlines' | 'safety'
   const [hotlinesList, setHotlinesList] = useState([]);
@@ -35,9 +36,24 @@ export default function EmergencyModal({
 
   useEffect(() => {
     if (isOpen) {
-      setHotlinesList(hotlinesService.getAll());
+      const all = hotlinesService.getAll();
+      const reconciled = all.map((h) => {
+        const spot = touristSpots.find((s) => s.id === h.id);
+        if (spot) {
+          const lat = spot.location?.lat ?? spot.lat;
+          const lng = spot.location?.lng ?? spot.lng;
+          return {
+            ...h,
+            lat,
+            lng,
+            location: { ...(h.location || {}), ...(spot.location || {}), lat, lng },
+          };
+        }
+        return h;
+      });
+      setHotlinesList(reconciled);
     }
-  }, [isOpen]);
+  }, [isOpen, touristSpots]);
 
   useEffect(() => {
     const unsub = hotlinesService.subscribe((updated) => {
@@ -632,7 +648,11 @@ export default function EmergencyModal({
                       {h.location?.lat && onRouteToSpot && (
                         <button
                           onClick={() => {
-                            onRouteToSpot([h.location.lng, h.location.lat]);
+                            const spot = touristSpots.find((s) => s.id === h.id);
+                            const finalCoords = spot
+                              ? [spot.location?.lng ?? spot.lng, spot.location?.lat ?? spot.lat]
+                              : [h.location.lng, h.location.lat];
+                            onRouteToSpot(finalCoords);
                             onClose();
                           }}
                           style={{

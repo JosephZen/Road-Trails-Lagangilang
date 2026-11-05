@@ -6,6 +6,7 @@ import {
   normalizeCategoryName,
   getDefaultCategoryIcon,
 } from '../services/touristSpotsService';
+import hotlinesService from '../services/hotlinesService';
 import { useMapillary } from '../hooks/useMapillary';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -34,6 +35,10 @@ export const POI_CATEGORIES = [
   { name: 'Bank & ATM', icon: '🏧' },
   { name: 'Transport Terminal', icon: '🚌' },
   { name: 'Government & Emergency Services', icon: '🏛️' },
+  { name: 'Police Station', icon: '👮' },
+  { name: 'Fire Station', icon: '🚒' },
+  { name: 'Hospital & Health Unit (RHU)', icon: '🏥' },
+  { name: 'Disaster & Rescue (MDRRMO)', icon: '🚑' },
   { name: 'DENR Environmental Checkpoint', icon: '🌲' },
 ];
 
@@ -99,6 +104,9 @@ export default function TouristSpotModal({
     lat: '17.6167',
     lng: '120.7333',
     address: 'Lagangilang, Abra, Philippines',
+    phone: '',
+    altPhone: '',
+    operatingHours: '',
     description: '',
     image: '',
     usePseudoImage: true,
@@ -147,6 +155,9 @@ export default function TouristSpotModal({
         lat: String(editingSpot.location?.lat || editingSpot.lat || '17.6167'),
         lng: String(editingSpot.location?.lng || editingSpot.lng || '120.7333'),
         address: editingSpot.location?.address || 'Lagangilang, Abra',
+        phone: editingSpot.phone || editingSpot.contact_phone || '',
+        altPhone: editingSpot.altPhone || editingSpot.alt_phone || '',
+        operatingHours: editingSpot.operatingHours || editingSpot.operating_hours || '',
         description: editingSpot.description || '',
         image: editingSpot.imageUrl || editingSpot.image || '',
         usePseudoImage:
@@ -183,13 +194,16 @@ export default function TouristSpotModal({
 
       setFormData({
         name: '',
-        category: TOURIST_CATEGORIES[0].name,
-        categoryIcon: TOURIST_CATEGORIES[0].icon,
+        category: (editingSpot?.category) || TOURIST_CATEGORIES[0].name,
+        categoryIcon: (editingSpot?.categoryIcon) || TOURIST_CATEGORIES[0].icon,
         cardVisualIcon: null,
         barangay: BARANGAYS[0],
         lat: baseLat,
         lng: baseLng,
         address: 'Lagangilang, Abra, Philippines',
+        phone: '',
+        altPhone: '',
+        operatingHours: '',
         description: '',
         image: '',
         usePseudoImage: true,
@@ -392,6 +406,9 @@ export default function TouristSpotModal({
       icon: formData.cardVisualIcon || formData.categoryIcon,
       cardVisualIcon: formData.cardVisualIcon || null,
       barangay: formData.barangay,
+      phone: formData.phone?.trim() || null,
+      altPhone: formData.altPhone?.trim() || null,
+      operatingHours: formData.operatingHours?.trim() || null,
       lat: latNum,
       lng: lngNum,
       location: {
@@ -426,6 +443,38 @@ export default function TouristSpotModal({
         console.warn('Sync to Neon warning:', syncErr);
       }
 
+      // Synchronize with Hotlines and Checkpoints directory if relevant
+      const isEmergencyEntry =
+        formData.category?.toLowerCase().includes('emergency') ||
+        formData.category?.toLowerCase().includes('police') ||
+        formData.category?.toLowerCase().includes('fire') ||
+        formData.category?.toLowerCase().includes('health') ||
+        formData.category?.toLowerCase().includes('rhu') ||
+        formData.category?.toLowerCase().includes('mdrrmo') ||
+        formData.category?.toLowerCase().includes('checkpoint') ||
+        formData.category?.toLowerCase().includes('denr') ||
+        Boolean(formData.phone?.trim()) ||
+        String(saved.id).startsWith('poi_lagangilang_') ||
+        String(saved.id).startsWith('poi_denr_');
+
+      if (isEmergencyEntry) {
+        try {
+          hotlinesService.saveEntry({
+            id: saved.id,
+            name: saved.name,
+            category: saved.category,
+            categoryIcon: saved.categoryIcon,
+            phone: saved.phone,
+            altPhone: saved.altPhone,
+            description: saved.description,
+            operatingHours: saved.operatingHours,
+            location: saved.location,
+            lat: saved.lat,
+            lng: saved.lng,
+          });
+        } catch (_) {}
+      }
+
       setSaving(false);
       onSpotSaved?.(saved);
       onClose();
@@ -442,6 +491,9 @@ export default function TouristSpotModal({
     if (window.confirm(`Are you sure you want to delete "${editingSpot.name}" from the system?`)) {
       setDeleting(true);
       touristSpotsService.deleteSpot(editingSpot.id);
+      try {
+        hotlinesService.deleteEntry(editingSpot.id);
+      } catch (_) {}
       setDeleting(false);
       onSpotDeleted?.(editingSpot.id);
       onClose();
@@ -755,6 +807,53 @@ export default function TouristSpotModal({
               type="text"
               name="address"
               value={formData.address}
+              onChange={handleChange}
+              className="input-field"
+              style={{ width: '100%', marginTop: '4px' }}
+            />
+          </div>
+
+          {/* Contact Numbers & Operating Schedule */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                📞 Phone / Hotline
+              </label>
+              <input
+                type="text"
+                name="phone"
+                placeholder="e.g. 0998-598-7742"
+                value={formData.phone}
+                onChange={handleChange}
+                className="input-field"
+                style={{ width: '100%', marginTop: '4px' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                ☎️ Alt Phone / Landline
+              </label>
+              <input
+                type="text"
+                name="altPhone"
+                placeholder="e.g. (074) 752-8234"
+                value={formData.altPhone}
+                onChange={handleChange}
+                className="input-field"
+                style={{ width: '100%', marginTop: '4px' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              🕒 Operating Hours & Schedule
+            </label>
+            <input
+              type="text"
+              name="operatingHours"
+              placeholder="e.g. 24/7 Response or 8:00 AM - 5:00 PM Mon-Fri"
+              value={formData.operatingHours}
               onChange={handleChange}
               className="input-field"
               style={{ width: '100%', marginTop: '4px' }}

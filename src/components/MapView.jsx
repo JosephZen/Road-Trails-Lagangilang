@@ -9,7 +9,6 @@ import { streetviewAlignmentService } from '../services/streetviewAlignmentServi
 import { calculateAdvancedETAs, getRouteElevationProfile } from '../services/routeConditionService';
 import offlineMapManager from '../services/offlineMapManager';
 import { getPoiVisualConfig } from '../utils/poiIconRegistry';
-import { addBarangayLabelsLayer } from '../utils/barangayData';
 
 // MapLibre GL worker initialization
 setWorkerUrl(maplibreWorkerUrl);
@@ -445,9 +444,6 @@ export default function MapView({
       });
 
       coneLayerAdded.current = true;
-
-      // Overlay 17 Official Barangays of Lagangilang, Abra
-      addBarangayLabelsLayer(map);
 
       // Custom OSM Overlay (user's edited map.osm data)
       fetch('/data/lagangilang-custom.geojson')
@@ -1314,9 +1310,6 @@ export default function MapView({
         });
       }
 
-      // Re-overlay 17 Official Barangays of Lagangilang, Abra
-      addBarangayLabelsLayer(mapRef.current);
-
       // Custom OSM Overlay
       fetch('/data/lagangilang-custom.geojson')
         .then(r => r.json())
@@ -1519,6 +1512,10 @@ export default function MapView({
       el.addEventListener('click', (e) => {
         if (wasDragged) return;
         e.stopPropagation();
+        if (routingMode || pickingMode) {
+          onMapClickRef.current?.(lat, lng, null, false);
+          return;
+        }
         onSelectTouristSpot?.(spot);
       });
 
@@ -1554,7 +1551,7 @@ export default function MapView({
       poiMarkersRef.current.forEach((m) => m.remove());
       poiMarkersRef.current = [];
     };
-  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot, onSpotLocationChange, isAdmin, isDraggable]);
+  }, [touristSpots, activeTouristSpotId, onSelectTouristSpot, onSpotLocationChange, isAdmin, isDraggable, routingMode, pickingMode]);
 
   // Fly to active tourist spot when selected
   useEffect(() => {
@@ -1633,16 +1630,27 @@ export default function MapView({
     const resolveLocationName = (coords, fallbackLabel) => {
       if (!coords) return fallbackLabel;
       const [lng, lat] = coords;
-      if (Math.abs(lng - 120.734) < 0.005 && Math.abs(lat - 17.6142) < 0.005) {
-        return 'Poblacion Town Plaza';
-      }
-      const match = touristSpots.find((s) => {
+
+      // Find closest spot by Euclidean distance
+      let closestSpot = null;
+      let minDistance = Infinity;
+      for (const s of touristSpots) {
         const sLat = s.location?.lat ?? s.lat;
         const sLng = s.location?.lng ?? s.lng;
-        return Math.abs(sLat - lat) < 0.0004 && Math.abs(sLng - lng) < 0.0004;
-      });
-      if (match) return match.name;
-      return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
+        if (typeof sLat === 'number' && typeof sLng === 'number') {
+          const dist = Math.hypot(sLng - lng, sLat - lat);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestSpot = s;
+          }
+        }
+      }
+
+      // If within ~100 meters, resolve to the matched spot name
+      if (closestSpot && minDistance < 0.00095) {
+        return closestSpot.name;
+      }
+      return `${lat.toFixed(5)}°N, ${lng.toFixed(5)}°E`;
     };
 
     let etaString = '';

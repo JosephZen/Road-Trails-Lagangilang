@@ -49,27 +49,39 @@ export default function RoutePlanner({
   // Check if destination matches any tourist spot
   const destinationSpot = useMemo(() => {
     if (!routeDestination) return null;
-    return touristSpots.find((s) => {
+    let closest = null;
+    let minD = Infinity;
+    for (const s of touristSpots) {
       const lat = s.location?.lat ?? s.lat;
       const lng = s.location?.lng ?? s.lng;
-      return (
-        Math.abs(lat - routeDestination[1]) < 0.0001 &&
-        Math.abs(lng - routeDestination[0]) < 0.0001
-      );
-    });
+      if (typeof lat === 'number' && typeof lng === 'number') {
+        const d = Math.hypot(lat - routeDestination[1], lng - routeDestination[0]);
+        if (d < minD) {
+          minD = d;
+          closest = s;
+        }
+      }
+    }
+    return (closest && minD < 0.00095) ? closest : null;
   }, [routeDestination, touristSpots]);
 
   // Check if origin matches any tourist spot
   const originSpot = useMemo(() => {
     if (!routeOrigin) return null;
-    return touristSpots.find((s) => {
+    let closest = null;
+    let minD = Infinity;
+    for (const s of touristSpots) {
       const lat = s.location?.lat ?? s.lat;
       const lng = s.location?.lng ?? s.lng;
-      return (
-        Math.abs(lat - routeOrigin[1]) < 0.0001 &&
-        Math.abs(lng - routeOrigin[0]) < 0.0001
-      );
-    });
+      if (typeof lat === 'number' && typeof lng === 'number') {
+        const d = Math.hypot(lat - routeOrigin[1], lng - routeOrigin[0]);
+        if (d < minD) {
+          minD = d;
+          closest = s;
+        }
+      }
+    }
+    return (closest && minD < 0.00095) ? closest : null;
   }, [routeOrigin, touristSpots]);
 
   const handleCalculateRoute = async () => {

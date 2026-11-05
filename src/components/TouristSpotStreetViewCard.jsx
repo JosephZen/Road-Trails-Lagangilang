@@ -56,7 +56,6 @@ export default function TouristSpotStreetViewCard({
 
   if (!spot) return null;
 
-  const isStaged = spot.sync_status === 'staged_local';
   const isVerified = spot.sync_status === 'verified';
   const isPoi = (spot.spotType || spot.type) === 'poi';
   const categoryName = normalizeCategoryName(spot.category);
@@ -219,21 +218,7 @@ export default function TouristSpotStreetViewCard({
               <span>{categoryName}</span>
             </span>
 
-            {isStaged ? (
-              <span
-                style={{
-                  fontSize: '0.62rem',
-                  fontWeight: 600,
-                  padding: '1px 5px',
-                  borderRadius: '4px',
-                  background: 'rgba(245, 158, 11, 0.25)',
-                  color: '#fbbf24',
-                  border: '1px solid rgba(245, 158, 11, 0.4)',
-                }}
-              >
-                🟡 Staged
-              </span>
-            ) : isVerified ? (
+            {isVerified ? (
               <span
                 style={{
                   fontSize: '0.62rem',

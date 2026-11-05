@@ -25,8 +25,8 @@ export const INITIAL_HOTLINES_AND_CHECKPOINTS = [
     description: 'Timber & Wildlife Monitoring, Watershed Protection, Mountain Trail Registration & Environmental Safety Inspection',
     operatingHours: '24/7 Official Monitoring & Registration Desk',
     location: {
-      lat: 17.6185,
-      lng: 120.7315,
+      lat: 17.60386,
+      lng: 120.741372,
       address: 'Abra-Kalinga National Highway, Poblacion, Lagangilang, Abra',
     },
     notes: 'Required registration point for hikers traversing upland eco-trails and municipal forest corridors.',
@@ -43,8 +43,8 @@ export const INITIAL_HOTLINES_AND_CHECKPOINTS = [
     description: '24/7 Search & Rescue, Medical Evacuation, Flood/Typhoon Monitoring, Mountain Assistance',
     operatingHours: '24/7 Disaster Operations Center',
     location: {
-      lat: 17.6146,
-      lng: 120.7342,
+      lat: 17.612657,
+      lng: 120.733619,
       address: 'Municipal Hall Complex, Poblacion, Lagangilang, Abra',
     },
     spotType: 'poi',
@@ -59,9 +59,9 @@ export const INITIAL_HOTLINES_AND_CHECKPOINTS = [
     description: 'Public Safety, Peace & Order, Highway Patrols, Tourist Security Assistance',
     operatingHours: '24/7 Police Desk & Mobile Patrols',
     location: {
-      lat: 17.6141,
-      lng: 120.7339,
-      address: 'Poblacion, Lagangilang, Abra',
+      lat: 17.606696,
+      lng: 120.736523,
+      address: 'Kalinga Road, Poblacion, Lagangilang, Abra',
     },
     spotType: 'poi',
   },
@@ -75,9 +75,9 @@ export const INITIAL_HOTLINES_AND_CHECKPOINTS = [
     description: 'Fire Emergency, Mountain & Forest Fire Response, Road Clearance & Disaster Rescue',
     operatingHours: '24/7 Emergency Dispatch',
     location: {
-      lat: 17.6138,
-      lng: 120.7345,
-      address: 'Poblacion, Lagangilang, Abra',
+      lat: 17.60848,
+      lng: 120.735801,
+      address: 'Kalinga Road, Poblacion, Lagangilang, Abra',
     },
     spotType: 'poi',
   },
@@ -91,8 +91,8 @@ export const INITIAL_HOTLINES_AND_CHECKPOINTS = [
     description: 'Emergency Medical Care, Outpatient Consultation, First Aid & Antivenom Administration',
     operatingHours: '8:00 AM - 5:00 PM (24/7 On-Call Emergency)',
     location: {
-      lat: 17.6152,
-      lng: 120.7335,
+      lat: 17.607668,
+      lng: 120.735759,
       address: 'Health Center, Poblacion, Lagangilang, Abra',
     },
     spotType: 'poi',
@@ -107,8 +107,8 @@ export const INITIAL_HOTLINES_AND_CHECKPOINTS = [
     description: 'Trail Information, Tourist Assistance, Tour Guide Accreditation & Cultural Advisories',
     operatingHours: '8:00 AM - 5:00 PM Monday to Friday',
     location: {
-      lat: 17.6144,
-      lng: 120.7340,
+      lat: 17.61267,
+      lng: 120.733661,
       address: 'Tourism Desk, Presidencia Ti Lagangilang, Poblacion',
     },
     spotType: 'poi',
@@ -130,6 +130,35 @@ class HotlinesService {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          let modified = false;
+          // Heal any entries that still have legacy Poblacion spawn coordinates
+          const healed = parsed.map((item) => {
+            const init = INITIAL_HOTLINES_AND_CHECKPOINTS.find((i) => i.id === item.id);
+            if (init) {
+              const itemLat = item.location?.lat ?? item.lat;
+              const isOldSpawn = (
+                (item.id === 'poi_lagangilang_pnp' && Math.abs(itemLat - 17.6141) < 0.001) ||
+                (item.id === 'poi_lagangilang_bfp' && Math.abs(itemLat - 17.6138) < 0.001) ||
+                (item.id === 'poi_lagangilang_rhu' && Math.abs(itemLat - 17.6152) < 0.001) ||
+                (item.id === 'poi_denr_checkpoint_lagangilang' && Math.abs(itemLat - 17.6185) < 0.001)
+              );
+              if (isOldSpawn) {
+                modified = true;
+                return {
+                  ...item,
+                  ...init,
+                  location: { ...(item.location || {}), ...init.location },
+                  lat: init.location.lat,
+                  lng: init.location.lng,
+                };
+              }
+            }
+            return item;
+          });
+          if (modified) {
+            this.saveAll(healed, false);
+            return healed;
+          }
           return parsed;
         }
       }

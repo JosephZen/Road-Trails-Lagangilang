@@ -282,22 +282,36 @@ class OfflineMapManager {
       });
 
       let cachedMediaCount = 0;
-      let neonPanoramas = [];
+      let panoList = [];
       try {
-        neonPanoramas = await touristSpotsService.fetchAllPanoramasWithImages();
+        panoList = await touristSpotsService.fetchPanoramaIdsWithImages();
       } catch (err) {
-        console.warn('Could not batch fetch 360 panoramas from NeonDB:', err);
+        console.warn('Could not query 360 panoramas list from NeonDB:', err);
       }
 
-      // 1. Process all 360 Panoramas retrieved from Neon Cloud Database
-      if (Array.isArray(neonPanoramas) && neonPanoramas.length > 0) {
-        for (let i = 0; i < neonPanoramas.length; i++) {
-          const np = neonPanoramas[i];
-          if (!np.image_data) continue;
+      // 1. Process all 360 Panoramas retrieved from Neon Cloud Database individually (safely under 10MB limit)
+      if (Array.isArray(panoList) && panoList.length > 0) {
+        for (let i = 0; i < panoList.length; i++) {
+          const np = panoList[i];
+          const panoPercent = 30 + Math.round(((i + 1) / panoList.length) * 26);
+          onProgress({
+            stage: 'media_360',
+            percent: panoPercent,
+            mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
+            message: `📸 Downloading 360° Photo (${i + 1}/${panoList.length}): ${np.label || np.id}...`,
+          });
+
+          let dataUri = null;
+          try {
+            dataUri = await touristSpotsService.fetchPanoramaImageData(np.id);
+          } catch (fetchErr) {
+            console.warn(`Could not fetch image data for pano ${np.id}:`, fetchErr);
+          }
+          if (!dataUri) continue;
 
           const panoClean = String(np.id).replace(/^pano_/, '');
           const panoFull = String(np.id).startsWith('pano_') ? String(np.id) : `pano_${np.id}`;
-          const dataUri = np.image_data;
+          
           // Approximate byte size of base64 data URI
           totalBytes += Math.round(dataUri.length * 0.75);
 
@@ -345,14 +359,21 @@ class OfflineMapManager {
             await this.put360Media(db, k, record);
           }
           cachedMediaCount++;
+        }
+      }
 
-          const panoPercent = 32 + Math.round(((i + 1) / neonPanoramas.length) * 23);
-          onProgress({
-            stage: 'media_360',
-            percent: panoPercent,
-            mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
-            message: `📸 Saving NeonDB 360° Photo: ${np.label || np.id} (${cachedMediaCount}/${neonPanoramas.length})...`,
-          });
+      // 2. Also ensure all spots with embedded images/panos in touristSpots array are saved
+      for (const s of touristSpots) {
+        const spotImg = s.imageUrl || s.image;
+        if (spotImg && typeof spotImg === 'string' && spotImg.startsWith('data:')) {
+          await this.put360Media(db, s.id, { dataUri: spotImg, spotId: s.id });
+          await this.put360Media(db, `${s.id}_cover`, { dataUri: spotImg, spotId: s.id });
+          if (s.primary_pano_id) {
+            await this.put360Media(db, s.primary_pano_id, { dataUri: spotImg, spotId: s.id });
+          }
+          if (s.connected360?.targetId) {
+            await this.put360Media(db, s.connected360.targetId, { dataUri: spotImg, spotId: s.id });
+          }
         }
       }
 

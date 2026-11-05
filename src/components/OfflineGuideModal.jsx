@@ -17,8 +17,6 @@ export default function OfflineGuideModal({
   onClose,
   touristSpots = [],
   customGeoJSON = null,
-  isOfflineModeActive = false,
-  onToggleOfflineMode,
   showToast,
 }) {
   const [offlineStatus, setOfflineStatus] = useState(null);
@@ -72,7 +70,7 @@ export default function OfflineGuideModal({
       setOfflineStatus(updated);
       const est = await offlineMapManager.getStorageEstimate();
       setStorageEstimate(est);
-      showToast?.(`📥 Full Offline Bundle Ready! ${bundleInfo.sizeMB} MB saved to device (${bundleInfo.cached360Count || 24} 360° panoramas).`);
+      showToast?.(`📥 Full Offline Bundle Ready! ${bundleInfo.sizeMB} MB saved to device (${bundleInfo.cached360Count || 29} 360° panoramas).`);
     } catch (e) {
       console.error('Offline download failed:', e);
       showToast?.(`⚠️ Offline download failed: ${e.message}`);
@@ -173,13 +171,13 @@ export default function OfflineGuideModal({
             </span>
             {offlineStatus?.isReady && (
               <span style={{ fontSize: '0.72rem', color: '#6ee7b7', fontWeight: 700 }}>
-                {offlineStatus.sizeMB} MB Saved • {offlineStatus.tileCount} Tiles • {offlineStatus.cached360Count || 24} 360° Panos
+                {offlineStatus.sizeMB} MB Saved • {offlineStatus.tileCount} Tiles • {offlineStatus.cached360Count || 29} 360° Panos
               </span>
             )}
           </div>
           <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.4 }}>
             {offlineStatus?.isReady
-              ? `Cached on ${new Date(offlineStatus.timestamp).toLocaleDateString()} at ${new Date(offlineStatus.timestamp).toLocaleTimeString()}. Includes Base Map Tiles, Custom Map Overlays, Road Graph, ${touristSpots.length} POIs & all 24 Landmark 360° Panoramas.`
+              ? `Cached on ${new Date(offlineStatus.timestamp).toLocaleDateString()} at ${new Date(offlineStatus.timestamp).toLocaleTimeString()}. Includes Base Map Tiles, Custom Map Overlays, Road Graph, ${touristSpots.length} POIs & all ${offlineStatus.cached360Count || 29} Landmark 360° Panoramas.`
               : 'Download the offline map bundle before heading out to remote trails with zero cellular coverage in Lagangilang (Ugiao River, Mt. Bullagao, BANAT Caves, Quirsodan Dam).'}
           </p>
 
@@ -339,55 +337,26 @@ export default function OfflineGuideModal({
             )}
           </div>
 
-          {/* Direct Switch to Offline Map Preview Button */}
-          <button
-            className={`btn ${isOfflineModeActive ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => onToggleOfflineMode?.(!isOfflineModeActive)}
-            style={{
-              padding: '10px 16px',
-              fontSize: '0.84rem',
-              fontWeight: 700,
-              background: isOfflineModeActive
-                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                : 'rgba(30, 41, 59, 0.9)',
-              border: isOfflineModeActive ? '1.5px solid #34d399' : '1px solid rgba(255, 255, 255, 0.2)',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: isOfflineModeActive ? '0 0 15px rgba(16, 185, 129, 0.4)' : 'none',
-              transition: 'all 0.2s ease',
-            }}
-            title="Toggle between Live Online Tiles and Cached Offline IndexedDB Tiles to test offline map"
-          >
-            <span>{isOfflineModeActive ? '✅' : '🗺️'}</span>
-            <span>
-              {isOfflineModeActive
-                ? 'Use / Preview Offline Map Now (Active)'
-                : 'Use / Preview Offline Map (Cached Tiles)'}
-            </span>
-          </button>
-
           <button
             className="btn btn-secondary"
             onClick={handleDownloadStandaloneHtml}
             style={{
-              padding: '9px 14px',
-              fontSize: '0.8rem',
-              fontWeight: 600,
+              padding: '10px 16px',
+              fontSize: '0.84rem',
+              fontWeight: 700,
               background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
               borderColor: '#38bdf8',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(2, 132, 199, 0.35)',
             }}
-            title="Download single-file offline HTML map for direct opening in phone browser"
+            title="Download single-file offline MapLibre HTML map for direct opening in phone or PC browser"
           >
-            <span>📄</span>
-            <span>Export Standalone Offline Map Guide (.HTML)</span>
+            <span>🗺️</span>
+            <span>Export Standalone MapLibre Offline Map (.HTML)</span>
           </button>
         </div>
 

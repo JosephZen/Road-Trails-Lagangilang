@@ -42,7 +42,7 @@ export default function App() {
   const [viewerHeading, setViewerHeading] = useState(0);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState('spots'); // 'spots' | 'staging' | 'routing'
+  const [sidebarTab, setSidebarTab] = useState('spots'); // 'spots' | 'routing'
   
   // Tourist Spots & POI State
   const [touristSpots, setTouristSpots] = useState([]);
@@ -95,7 +95,14 @@ export default function App() {
   const [cloudSyncStatus, setCloudSyncStatus] = useState('synced'); // 'syncing' | 'synced' | 'error'
 
   // Theme & Auth State
-  const [mapTheme, setMapTheme] = useState(() => localStorage.getItem('lagangilang_map_theme') || 'light'); // 'dark' | 'light' | 'beige' | 'satellite'
+  const [mapTheme, setMapTheme] = useState(() => {
+    const saved = localStorage.getItem('lagangilang_map_theme');
+    if (!saved || saved === 'offline') {
+      localStorage.setItem('lagangilang_map_theme', 'light');
+      return 'light';
+    }
+    return saved;
+  }); // 'dark' | 'light' | 'beige' | 'satellite'
   const [isAdmin, setIsAdmin] = useState(() => {
     return sessionStorage.getItem('lagangilang_admin_authenticated') === 'true';
   });
@@ -500,18 +507,21 @@ export default function App() {
     hotlinePois.forEach((hp) => {
       const idx = merged.findIndex((s) => s.id === hp.id);
       if (idx >= 0) {
-        const currentLat = merged[idx].location?.lat ?? merged[idx].lat;
-        const currentLng = merged[idx].location?.lng ?? merged[idx].lng;
+        const spotLat = merged[idx].location?.lat ?? merged[idx].lat;
+        const spotLng = merged[idx].location?.lng ?? merged[idx].lng;
         merged[idx] = {
-          ...merged[idx],
           ...hp,
-          lat: currentLat ?? hp.lat,
-          lng: currentLng ?? hp.lng,
+          ...merged[idx],
+          phone: merged[idx].phone || hp.phone,
+          altPhone: merged[idx].altPhone || hp.altPhone,
+          operatingHours: merged[idx].operatingHours || hp.operatingHours,
+          lat: spotLat ?? hp.lat,
+          lng: spotLng ?? hp.lng,
           location: {
             ...(hp.location || {}),
             ...(merged[idx].location || {}),
-            lat: currentLat ?? hp.lat,
-            lng: currentLng ?? hp.lng,
+            lat: spotLat ?? hp.lat,
+            lng: spotLng ?? hp.lng,
           },
         };
       } else {
@@ -540,18 +550,21 @@ export default function App() {
           freshHotlines.forEach((hp) => {
             const idx = mergedCloud.findIndex((s) => s.id === hp.id);
             if (idx >= 0) {
-              const currentLat = mergedCloud[idx].location?.lat ?? mergedCloud[idx].lat;
-              const currentLng = mergedCloud[idx].location?.lng ?? mergedCloud[idx].lng;
+              const spotLat = mergedCloud[idx].location?.lat ?? mergedCloud[idx].lat;
+              const spotLng = mergedCloud[idx].location?.lng ?? mergedCloud[idx].lng;
               mergedCloud[idx] = {
-                ...mergedCloud[idx],
                 ...hp,
-                lat: currentLat ?? hp.lat,
-                lng: currentLng ?? hp.lng,
+                ...mergedCloud[idx],
+                phone: mergedCloud[idx].phone || hp.phone,
+                altPhone: mergedCloud[idx].altPhone || hp.altPhone,
+                operatingHours: mergedCloud[idx].operatingHours || hp.operatingHours,
+                lat: spotLat ?? hp.lat,
+                lng: spotLng ?? hp.lng,
                 location: {
                   ...(hp.location || {}),
                   ...(mergedCloud[idx].location || {}),
-                  lat: currentLat ?? hp.lat,
-                  lng: currentLng ?? hp.lng,
+                  lat: spotLat ?? hp.lat,
+                  lng: spotLng ?? hp.lng,
                 },
               };
             } else {
@@ -764,8 +777,25 @@ export default function App() {
       const spot = touristSpots.find((s) => s.id === spotId);
       const spotName = spot?.name || 'Landmark';
       showToast(`📍 ${spotName} moved to [${lat.toFixed(5)}, ${lng.toFixed(5)}] — Synced to Cloud`);
+
+      // Real-time route recalculation if current origin or destination was pointing to this moved spot
+      const oldLat = spot?.location?.lat ?? spot?.lat;
+      const oldLng = spot?.location?.lng ?? spot?.lng;
+
+      if (routeDestination && oldLat && oldLng) {
+        if (Math.hypot(routeDestination[0] - oldLng, routeDestination[1] - oldLat) < 0.0008) {
+          setRouteDestination([lng, lat]);
+          setRouteData(null);
+        }
+      }
+      if (routeOrigin && oldLat && oldLng) {
+        if (Math.hypot(routeOrigin[0] - oldLng, routeOrigin[1] - oldLat) < 0.0008) {
+          setRouteOrigin([lng, lat]);
+          setRouteData(null);
+        }
+      }
     },
-    [activeTouristSpot, touristSpots, showToast]
+    [activeTouristSpot, touristSpots, routeOrigin, routeDestination, showToast]
   );
 
   // Swap origin and destination
@@ -1391,29 +1421,6 @@ export default function App() {
                   <span>{isOnline ? 'Online ⚙️' : 'Offline ⚙️'}</span>
                 </div>
 
-                {/* Staged Drafts Indicator & Queue Opener (Always accessible for Admin) */}
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setSidebarTab('staging');
-                    setSidebarOpen(true);
-                  }}
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '4px 10px',
-                    borderRadius: 'var(--radius-full)',
-                    border: stagedCount > 0 ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.2)',
-                    color: stagedCount > 0 ? '#fbbf24' : '#e2e8f0',
-                    background: stagedCount > 0 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(0,0,0,0.5)',
-                    animation: stagedCount > 0 ? 'pulse 2s infinite' : 'none',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}
-                  title={stagedCount > 0 ? `${stagedCount} locally staged draft(s) pending sync` : 'Open Staging Queue'}
-                >
-                  🟡 {stagedCount > 0 ? `${stagedCount} Staged` : 'Staging'}
-                </button>
-
                 {/* Excluded Sequences Manager Button */}
                 <button
                   className="btn btn-secondary"
@@ -1481,7 +1488,7 @@ export default function App() {
           <button
             className="btn btn-secondary btn-icon nav-hamburger-btn"
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            title="Explore Tourist Spots, Staging & Route Planner"
+            title="Explore Tourist Spots & Route Planner"
             aria-label="Toggle navigation drawer"
           >
             ☰
@@ -1560,7 +1567,7 @@ export default function App() {
           />
         )}
 
-        {/* Sidebar - Tabs: Tourist Spots, Staging Queue, Routing */}
+        {/* Sidebar - Tabs: Tourist Spots, Route Planner */}
         <div className={`sidebar glass-panel ${sidebarOpen ? 'open' : ''}`}>
           <div className="sidebar-header">
             <div className="sidebar-tabs-group" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -1600,26 +1607,6 @@ export default function App() {
               >
                 🛠️ Tools
               </button>
-              {isAdmin && (
-                <button
-                  className={`sidebar-tab-btn tab-staging ${sidebarTab === 'staging' ? 'active' : ''}`}
-                  onClick={() => setSidebarTab('staging')}
-                  style={{
-                    background: sidebarTab === 'staging' ? '#f59e0b' : 'rgba(245,158,11,0.2)',
-                    color: sidebarTab === 'staging' ? '#1a1a2e' : '#fbbf24',
-                    border: '1px solid rgba(245,158,11,0.4)',
-                    padding: '6px 12px',
-                    borderRadius: 'var(--radius-full)',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                  }}
-                  title="Staging Queue (Offline field captures)"
-                >
-                  🟡 Staging {stagedCount > 0 ? `(${stagedCount})` : ''}
-                </button>
-              )}
               <button
                 className={`sidebar-tab-btn ${sidebarTab === 'routing' ? 'active' : ''}`}
                 onClick={() => setSidebarTab('routing')}
@@ -1769,9 +1756,6 @@ export default function App() {
                               <h4 style={{ fontSize: '0.88rem', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {spot.name}
                               </h4>
-                              {spot.sync_status === 'staged_local' && (
-                                <span style={{ fontSize: '0.65rem', color: '#fbbf24', marginLeft: '4px', flexShrink: 0 }}>🟡 Draft</span>
-                              )}
                             </div>
                             <p style={{ fontSize: '0.72rem', color: isPoi ? '#34d399' : '#ffd700', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon || (isPoi ? '🏪' : '⭐')} {spot.category} • Brgy. {spot.barangay}
@@ -2174,88 +2158,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Tab 2: 2-Step Offline Staging Queue (Admin) */}
-          {isAdmin && sidebarTab === 'staging' && (
-            <div>
-              <div
-                style={{
-                  padding: '10px',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'rgba(245, 158, 11, 0.1)',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  marginBottom: '12px',
-                }}
-              >
-                <h4 style={{ color: '#fbbf24', fontSize: '0.85rem', margin: '0 0 4px 0' }}>
-                  2-Step Field Staging Pipeline
-                </h4>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  <strong>Step 1:</strong> Captured data is staged in browser storage while offline in Lagangilang trails.
-                  <br />
-                  <strong>Step 2:</strong> Once verified on the map, push to Neon PostgreSQL.
-                </p>
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleBatchSyncToNeon}
-                  disabled={isSyncing || stagedCount === 0}
-                  style={{
-                    width: '100%',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  {isSyncing ? 'Syncing to Neon...' : `🚀 Sync All ${stagedCount} Drafts to Neon`}
-                </button>
-              </div>
-
-              {stagedCount === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '16px 0' }}>
-                  All tourist spots are synced to the cloud!
-                </p>
-              ) : (
-                <div className="pano-list">
-                  {touristSpots
-                    .filter((s) => s.sync_status === 'staged_local')
-                    .map((spot) => (
-                      <div
-                        key={spot.id}
-                        className="pano-list-item"
-                        style={{ flexDirection: 'column', alignItems: 'stretch' }}
-                        onClick={() => handleSelectTouristSpot(spot)}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <h4 style={{ fontSize: '0.85rem', margin: 0 }}>{spot.name}</h4>
-                          <span style={{ fontSize: '0.65rem', color: '#fbbf24' }}>🟡 Local Draft</span>
-                        </div>
-                        <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '4px 0' }}>
-                          {spot.location?.address}
-                        </p>
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '4px' }}>
-                          <button
-                            className="btn btn-secondary"
-                            style={{ fontSize: '0.7rem', padding: '2px 6px' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              touristSpotsService.syncToNeonCloud(spot.id).then((r) => {
-                                alert(r.message);
-                                loadTouristSpots();
-                              });
-                            }}
-                          >
-                            Sync Single
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Tab 3: Route Planner */}
+          {/* Tab 2: Route Planner */}
           {sidebarTab === 'routing' && (
             <RoutePlanner
               routeOrigin={routeOrigin}
@@ -2698,6 +2601,24 @@ export default function App() {
               }}>
                 📌 Add Point of Interest here {contextMenu.imageId ? '📸 (Auto-Linked to Image)' : ''}
               </button>
+              <button onClick={() => {
+                setEditingSpot({
+                  spotType: 'poi',
+                  category: 'Government & Emergency Services',
+                  categoryIcon: '🚨',
+                  location: { lat: contextMenu.lat, lng: contextMenu.lng, address: '' },
+                  connected360: contextMenu.imageId ? {
+                    type: 'mapillary',
+                    targetId: contextMenu.imageId,
+                    heading: 0,
+                    pitch: 0,
+                  } : undefined,
+                });
+                setShowSpotModal(true);
+                setContextMenu(null);
+              }}>
+                🚨 Add Emergency / Hotline / Checkpoint here {contextMenu.imageId ? '📸 (Auto-Linked to Image)' : ''}
+              </button>
             </>
           )}
         </div>
@@ -2925,10 +2846,14 @@ export default function App() {
         onClose={() => setShowEmergencyModal(false)}
         isAdmin={isAdmin}
         showToast={showToast}
+        touristSpots={touristSpots}
         onRouteToSpot={(coords) => {
           setRouteDestination(coords);
           setSidebarTab('routing');
           setSidebarOpen(true);
+          if (userLocation) {
+            setRouteOrigin([userLocation.lng, userLocation.lat]);
+          }
         }}
         onLocateSpot={(spotId) => {
           setShowEmergencyModal(false);
@@ -2961,17 +2886,6 @@ export default function App() {
         onClose={() => setShowOfflineModal(false)}
         touristSpots={touristSpots}
         customGeoJSON={alignedGeoJSON}
-        isOfflineModeActive={mapTheme === 'offline'}
-        onToggleOfflineMode={(activate) => {
-          const next = activate ? 'offline' : 'light';
-          setMapTheme(next);
-          localStorage.setItem('lagangilang_map_theme', next);
-          showToast?.(
-            activate
-              ? '🗺️ Switched to Offline Map (Cached Tiles Active)'
-              : '🌐 Returned to Live Online Map'
-          );
-        }}
         showToast={showToast}
       />
 

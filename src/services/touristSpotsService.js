@@ -624,6 +624,7 @@ export const touristSpotsService = {
               id, name, category_id, barangay, latitude, longitude, address,
               description, image_url, is_pseudo_image, pseudo_theme,
               primary_pano_id, target_heading, target_pitch, sync_status,
+              phone, alt_phone, operating_hours, spot_type,
               staged_at, synced_at, updated_at
             ) VALUES (
               ${spot.id},
@@ -641,6 +642,10 @@ export const touristSpotsService = {
               ${spot.connected360?.heading || 0},
               ${spot.connected360?.pitch || 0},
               'synced_cloud',
+              ${spot.phone || null},
+              ${spot.altPhone || spot.alt_phone || null},
+              ${spot.operatingHours || spot.operating_hours || null},
+              ${spot.spotType || 'poi'},
               ${spot.staged_at || new Date().toISOString()},
               NOW(),
               NOW()
@@ -659,6 +664,10 @@ export const touristSpotsService = {
               primary_pano_id = EXCLUDED.primary_pano_id,
               target_heading = EXCLUDED.target_heading,
               target_pitch = EXCLUDED.target_pitch,
+              phone = COALESCE(EXCLUDED.phone, public.tourist_spots.phone),
+              alt_phone = COALESCE(EXCLUDED.alt_phone, public.tourist_spots.alt_phone),
+              operating_hours = COALESCE(EXCLUDED.operating_hours, public.tourist_spots.operating_hours),
+              spot_type = COALESCE(EXCLUDED.spot_type, public.tourist_spots.spot_type),
               sync_status = 'synced_cloud',
               synced_at = NOW(),
               updated_at = NOW();
@@ -848,8 +857,11 @@ export const touristSpotsService = {
               name: r.name,
               category: categoryName,
               categoryIcon: categoryIcon,
-              spotType: spotType,
+              spotType: r.spot_type || spotType,
               barangay: r.barangay,
+              phone: r.phone || seedMatch?.phone || null,
+              altPhone: r.alt_phone || seedMatch?.altPhone || null,
+              operatingHours: r.operating_hours || seedMatch?.operatingHours || null,
               location: {
                 lat: parseFloat(r.latitude),
                 lng: parseFloat(r.longitude),
@@ -1146,15 +1158,15 @@ export const touristSpotsService = {
   },
 
   /**
-   * Fetch all 360 Panoramas with their full image data from Neon Cloud Database.
-   * Used for offline packaging so all 360 photos can be stored locally for zero-signal operation.
+   * Fetch metadata list of all 360 Panoramas that have full image data in Neon Cloud.
+   * Excludes the multi-megabyte image_data column so query executes instantly under 50ms and avoids Neon's 10MB limit.
    */
-  async fetchAllPanoramasWithImages() {
+  async fetchPanoramaIdsWithImages() {
     try {
       const rows = await this.executeNeonQuery(async (sql) => {
         return await sql`
           SELECT id, label, filename, thumbnail_url, latitude as lat, longitude as lng,
-                 compass_heading as heading, image_data, thumbnail_data
+                 compass_heading as heading
           FROM public.panoramas
           WHERE image_data IS NOT NULL
           ORDER BY captured_at DESC
@@ -1163,6 +1175,34 @@ export const touristSpotsService = {
       if (Array.isArray(rows)) {
         return rows;
       }
+    } catch (err) {
+      console.warn('Could not list 360 panoramas from Neon Cloud:', err.message);
+    }
+    return [];
+  },
+
+  /**
+   * Fetch all 360 Panoramas with their full image data from Neon Cloud Database safely,
+   * chunked individually to strictly avoid Neon serverless payload timeouts and socket closures.
+   */
+  async fetchAllPanoramasWithImages(onItemProgress) {
+    try {
+      const metaRows = await this.fetchPanoramaIdsWithImages();
+      if (!Array.isArray(metaRows) || metaRows.length === 0) return [];
+
+      const fullRows = [];
+      for (let i = 0; i < metaRows.length; i++) {
+        const meta = metaRows[i];
+        if (onItemProgress) onItemProgress(i + 1, metaRows.length, meta.label || meta.id);
+        const dataUri = await this.fetchPanoramaImageData(meta.id);
+        if (dataUri) {
+          fullRows.push({
+            ...meta,
+            image_data: dataUri,
+          });
+        }
+      }
+      return fullRows;
     } catch (err) {
       console.warn('Could not batch fetch 360 panoramas with images from Neon Cloud:', err.message);
     }
