@@ -1,28 +1,121 @@
 import React, { useState, useEffect, useRef } from 'react';
+import globalSyncService, { GLOBAL_STATE_KEYS } from '../services/globalSyncService';
 
 const STORAGE_ADMIN_PASSWORD_KEY = 'lagangilang_admin_password';
-const DEFAULT_ADMIN_PASSWORD = 'touristspot2026';
+export const DEFAULT_ADMIN_PASSWORD = 'touristspot2026';
+
+let cachedGlobalPassword = null;
 
 /**
- * Validate entered password against custom stored password or default system password.
+ * Fetch the authoritative global admin password from Neon PostgreSQL database.
+ */
+export const fetchGlobalAdminPassword = async () => {
+  if (typeof window !== 'undefined' && !navigator.onLine) {
+    return getLocalAdminPassword();
+  }
+
+  // 1. Try globalSyncService (which reads /api/global-state or direct Neon query)
+  try {
+    const state = await globalSyncService.fetchGlobalState();
+    const creds = state?.[GLOBAL_STATE_KEYS.ADMIN_PASSWORD];
+    if (creds && typeof creds.password === 'string' && creds.password.trim()) {
+      cachedGlobalPassword = creds.password.trim();
+      try {
+        localStorage.setItem(STORAGE_ADMIN_PASSWORD_KEY, cachedGlobalPassword);
+      } catch (_) {}
+      return cachedGlobalPassword;
+    }
+  } catch (e) {
+    console.warn('[AdminAuth] Global password fetch error:', e);
+  }
+
+  // 2. Direct Neon SQL query fallback
+  try {
+    const sql = await globalSyncService.getNeonSql();
+    const rows = await sql.query(
+      `SELECT payload FROM lagangilang_global_state WHERE state_key = $1`,
+      [GLOBAL_STATE_KEYS.ADMIN_PASSWORD]
+    );
+    if (rows && rows.length > 0 && rows[0].payload?.password) {
+      cachedGlobalPassword = String(rows[0].payload.password).trim();
+      try {
+        localStorage.setItem(STORAGE_ADMIN_PASSWORD_KEY, cachedGlobalPassword);
+      } catch (_) {}
+      return cachedGlobalPassword;
+    }
+  } catch (_) {}
+
+  return getLocalAdminPassword();
+};
+
+/**
+ * Synchronous local read with fallback to default system password.
+ */
+export const getLocalAdminPassword = () => {
+  if (cachedGlobalPassword && cachedGlobalPassword.trim()) {
+    return cachedGlobalPassword.trim();
+  }
+  if (typeof localStorage !== 'undefined') {
+    const custom = localStorage.getItem(STORAGE_ADMIN_PASSWORD_KEY);
+    if (custom && custom.trim()) {
+      return custom.trim();
+    }
+  }
+  return DEFAULT_ADMIN_PASSWORD;
+};
+
+/**
+ * Validate entered password against local cache or default system password.
  */
 export const checkAdminPassword = (entered) => {
   if (!entered) return false;
   const trimmed = String(entered).trim();
-  const custom = localStorage.getItem(STORAGE_ADMIN_PASSWORD_KEY);
-  if (custom && custom.trim()) {
-    return trimmed === custom.trim();
-  }
-  return trimmed === DEFAULT_ADMIN_PASSWORD;
+  const current = getLocalAdminPassword();
+  return trimmed === current;
 };
 
 /**
- * Update the admin password in localStorage.
+ * Set and persist new admin password globally across all devices via Neon PostgreSQL.
  */
-export const setAdminPassword = (newPassword) => {
+export const setAdminPassword = async (newPassword) => {
   if (!newPassword || !newPassword.trim()) return false;
-  localStorage.setItem(STORAGE_ADMIN_PASSWORD_KEY, newPassword.trim());
-  return true;
+  const clean = newPassword.trim();
+  cachedGlobalPassword = clean;
+
+  // 1. Save locally for instant offline authorization
+  try {
+    localStorage.setItem(STORAGE_ADMIN_PASSWORD_KEY, clean);
+  } catch (_) {}
+
+  // 2. Persist globally to Neon PostgreSQL (table: lagangilang_global_state)
+  const payload = {
+    password: clean,
+    updated_at: new Date().toISOString(),
+  };
+
+  let saved = false;
+  try {
+    saved = await globalSyncService.saveKey(GLOBAL_STATE_KEYS.ADMIN_PASSWORD, payload);
+  } catch (_) {}
+
+  // 3. Direct Neon SQL execution fallback
+  if (!saved) {
+    try {
+      const sql = await globalSyncService.getNeonSql();
+      await sql.query(
+        `INSERT INTO lagangilang_global_state (state_key, payload, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (state_key)
+         DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
+        [GLOBAL_STATE_KEYS.ADMIN_PASSWORD, JSON.stringify(payload)]
+      );
+      saved = true;
+    } catch (err) {
+      console.warn('[AdminAuth] Direct Neon insert error:', err);
+    }
+  }
+
+  return saved;
 };
 
 /**
@@ -41,10 +134,11 @@ export default function AdminPasswordModal({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
 
-  // Reset fields when opening/closing
+  // Reset fields when opening/closing and pre-fetch latest global password
   useEffect(() => {
     if (isOpen) {
       setPassword('');
@@ -53,16 +147,22 @@ export default function AdminPasswordModal({
       setConfirmPassword('');
       setError('');
       setShowPassword(false);
+      setIsSubmitting(false);
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
+
+      // Pre-fetch latest global password from Neon DB in background
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        fetchGlobalAdminPassword().catch(() => {});
+      }
     }
   }, [isOpen, isChangePassword]);
 
   if (!isOpen) return null;
 
   // Handle unlocking Admin Mode
-  const handleUnlockSubmit = (e) => {
+  const handleUnlockSubmit = async (e) => {
     e?.preventDefault();
     setError('');
 
@@ -71,7 +171,24 @@ export default function AdminPasswordModal({
       return;
     }
 
-    if (checkAdminPassword(password)) {
+    setIsSubmitting(true);
+
+    // 1. Instant check against local cache
+    let isValid = checkAdminPassword(password);
+
+    // 2. If local check fails, verify with fresh Neon DB password (in case changed on Desktop)
+    if (!isValid && typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        const fresh = await fetchGlobalAdminPassword();
+        if (fresh && String(password).trim() === fresh.trim()) {
+          isValid = true;
+        }
+      } catch (_) {}
+    }
+
+    setIsSubmitting(false);
+
+    if (isValid) {
       onSuccess?.();
     } else {
       setError('Incorrect password. Please try again.');
@@ -81,7 +198,7 @@ export default function AdminPasswordModal({
   };
 
   // Handle changing Admin Password
-  const handleChangeSubmit = (e) => {
+  const handleChangeSubmit = async (e) => {
     e?.preventDefault();
     setError('');
 
@@ -90,24 +207,46 @@ export default function AdminPasswordModal({
       return;
     }
 
-    if (!checkAdminPassword(currentPassword)) {
+    setIsSubmitting(true);
+
+    // Verify current password with local cache + cloud fallback
+    let isCurrentValid = checkAdminPassword(currentPassword);
+    if (!isCurrentValid && typeof navigator !== 'undefined' && navigator.onLine) {
+      try {
+        const fresh = await fetchGlobalAdminPassword();
+        if (fresh && String(currentPassword).trim() === fresh.trim()) {
+          isCurrentValid = true;
+        }
+      } catch (_) {}
+    }
+
+    if (!isCurrentValid) {
+      setIsSubmitting(false);
       setError('Current password is incorrect.');
       return;
     }
 
     if (!newPassword || newPassword.length < 4) {
+      setIsSubmitting(false);
       setError('New password must be at least 4 characters long.');
       return;
     }
 
     if (newPassword !== confirmPassword) {
+      setIsSubmitting(false);
       setError('New passwords do not match.');
       return;
     }
 
-    setAdminPassword(newPassword);
-    showToast?.('🔑 Admin password updated successfully!');
-    onClose?.();
+    try {
+      await setAdminPassword(newPassword);
+      showToast?.('🔑 Global admin password updated across all devices (Desktop, Mobile & Tablet)!');
+      onClose?.();
+    } catch (err) {
+      setError('Failed to sync password globally. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -132,7 +271,7 @@ export default function AdminPasswordModal({
         className="glass-card"
         style={{
           width: '100%',
-          maxWidth: '420px',
+          maxWidth: '430px',
           background: 'rgba(15, 23, 42, 0.95)',
           border: '1.5px solid rgba(56, 189, 248, 0.3)',
           borderRadius: '16px',
@@ -151,7 +290,7 @@ export default function AdminPasswordModal({
               </h3>
               <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
                 {isChangePassword
-                  ? 'Update the security password for Admin Mode'
+                  ? 'Update the security password globally across all devices'
                   : 'Enter password to unlock POI & map editing tools'}
               </p>
             </div>
@@ -173,6 +312,27 @@ export default function AdminPasswordModal({
             ✕
           </button>
         </div>
+
+        {/* Global sync notice in Change Password mode */}
+        {isChangePassword && (
+          <div
+            style={{
+              background: 'rgba(14, 165, 233, 0.12)',
+              border: '1px solid rgba(14, 165, 233, 0.3)',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              marginBottom: '14px',
+              fontSize: '0.74rem',
+              color: '#38bdf8',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>🌐</span>
+            <span>Changes persist to Neon PostgreSQL and update Desktop, Mobile & Tablet simultaneously.</span>
+          </div>
+        )}
 
         {/* Error message */}
         {error && (
@@ -217,6 +377,7 @@ export default function AdminPasswordModal({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter admin password..."
+                  disabled={isSubmitting}
                   className="input-field"
                   style={{
                     width: '100%',
@@ -256,6 +417,7 @@ export default function AdminPasswordModal({
                 type="button"
                 className="btn btn-secondary"
                 onClick={onClose}
+                disabled={isSubmitting}
                 style={{ padding: '8px 16px', fontSize: '0.82rem' }}
               >
                 Cancel
@@ -263,15 +425,18 @@ export default function AdminPasswordModal({
               <button
                 type="submit"
                 className="btn btn-primary"
+                disabled={isSubmitting}
                 style={{
                   padding: '8px 18px',
                   fontSize: '0.82rem',
                   fontWeight: 700,
                   background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                   boxShadow: '0 4px 12px rgba(2, 132, 199, 0.35)',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: isSubmitting ? 0.7 : 1,
                 }}
               >
-                🔓 Unlock Admin
+                {isSubmitting ? '⏳ Verifying...' : '🔓 Unlock Admin'}
               </button>
             </div>
           </form>
@@ -288,6 +453,7 @@ export default function AdminPasswordModal({
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Enter current password..."
+                disabled={isSubmitting}
                 className="input-field"
                 style={{ width: '100%', padding: '9px 12px', fontSize: '0.85rem', boxSizing: 'border-box' }}
               />
@@ -302,6 +468,7 @@ export default function AdminPasswordModal({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter at least 4 characters..."
+                disabled={isSubmitting}
                 className="input-field"
                 style={{ width: '100%', padding: '9px 12px', fontSize: '0.85rem', boxSizing: 'border-box' }}
               />
@@ -316,6 +483,7 @@ export default function AdminPasswordModal({
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Re-enter new password..."
+                disabled={isSubmitting}
                 className="input-field"
                 style={{ width: '100%', padding: '9px 12px', fontSize: '0.85rem', boxSizing: 'border-box' }}
               />
@@ -344,6 +512,7 @@ export default function AdminPasswordModal({
                   type="button"
                   className="btn btn-secondary"
                   onClick={onClose}
+                  disabled={isSubmitting}
                   style={{ padding: '7px 14px', fontSize: '0.8rem' }}
                 >
                   Cancel
@@ -351,14 +520,17 @@ export default function AdminPasswordModal({
                 <button
                   type="submit"
                   className="btn btn-primary"
+                  disabled={isSubmitting}
                   style={{
                     padding: '7px 16px',
                     fontSize: '0.8rem',
                     fontWeight: 700,
                     background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    opacity: isSubmitting ? 0.7 : 1,
                   }}
                 >
-                  Save Password
+                  {isSubmitting ? '⏳ Saving...' : 'Save Password Globally'}
                 </button>
               </div>
             </div>

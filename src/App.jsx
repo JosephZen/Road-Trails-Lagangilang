@@ -640,8 +640,8 @@ export default function App() {
     const unsub = globalSyncService.subscribe((evt) => {
       if (evt.type === 'status_change') {
         setCloudSyncStatus(evt.status);
-      } else if (evt.type === 'state_updated') {
-        const state = evt.state;
+      } else if (evt.type === 'state_updated' || evt.type === 'key_saved') {
+        const state = evt.state || globalSyncService.cachedState;
         if (state && Array.isArray(state[GLOBAL_STATE_KEYS.POIS]) && state[GLOBAL_STATE_KEYS.POIS].length > 0) {
           setTouristSpots(state[GLOBAL_STATE_KEYS.POIS]);
         }
@@ -650,6 +650,11 @@ export default function App() {
         }
         if (state && state[GLOBAL_STATE_KEYS.TRAILS]) {
           setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+        }
+        if (state && state[GLOBAL_STATE_KEYS.ADMIN_PASSWORD]?.password) {
+          try {
+            localStorage.setItem('lagangilang_admin_password', state[GLOBAL_STATE_KEYS.ADMIN_PASSWORD].password);
+          } catch (_) {}
         }
       }
     });

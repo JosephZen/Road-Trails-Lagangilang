@@ -17,6 +17,7 @@ export const GLOBAL_STATE_KEYS = {
   POIS: 'pois_and_landmarks',
   HOTLINES: 'hotlines_and_checkpoints',
   TRAILS: 'trail_alignments_and_bridges',
+  ADMIN_PASSWORD: 'admin_security_credentials',
 };
 
 class GlobalSyncService {
