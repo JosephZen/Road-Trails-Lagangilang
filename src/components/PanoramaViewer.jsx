@@ -155,10 +155,11 @@ export default function PanoramaViewer({
         }
       }
 
-      // 5. High-Definition Bundled Fallback: If cloud texture is locked (e.g. Neon 402 Quota)
+      // 5. If no valid custom 360 photo found yet
       if (!finalImageUrl) {
-        // Fall back to clean equirectangular HD asset rather than broken 50p thumbnail
-        finalImageUrl = '/assets/road_trail_360_concept_ai.jpg';
+        setIsLoading(false);
+        setHasLoadError(true);
+        return;
       }
 
       if (isCancelled) return;
@@ -281,12 +282,6 @@ export default function PanoramaViewer({
     viewer.on('error', (err) => {
       clearTimeout(timer);
       console.warn('Pannellum viewer load error for', imageUrl, err);
-      // Auto-fallback to bundled high-definition 360 preview if custom texture failed to load
-      if (imageUrl !== '/assets/road_trail_360_concept_ai.jpg') {
-        console.info('Auto-recovering: Loading bundled HD 360 preview...');
-        createViewer('/assets/road_trail_360_concept_ai.jpg', hotSpots, heading, currentAbsoluteHeading);
-        return;
-      }
       setIsLoading(false);
       setHasLoadError(true);
     });
@@ -442,46 +437,40 @@ export default function PanoramaViewer({
             animation: 'fadeInUp 0.3s ease',
           }}
         >
-          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>⚠️</div>
-          <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', color: '#f87171' }}>
-            360 Photo Unavailable
+          <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📷</div>
+          <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 700, color: '#60a5fa' }}>
+            360° Photo Needed
           </h4>
-          <p style={{ margin: '0 0 16px 0', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.4 }}>
-            The custom 360 panorama image could not be accessed from the cloud database. Would you like to view the street view instead?
+          <p style={{ margin: '0 0 18px 0', fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.45 }}>
+            No 360° photosphere has been uploaded for <strong>{panorama?.label || 'this location'}</strong> yet.
           </p>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               className="btn btn-primary"
               onClick={() => fileInputRef.current?.click()}
               style={{
-                fontSize: '0.78rem',
-                padding: '6px 14px',
+                fontSize: '0.8rem',
+                padding: '7px 16px',
                 background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                 border: 'none',
                 cursor: 'pointer',
+                fontWeight: 600,
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
               }}
             >
-              📷 Upload / Replace Photo
+              📷 Upload 360 Photo
             </button>
             <button
               className="btn btn-secondary"
-              onClick={() => {
-                setHasLoadError(false);
-                createViewer('/assets/road_trail_360_concept_ai.jpg', [], panorama?.heading || 0, panorama?.heading || 0);
-              }}
-              style={{ fontSize: '0.78rem', padding: '6px 14px', cursor: 'pointer' }}
-            >
-              🏞️ Load HD Sample
-            </button>
-            <button
-              className="btn btn-primary"
               onClick={() => onFallbackToMapillary?.()}
               style={{
-                fontSize: '0.78rem',
-                padding: '6px 14px',
+                fontSize: '0.8rem',
+                padding: '7px 16px',
                 background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 border: 'none',
+                color: '#fff',
                 cursor: 'pointer',
+                fontWeight: 600,
               }}
             >
               🚗 View Street View
@@ -489,7 +478,7 @@ export default function PanoramaViewer({
             <button
               className="btn btn-secondary"
               onClick={onCloseViewer}
-              style={{ fontSize: '0.78rem', padding: '6px 14px', cursor: 'pointer' }}
+              style={{ fontSize: '0.8rem', padding: '7px 16px', cursor: 'pointer' }}
             >
               ✕ Close
             </button>
