@@ -5,7 +5,7 @@ import { touristSpotsService } from './touristSpotsService';
  * 
  * Powered by IndexedDB (`lagangilang_offline_db`) and Cache API.
  * Packages and persists:
- * 1. Base Map Tiles (Zoom levels 12 - 18 across Lagangilang bounding box)
+ * 1. Base Map Tiles (Zoom levels 5 - 18 across Lagangilang bounding box)
  * 2. Custom Map Overlays (Campus polygons, aligned streetview lines, local GeoJSON)
  * 3. Offline Road Network Routing Graph (lagangilang_roads_graph.json)
  * 4. POIs, Tourist Spots, Hotlines, and DENR Checkpoints
@@ -79,9 +79,9 @@ export function lngLatToTile(lng, lat, zoom) {
 }
 
 /**
- * Generate tile list covering the Lagangilang bounding box for zooms 12 through 19.
+ * Generate tile list covering the Lagangilang bounding box for zooms 5 through 18.
  */
-export function getBboxTileList(bbox = LAGANGILANG_BBOX, minZoom = 12, maxZoom = 17) {
+export function getBboxTileList(bbox = LAGANGILANG_BBOX, minZoom = 5, maxZoom = 17) {
   const tiles = [];
 
   for (let z = minZoom; z <= maxZoom; z++) {
@@ -416,16 +416,16 @@ class OfflineMapManager {
         } catch (_) {}
       }
 
-      // Stage 5: Cache Map Tiles (Zooms 12 - maxZoom across Lagangilang BBox) (100%)
+      // Stage 5: Cache Map Tiles (Zooms 5 - maxZoom across Lagangilang BBox) (100%)
       // Uses 100% free, CORS-friendly Esri World Street Map (zero API key, no watermarks, no 403 blocks)
-      const tileList = getBboxTileList(LAGANGILANG_BBOX, 12, maxZoom);
+      const tileList = getBboxTileList(LAGANGILANG_BBOX, 5, maxZoom);
       const totalTiles = tileList.length;
 
       onProgress({
         stage: 'tiles',
         percent: 58,
         mbDownloaded: (totalBytes / (1024 * 1024)).toFixed(1),
-        message: `Downloading ${totalTiles} Clean Esri World Street Map Tiles (Zoom 12-${maxZoom})...`,
+        message: `Downloading ${totalTiles} Clean Esri World Street Map Tiles (Zoom 5-${maxZoom})...`,
       });
 
       const batchSize = 12;

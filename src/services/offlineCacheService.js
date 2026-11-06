@@ -501,6 +501,17 @@ class OfflineCacheService {
       white-space: normal !important;
       box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
     }
+    .maplibregl-ctrl-attrib.maplibregl-compact {
+      min-height: auto !important;
+      padding: 3px 10px !important;
+      background-color: rgba(255, 255, 255, 0.94) !important;
+    }
+    .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner {
+      display: inline !important;
+    }
+    .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
+      display: none !important;
+    }
     .maplibregl-ctrl-attrib em, .offline-map-accuracy-note {
       font-style: italic !important;
       color: #334155 !important;
