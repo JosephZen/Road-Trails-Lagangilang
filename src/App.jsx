@@ -1330,16 +1330,6 @@ export default function App() {
                 >
                   <span className="role-indicator-dot" />
                   <span className="role-indicator-title">🛡️ Admin</span>
-                  <span
-                    className="role-indicator-logout"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRoleToggle();
-                    }}
-                    title="Exit Admin Mode"
-                  >
-                    Logout
-                  </span>
                 </div>
               </>
             )}
@@ -1660,40 +1650,36 @@ export default function App() {
           {/* Tab: Tools (Admin Quick-Access Hub - Admin only) */}
           {sidebarTab === 'tools' && isAdmin && (
             <div className="sidebar-body sidebar-tools-container" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
-                  Map Theme Style
+              {/* Admin Logout Button (Top of Admin Tools) */}
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  handleRoleToggle();
+                  setSidebarOpen(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '11px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.85rem',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  color: '#fca5a5',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🛡️</span>
+                  <span>Admin Logout (Exit to Tourist)</span>
                 </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                  {[
-                    { id: 'light', label: '☀️ Light' },
-                    { id: 'dark', label: '🌙 Dark' },
-                    { id: 'beige', label: '📜 Beige' },
-                    { id: 'satellite', label: '🛰️ Satellite' },
-                  ].map((t) => (
-                    <button
-                      key={t.id}
-                      className={`btn ${mapTheme === t.id ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() => {
-                        setMapTheme(t.id);
-                        localStorage.setItem('lagangilang_map_theme', t.id);
-                        showToast(`Map theme: ${t.label}`);
-                      }}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 'var(--radius-md)',
-                        fontSize: '0.85rem',
-                        fontWeight: mapTheme === t.id ? 700 : 500,
-                      }}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                <span>➔</span>
+              </button>
 
               {/* Admin Tools Section */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f59e0b' }}>
                   🛡️ Admin Controls
                 </span>
@@ -1900,35 +1886,6 @@ export default function App() {
                   <span>Cloud Database</span>
                   <span>{isOnline ? '🟢 Connected ⚙️' : '🟡 Offline Buffer ⚙️'}</span>
                 </div>
-
-                {/* Admin Logout Button */}
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    handleRoleToggle();
-                    setSidebarOpen(false);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '11px 14px',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '0.85rem',
-                    background: 'rgba(239, 68, 68, 0.15)',
-                    border: '1px solid rgba(239, 68, 68, 0.4)',
-                    color: '#fca5a5',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    marginTop: '6px',
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>🛡️</span>
-                    <span>Admin Logout (Exit to Tourist)</span>
-                  </span>
-                  <span>➔</span>
-                </button>
               </div>
             </div>
           )}
