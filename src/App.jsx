@@ -66,7 +66,6 @@ export default function App() {
   const [isNavMinimized, setIsNavMinimized] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [showOfflineModal, setShowOfflineModal] = useState(false);
-  const [difficultyFilter, setDifficultyFilter] = useState('all'); // 'all' | 'Easy' | 'Moderate' | 'Challenging'
   const [showCustomOSM, setShowCustomOSM] = useState(true);
 
   // Right-click context menu state: { lat, lng, x, y } | null
@@ -618,17 +617,20 @@ export default function App() {
     return () => unsub();
   }, [loadTouristSpots]);
 
-  // Filter spots by Tourist Attraction vs Service/POI, Barangay, and Trail Difficulty
+  // Filter spots by Tourist Attraction vs Service/POI and Barangay, sorted alphabetically (A-Z)
   const displayedSpots = useMemo(() => {
-    return touristSpots.filter((s) => {
+    const list = touristSpots.filter((s) => {
       const isPoi = (s.spotType || s.type) === 'poi';
       if (spotFilter === 'tourist_spot' && isPoi) return false;
       if (spotFilter === 'poi' && !isPoi) return false;
       if (barangayFilter !== 'all' && s.barangay !== barangayFilter) return false;
-      if (difficultyFilter !== 'all' && s.trail_difficulty !== difficultyFilter) return false;
       return true;
     });
-  }, [touristSpots, spotFilter, barangayFilter, difficultyFilter]);
+
+    return list.slice().sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+    );
+  }, [touristSpots, spotFilter, barangayFilter]);
 
   useEffect(() => {
     loadTouristSpots();
@@ -1020,6 +1022,7 @@ export default function App() {
   const handleRoleToggle = useCallback(() => {
     if (isAdmin) {
       setIsAdmin(false);
+      setSidebarTab('spots');
       sessionStorage.removeItem('lagangilang_admin_authenticated');
       showToast('🌴 Tourist Explorer active — Explore map & navigate 360 street views');
     } else {
@@ -1220,34 +1223,6 @@ export default function App() {
               <span>Road & Trail</span>
             </div>
 
-            {/* Explore Spots Drawer Button */}
-            <button
-              className="btn btn-secondary"
-              onClick={() => {
-                setSidebarTab('spots');
-                setSidebarOpen(true);
-              }}
-              title="Explore Tourist Spots, Caves, Waterfalls & Heritage Sites"
-              style={{
-                fontSize: '0.8rem',
-                padding: '6px 12px',
-                borderRadius: 'var(--radius-full)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                background: 'rgba(15, 23, 42, 0.92)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: '#ffffff',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
-                backdropFilter: 'blur(12px)',
-              }}
-            >
-              <span>📍</span>
-              <span className="btn-label-text">Explore</span>
-            </button>
-
             {/* Live Weather & Trail Advisory Pill (Online only) */}
             {isOnline && <WeatherWidget isCompact={true} />}
 
@@ -1343,15 +1318,14 @@ export default function App() {
               <>
                 <div className="controls-separator" />
 
-                {/* Role Indicator Badge (Admin Logout) */}
+                {/* Role Indicator Badge */}
                 <div
                   className="role-indicator admin"
-                  onClick={handleRoleToggle}
-                  title="Admin Mode Active (Click to Logout)"
+                  style={{ cursor: 'default' }}
+                  title="Admin Mode Active"
                 >
                   <span className="role-indicator-dot" />
                   <span className="role-indicator-title">🛡️ Admin</span>
-                  <span className="role-indicator-logout">Logout</span>
                 </div>
 
                 {/* 360° Street View & Trails Toggle (Admin only) */}
@@ -1521,41 +1495,6 @@ export default function App() {
                 >
                   <span>{pinsDraggable ? '🔓' : '🔒'}</span>
                   <span className="btn-label-text">{pinsDraggable ? 'Reposition ON' : 'Pins Locked'}</span>
-                </button>
-
-                {/* Admin Master Toggle for Sequence & Junction Bridges */}
-                <button
-                  className={`btn btn-sm ${showBridgePrompts ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => {
-                    const next = !showBridgePrompts;
-                    setShowBridgePrompts(next);
-                    try {
-                      localStorage.setItem('lagangilang_show_bridge_prompts', String(next));
-                    } catch (_) {}
-                    showToast(next ? '🔗 Sequence & Junction Bridges: ON' : '🔗 Sequence & Junction Bridges: OFF (Hidden)');
-                  }}
-                  title={showBridgePrompts ? 'Bridge Prompts are VISIBLE in 360 viewer. Click to hide.' : 'Bridge Prompts are HIDDEN. Click to turn ON.'}
-                  style={{
-                    fontSize: '0.8rem',
-                    padding: '6px 12px',
-                    borderRadius: 'var(--radius-full)',
-                    background: showBridgePrompts
-                      ? 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)'
-                      : 'rgba(0,0,0,0.6)',
-                    border: showBridgePrompts
-                      ? '1px solid #c084fc'
-                      : '1px solid rgba(255,255,255,0.15)',
-                    color: '#ffffff',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}
-                >
-                  <span>🔗</span>
-                  <span className="btn-label-text">Bridges: {showBridgePrompts ? 'ON' : 'OFF'}</span>
                 </button>
 
                 {/* Online/Offline indicator & DB configuration */}
@@ -1759,24 +1698,26 @@ export default function App() {
               >
                 ⭐ Spots ({touristSpots.length})
               </button>
-              <button
-                className={`sidebar-tab-btn ${sidebarTab === 'tools' ? 'active' : ''}`}
-                onClick={() => setSidebarTab('tools')}
-                style={{
-                  background: sidebarTab === 'tools' ? 'var(--accent-primary)' : 'transparent',
-                  color: sidebarTab === 'tools' ? '#fff' : 'var(--text-secondary)',
-                  border: sidebarTab === 'tools' ? 'none' : '1px solid var(--border-subtle)',
-                  padding: '6px 12px',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                🛠️ Tools
-              </button>
+              {isAdmin && (
+                <button
+                  className={`sidebar-tab-btn ${sidebarTab === 'tools' ? 'active' : ''}`}
+                  onClick={() => setSidebarTab('tools')}
+                  style={{
+                    background: sidebarTab === 'tools' ? 'var(--accent-primary)' : 'transparent',
+                    color: sidebarTab === 'tools' ? '#fff' : 'var(--text-secondary)',
+                    border: sidebarTab === 'tools' ? 'none' : '1px solid var(--border-subtle)',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-full)',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  🛠️ Tools
+                </button>
+              )}
               <button
                 className={`sidebar-tab-btn ${sidebarTab === 'routing' ? 'active' : ''}`}
                 onClick={() => setSidebarTab('routing')}
@@ -1863,22 +1804,6 @@ export default function App() {
                         {b}
                       </option>
                     ))}
-                  </select>
-                </div>
-
-                {/* Trail Difficulty Filter */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Difficulty:</span>
-                  <select
-                    value={difficultyFilter}
-                    onChange={(e) => setDifficultyFilter(e.target.value)}
-                    className="input-field"
-                    style={{ flex: 1, fontSize: '0.75rem', padding: '3px 8px' }}
-                  >
-                    <option value="all">All Trail Difficulties</option>
-                    <option value="Easy">🟢 Easy (Gentle / Accessible)</option>
-                    <option value="Moderate">🟠 Moderate (Gravel & Riverbank)</option>
-                    <option value="Challenging">🔴 Challenging (Caves & Rocks)</option>
                   </select>
                 </div>
               </div>
@@ -1979,37 +1904,9 @@ export default function App() {
             </div>
           )}
 
-          {/* Tab: Tools (Tablet & Mobile Optimized Quick-Access Hub) */}
-          {sidebarTab === 'tools' && (
+          {/* Tab: Tools (Admin Quick-Access Hub - Admin only) */}
+          {sidebarTab === 'tools' && isAdmin && (
             <div className="sidebar-body sidebar-tools-container" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Discrete Role Switch: Only visible when Admin is already unlocked */}
-              {isAdmin && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
-                    User Role & Permissions
-                  </span>
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleRoleToggle}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.88rem',
-                      fontWeight: 600,
-                      width: '100%',
-                    }}
-                  >
-                    <span>🛡️ Admin Panel Active</span>
-                    <span style={{ fontSize: '0.78rem', opacity: 0.85 }}>
-                      Switch to Tourist (Logout)
-                    </span>
-                  </button>
-                </div>
-              )}
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
                   Map Theme Style
@@ -2042,249 +1939,244 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
-                  Navigation & Planner
+              {/* Admin Tools Section */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f59e0b' }}>
+                  🛡️ Admin Controls
                 </span>
+
+                <button
+                  className={`btn ${showMapillaryStreetview ? 'btn-secondary' : 'btn-ghost'}`}
+                  onClick={() => {
+                    const next = !showMapillaryStreetview;
+                    setShowMapillaryStreetview(next);
+                    setShowMapillaryDots(next);
+                    setShowMapillaryLines(next);
+                    showToast(next ? '🟢 Mapillary streetview visible' : '⚪ Mapillary streetview hidden');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <span>Raw Streetview Lines & Dots</span>
+                  <span>{showMapillaryStreetview ? '🟢 ON' : '⚪ OFF'}</span>
+                </button>
+
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    setSidebarTab('routing');
+                    setEditingSpot(null);
+                    setShowSpotModal(true);
+                    setSidebarOpen(false);
                   }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    padding: '12px',
+                    padding: '11px 14px',
                     borderRadius: 'var(--radius-md)',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
+                    color: '#1a1a2e',
+                    border: 'none',
                   }}
                 >
-                  🧭 Open Route Planner
+                  ⭐ + Add New Landmark / Spot
                 </button>
-              </div>
 
-              {/* Emergency & Municipal Services Hub */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f87171' }}>
-                  Safety & Emergency Services
-                </span>
+                <button
+                  className={`btn ${pinsDraggable ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    const next = !pinsDraggable;
+                    setPinsDraggable(next);
+                    showToast(next ? '🔓 Pin repositioning unlocked' : '🔒 Pins locked');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <span>Drag & Reposition Pins</span>
+                  <span>{pinsDraggable ? '🔓 Unlocked' : '🔒 Locked'}</span>
+                </button>
+
+                <button
+                  className={`btn ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setShowCustomOSM(!showCustomOSM)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <span>🗺️ Custom OSM Overlay</span>
+                  <span>{showCustomOSM ? 'ON' : 'OFF'}</span>
+                </button>
+
+                <button
+                  className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    if (aligningSequence) {
+                      setAligningSequence(null);
+                      setIsSelectingAlignmentTarget(false);
+                    } else if (isSelectingAlignmentTarget) {
+                      setIsSelectingAlignmentTarget(false);
+                    } else {
+                      setIsSelectingAlignmentTarget(true);
+                      showToast('🎯 Click directly on the green streetview line you want to bend & re-align!');
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <span>📐 Bend & Align Streetview Line</span>
+                  <span>{aligningSequence ? 'Exit' : isSelectingAlignmentTarget ? 'Cancel' : 'Select'}</span>
+                </button>
+
+                {/* Sequence & Junction Bridges Master Toggle */}
+                <button
+                  className={`btn ${showBridgePrompts ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    const next = !showBridgePrompts;
+                    setShowBridgePrompts(next);
+                    try {
+                      localStorage.setItem('lagangilang_show_bridge_prompts', String(next));
+                    } catch (_) {}
+                    showToast(next ? '🔗 Sequence & Junction Bridges: ON' : '🔗 Sequence & Junction Bridges: OFF (Hidden)');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <span>🔗 Sequence & Junction Bridges</span>
+                  <span>{showBridgePrompts ? '🟢 ON' : '⚪ OFF'}</span>
+                </button>
+
                 <button
                   className="btn btn-secondary"
                   onClick={() => {
-                    setShowEmergencyModal(true);
+                    setShowExcludedModal(true);
                     setSidebarOpen(false);
                   }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '12px 14px',
+                    padding: '10px 14px',
                     borderRadius: 'var(--radius-md)',
-                    fontSize: '0.88rem',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <span>🚫 Excluded Sequences Manager</span>
+                  {excludedSequences.length > 0 && (
+                    <span style={{
+                      background: '#ef4444',
+                      color: '#fff',
+                      borderRadius: 'var(--radius-full)',
+                      padding: '1px 8px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                    }}>
+                      {excludedSequences.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setIsChangePasswordMode(true);
+                    setShowAdminPasswordModal(true);
+                    setSidebarOpen(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <span>🔑 Change Admin Password</span>
+                  <span>Edit</span>
+                </button>
+
+                <div
+                  onClick={handleConfigureNeonUrl}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'rgba(0,0,0,0.5)',
+                    fontSize: '0.82rem',
                     fontWeight: 600,
+                    color: isOnline ? '#10b981' : '#f59e0b',
+                    cursor: 'pointer',
+                    border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.4)'}`,
+                  }}
+                >
+                  <span>Cloud Database</span>
+                  <span>{isOnline ? '🟢 Connected ⚙️' : '🟡 Offline Buffer ⚙️'}</span>
+                </div>
+
+                {/* Admin Logout Button */}
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    handleRoleToggle();
+                    setSidebarOpen(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '11px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '0.85rem',
                     background: 'rgba(239, 68, 68, 0.15)',
-                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
                     color: '#fca5a5',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    marginTop: '6px',
                   }}
                 >
                   <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>🚨</span>
-                    <span>Emergency Hotlines & Guidelines</span>
+                    <span>🛡️</span>
+                    <span>Admin Logout (Exit to Tourist)</span>
                   </span>
                   <span>➔</span>
                 </button>
               </div>
-
-              {/* Admin Tools Section */}
-              {isAdmin ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f59e0b' }}>
-                    🛡️ Admin Controls
-                  </span>
-
-                  <button
-                    className={`btn ${showMapillaryStreetview ? 'btn-secondary' : 'btn-ghost'}`}
-                    onClick={() => {
-                      const next = !showMapillaryStreetview;
-                      setShowMapillaryStreetview(next);
-                      setShowMapillaryDots(next);
-                      setShowMapillaryLines(next);
-                      showToast(next ? '🟢 Mapillary streetview visible' : '⚪ Mapillary streetview hidden');
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    <span>Raw Streetview Lines & Dots</span>
-                    <span>{showMapillaryStreetview ? '🟢 ON' : '⚪ OFF'}</span>
-                  </button>
-
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => {
-                      setEditingSpot(null);
-                      setShowSpotModal(true);
-                      setSidebarOpen(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      padding: '11px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.85rem',
-                      fontWeight: 700,
-                      background: 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
-                      color: '#1a1a2e',
-                      border: 'none',
-                    }}
-                  >
-                    ⭐ + Add New Landmark / Spot
-                  </button>
-
-                  <button
-                    className={`btn ${pinsDraggable ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => {
-                      const next = !pinsDraggable;
-                      setPinsDraggable(next);
-                      showToast(next ? '🔓 Pin repositioning unlocked' : '🔒 Pins locked');
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    <span>Drag & Reposition Pins</span>
-                    <span>{pinsDraggable ? '🔓 Unlocked' : '🔒 Locked'}</span>
-                  </button>
-
-                  <button
-                    className={`btn ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setShowCustomOSM(!showCustomOSM)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    <span>🗺️ Custom OSM Overlay</span>
-                    <span>{showCustomOSM ? 'ON' : 'OFF'}</span>
-                  </button>
-
-                  <button
-                    className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => {
-                      setSidebarOpen(false);
-                      if (aligningSequence) {
-                        setAligningSequence(null);
-                        setIsSelectingAlignmentTarget(false);
-                      } else if (isSelectingAlignmentTarget) {
-                        setIsSelectingAlignmentTarget(false);
-                      } else {
-                        setIsSelectingAlignmentTarget(true);
-                        showToast('🎯 Click directly on the green streetview line you want to bend & re-align!');
-                      }
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    <span>📐 Bend & Align Streetview Line</span>
-                    <span>{aligningSequence ? 'Exit' : isSelectingAlignmentTarget ? 'Cancel' : 'Select'}</span>
-                  </button>
-
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      setShowExcludedModal(true);
-                      setSidebarOpen(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    <span>🚫 Excluded Sequences Manager</span>
-                    {excludedSequences.length > 0 && (
-                      <span style={{
-                        background: '#ef4444',
-                        color: '#fff',
-                        borderRadius: 'var(--radius-full)',
-                        padding: '1px 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                      }}>
-                        {excludedSequences.length}
-                      </span>
-                    )}
-                  </button>
-
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      setIsChangePasswordMode(true);
-                      setShowAdminPasswordModal(true);
-                      setSidebarOpen(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    <span>🔑 Change Admin Password</span>
-                    <span>Edit</span>
-                  </button>
-
-                  <div
-                    onClick={handleConfigureNeonUrl}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'rgba(0,0,0,0.5)',
-                      fontSize: '0.82rem',
-                      fontWeight: 600,
-                      color: isOnline ? '#10b981' : '#f59e0b',
-                      cursor: 'pointer',
-                      border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.4)'}`,
-                    }}
-                  >
-                    <span>Cloud Database</span>
-                    <span>{isOnline ? '🟢 Connected ⚙️' : '🟡 Offline Buffer ⚙️'}</span>
-                  </div>
-                </div>
-              ) : null}
             </div>
           )}
 
@@ -2995,7 +2887,6 @@ export default function App() {
           // Ensure POIs are not hidden by sidebar filter tabs
           setSpotFilter('all');
           setBarangayFilter('all');
-          setDifficultyFilter('all');
 
           let targetSpot = touristSpots.find((s) => s.id === spotId);
           if (!targetSpot) {

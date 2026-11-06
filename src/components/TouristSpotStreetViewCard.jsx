@@ -342,39 +342,6 @@ export default function TouristSpotStreetViewCard({
           alignItems: 'center',
         }}
       >
-        {/* Difficulty Pill */}
-        {spot.trail_difficulty && (
-          <span
-            style={{
-              fontSize: '0.62rem',
-              fontWeight: 700,
-              padding: '2px 6px',
-              borderRadius: '4px',
-              background:
-                spot.trail_difficulty === 'Easy'
-                  ? 'rgba(16, 185, 129, 0.2)'
-                  : spot.trail_difficulty === 'Moderate'
-                  ? 'rgba(245, 158, 11, 0.2)'
-                  : 'rgba(239, 68, 68, 0.2)',
-              color:
-                spot.trail_difficulty === 'Easy'
-                  ? '#34d399'
-                  : spot.trail_difficulty === 'Moderate'
-                  ? '#fbbf24'
-                  : '#f87171',
-              border:
-                spot.trail_difficulty === 'Easy'
-                  ? '1px solid rgba(16, 185, 129, 0.4)'
-                  : spot.trail_difficulty === 'Moderate'
-                  ? '1px solid rgba(245, 158, 11, 0.4)'
-                  : '1px solid rgba(239, 68, 68, 0.4)',
-            }}
-            title="Trail Difficulty"
-          >
-            {spot.trail_difficulty === 'Easy' ? '🟢 Easy' : spot.trail_difficulty === 'Moderate' ? '🟠 Moderate' : '🔴 Challenging'}
-          </span>
-        )}
-
         {/* Trail Condition */}
         {spot.trail_condition && (
           <span

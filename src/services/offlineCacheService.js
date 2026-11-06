@@ -986,7 +986,9 @@ class OfflineCacheService {
       });
 
       sortedGroupKeys.forEach(function(grpName) {
-        const items = groups[grpName];
+        const items = groups[grpName].sort(function(a, b) {
+          return (a.spot.name || '').localeCompare(b.spot.name || '', undefined, { sensitivity: 'base' });
+        });
         const groupDiv = document.createElement('div');
         groupDiv.className = 'category-group';
 
