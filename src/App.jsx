@@ -1318,276 +1318,29 @@ export default function App() {
               <>
                 <div className="controls-separator" />
 
-                {/* Role Indicator Badge */}
+                {/* Role Indicator Badge (Click to open Admin Tools drawer) */}
                 <div
                   className="role-indicator admin"
-                  style={{ cursor: 'default' }}
-                  title="Admin Mode Active"
+                  onClick={() => {
+                    setSidebarTab('tools');
+                    setSidebarOpen(true);
+                  }}
+                  title="Admin Mode Active — Click to open Admin Tools drawer"
+                  style={{ cursor: 'pointer' }}
                 >
                   <span className="role-indicator-dot" />
                   <span className="role-indicator-title">🛡️ Admin</span>
-                </div>
-
-                {/* 360° Street View & Trails Toggle (Admin only) */}
-                <button
-                  className={`btn ${showMapillaryStreetview ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => {
-                    const next = !showMapillaryStreetview;
-                    setShowMapillaryStreetview(next);
-                    setShowMapillaryDots(next);
-                    setShowMapillaryLines(next);
-                    showToast(
-                      next
-                        ? '🟢 360° Trail coverage visible on map'
-                        : '⚪ 360° Trail coverage hidden'
-                    );
-                  }}
-                  style={{
-                    fontSize: '0.8rem',
-                    padding: '6px 12px',
-                    borderRadius: 'var(--radius-full)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    background: showMapillaryStreetview
-                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                      : 'rgba(15, 23, 42, 0.92)',
-                    color: '#ffffff',
-                    border: showMapillaryStreetview ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
-                    backdropFilter: 'blur(12px)',
-                  }}
-                  title={
-                    showMapillaryStreetview
-                      ? 'Hide 360° Trail lines & photo points'
-                      : 'Display 360° Trail lines & photo points across Lagangilang'
-                  }
-                >
-                  <span>📷</span>
-                  <span className="btn-label-text">
-                    {showMapillaryStreetview ? 'Trails: ON' : '360° Trails'}
-                  </span>
-                </button>
-                {/* Bend / Align Streetview Line Button (Admin only) */}
-                <button
-                  className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => {
-                    if (aligningSequence) {
-                      setAligningSequence(null);
-                      setIsSelectingAlignmentTarget(false);
-                    } else if (isSelectingAlignmentTarget) {
-                      setIsSelectingAlignmentTarget(false);
-                      showToast('Line selection cancelled');
-                    } else {
-                      setIsSelectingAlignmentTarget(true);
-                      showToast('🎯 Click directly on the green streetview line you want to bend & re-align!');
-                    }
-                  }}
-                  style={{
-                    fontSize: '0.8rem',
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-full)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    background: aligningSequence || isSelectingAlignmentTarget
-                      ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
-                      : undefined,
-                  }}
-                  title="Bend and re-align Mapillary streetview lines onto road curves (Admin only)"
-                >
-                  <span>📐</span>
-                  <span className="btn-label-text">
-                    {aligningSequence ? 'Exit Align' : isSelectingAlignmentTarget ? 'Cancel' : 'Align Line'}
-                  </span>
-                </button>
-                {/* Custom OSM Overlay Toggle */}
-                <button
-                  className={`btn btn-sm ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setShowCustomOSM(!showCustomOSM)}
-                  title="Toggle Custom OSM Map Overlay"
-                  style={{
-                    fontSize: '0.8rem',
-                    padding: '6px 10px',
-                    borderRadius: 'var(--radius-full)',
-                    background: showCustomOSM
-                      ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-                      : 'rgba(0,0,0,0.6)',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    color: '#ffffff',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <span>🗺️</span>
-                  <span className="btn-label-text">Custom Map</span>
-                </button>
-
-                {/* Add Tourist Spot Button */}
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    setEditingSpot(null);
-                    setShowSpotModal(true);
-                  }}
-                  title="Add Location (POI or Attraction) to System"
-                  style={{
-                    fontSize: '0.8rem',
-                    padding: '6px 12px',
-                    borderRadius: 'var(--radius-full)',
-                    background: 'linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)',
-                    color: '#1a1a2e',
-                    fontWeight: 700,
-                    border: 'none',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <span>⭐</span>
-                  <span className="btn-label-text">+ Add Spot</span>
-                </button>
-
-                {/* Pin Repositioning Lock / Unlock Button */}
-                <button
-                  className={`btn btn-sm ${pinsDraggable ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => {
-                    const nextState = !pinsDraggable;
-                    setPinsDraggable(nextState);
-                    showToast(
-                      nextState
-                        ? '🔓 Pin repositioning unlocked: Drag landmarks or POIs to adjust coordinates.'
-                        : '🔒 Pin repositioning locked: Marker positions are secured.'
-                    );
-                  }}
-                  title={
-                    pinsDraggable
-                      ? 'Pins are UNLOCKED for dragging. Click to lock against movement.'
-                      : 'Pins are LOCKED against accidental movement. Click to unlock repositioning.'
-                  }
-                  style={{
-                    fontSize: '0.8rem',
-                    padding: '6px 12px',
-                    borderRadius: 'var(--radius-full)',
-                    background: pinsDraggable
-                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                      : 'rgba(0,0,0,0.6)',
-                    border: pinsDraggable
-                      ? '1px solid #34d399'
-                      : '1px solid rgba(255,255,255,0.15)',
-                    color: '#ffffff',
-                    fontWeight: 600,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}
-                >
-                  <span>{pinsDraggable ? '🔓' : '🔒'}</span>
-                  <span className="btn-label-text">{pinsDraggable ? 'Reposition ON' : 'Pins Locked'}</span>
-                </button>
-
-                {/* Online/Offline indicator & DB configuration */}
-                <div
-                  onClick={handleConfigureNeonUrl}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '5px 10px',
-                    borderRadius: 'var(--radius-full)',
-                    background: 'rgba(0,0,0,0.6)',
-                    backdropFilter: 'blur(8px)',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    color: isOnline ? '#10b981' : '#f59e0b',
-                    border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.4)'}`,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}
-                  title={isOnline ? 'Online • Neon PostgreSQL connected (Click to change DB URL)' : 'Offline • Field staging buffer active (Click to change DB URL)'}
-                >
                   <span
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: isOnline ? '#10b981' : '#f59e0b',
-                      boxShadow: `0 0 6px ${isOnline ? '#10b981' : '#f59e0b'}`,
+                    className="role-indicator-logout"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRoleToggle();
                     }}
-                  />
-                  <span>{isOnline ? 'Online ⚙️' : 'Offline ⚙️'}</span>
+                    title="Exit Admin Mode"
+                  >
+                    Logout
+                  </span>
                 </div>
-
-                {/* Excluded Sequences Manager Button */}
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setShowExcludedModal(true)}
-                  title="Manage excluded streetview sequences"
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '4px 10px',
-                    borderRadius: 'var(--radius-full)',
-                    border: excludedSequences.length > 0 ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.2)',
-                    color: excludedSequences.length > 0 ? '#fca5a5' : '#cbd5e1',
-                    background: excludedSequences.length > 0 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}
-                >
-                  <span>🚫 Excluded</span>
-                  {excludedSequences.length > 0 && (
-                    <span style={{
-                      background: '#ef4444',
-                      color: '#fff',
-                      borderRadius: 'var(--radius-full)',
-                      padding: '1px 6px',
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                    }}>
-                      {excludedSequences.length}
-                    </span>
-                  )}
-                </button>
-
-                {/* Change Admin Password Button */}
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setIsChangePasswordMode(true);
-                    setShowAdminPasswordModal(true);
-                  }}
-                  title="Change Admin Password"
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '4px 10px',
-                    borderRadius: 'var(--radius-full)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    color: '#cbd5e1',
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}
-                >
-                  <span>🔑 Password</span>
-                </button>
               </>
             )}
           </div>
