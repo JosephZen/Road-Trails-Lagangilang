@@ -162,11 +162,11 @@ export const touristSpotsService = {
    * Get configured Neon Database URL from env or localStorage
    */
   getNeonUrl() {
-    return (
-      localStorage.getItem(NEON_URL_KEY) ||
-      import.meta.env.VITE_NEON_DATABASE_URL ||
-      DEFAULT_NEON_URL
-    );
+    const custom = typeof localStorage !== 'undefined' && localStorage.getItem(NEON_URL_KEY);
+    if (custom && custom.includes('ep-silent-heart-azsxtkkj')) return custom;
+    const env = import.meta.env.VITE_NEON_DATABASE_URL;
+    if (env && env.includes('ep-silent-heart-azsxtkkj')) return env;
+    return DEFAULT_NEON_URL;
   },
 
   /**

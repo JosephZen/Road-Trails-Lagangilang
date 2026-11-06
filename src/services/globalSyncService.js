@@ -6,10 +6,18 @@
  * persist immediately to Neon PostgreSQL (table: lagangilang_global_state).
  */
 
-const NEON_URL =
-  (typeof localStorage !== 'undefined' && localStorage.getItem('lagangilang_neon_db_url')) ||
-  import.meta.env.VITE_NEON_DATABASE_URL ||
+const ACTIVE_NEON_URL =
   'postgresql://neondb_owner:npg_lHhZV7o5xvMt@ep-silent-heart-azsxtkkj-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+
+function getNeonUrl() {
+  const custom = typeof localStorage !== 'undefined' && localStorage.getItem('lagangilang_neon_db_url');
+  if (custom && custom.includes('ep-silent-heart-azsxtkkj')) return custom;
+  const env = import.meta.env.VITE_NEON_DATABASE_URL;
+  if (env && env.includes('ep-silent-heart-azsxtkkj')) return env;
+  return ACTIVE_NEON_URL;
+}
+
+const NEON_URL = getNeonUrl();
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -97,15 +105,15 @@ class GlobalSyncService {
     try {
       const sql = await this.getNeonSql();
       // Ensure table exists
-      await sql.query(`
+      await sql`
         CREATE TABLE IF NOT EXISTS lagangilang_global_state (
           state_key TEXT PRIMARY KEY,
           payload JSONB NOT NULL,
           updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-      `);
+        )
+      `;
 
-      const rows = await sql.query('SELECT state_key, payload, updated_at FROM lagangilang_global_state');
+      const rows = await sql`SELECT state_key, payload, updated_at FROM lagangilang_global_state`;
       const stateMap = {};
       rows.forEach((r) => {
         stateMap[r.state_key] = r.payload;
@@ -153,13 +161,12 @@ class GlobalSyncService {
     // 2. Direct Neon DB fallback
     try {
       const sql = await this.getNeonSql();
-      await sql.query(
-        `INSERT INTO lagangilang_global_state (state_key, payload, updated_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (state_key)
-         DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
-        [key, JSON.stringify(payload)]
-      );
+      await sql`
+        INSERT INTO lagangilang_global_state (state_key, payload, updated_at)
+        VALUES (${key}, ${JSON.stringify(payload)}::jsonb, NOW())
+        ON CONFLICT (state_key)
+        DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()
+      `;
 
       this.lastSyncTime = new Date().toISOString();
       this.setSyncStatus('synced');

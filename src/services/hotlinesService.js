@@ -247,10 +247,12 @@ class HotlinesService {
 
       // Direct Neon DB execution fallback for 100% cloud persistence
       try {
-        const NEON_URL =
-          (typeof localStorage !== 'undefined' && localStorage.getItem('lagangilang_neon_db_url')) ||
-          import.meta.env.VITE_NEON_DATABASE_URL ||
-          'postgresql://neondb_owner:npg_lHhZV7o5xvMt@ep-silent-heart-azsxtkkj-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+        const customUrl = typeof localStorage !== 'undefined' && localStorage.getItem('lagangilang_neon_db_url');
+        const envUrl = import.meta.env.VITE_NEON_DATABASE_URL;
+        const fallbackUrl = 'postgresql://neondb_owner:npg_lHhZV7o5xvMt@ep-silent-heart-azsxtkkj-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+        const NEON_URL = (customUrl && customUrl.includes('ep-silent-heart-azsxtkkj')) ? customUrl
+          : (envUrl && envUrl.includes('ep-silent-heart-azsxtkkj')) ? envUrl
+          : fallbackUrl;
         import('@neondatabase/serverless').then(({ neon }) => {
           const sql = neon(NEON_URL);
           sql`

@@ -4,10 +4,18 @@ export const config = {
   runtime: 'edge',
 };
 
-const DB_URL =
-  process.env.VITE_NEON_DATABASE_URL ||
-  process.env.NEON_DATABASE_URL ||
+const ACTIVE_NEON_URL =
   'postgresql://neondb_owner:npg_lHhZV7o5xvMt@ep-silent-heart-azsxtkkj-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+
+function getDbUrl() {
+  const envUrl = process.env.VITE_NEON_DATABASE_URL || process.env.NEON_DATABASE_URL;
+  if (envUrl && envUrl.includes('ep-silent-heart-azsxtkkj')) {
+    return envUrl;
+  }
+  return ACTIVE_NEON_URL;
+}
+
+const DB_URL = getDbUrl();
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

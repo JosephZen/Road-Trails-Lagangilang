@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import globalSyncService, { GLOBAL_STATE_KEYS } from '../services/globalSyncService';
 
 const STORAGE_ADMIN_PASSWORD_KEY = 'lagangilang_admin_password';
-export const DEFAULT_ADMIN_PASSWORD = 'touristspot2026';
+export const DEFAULT_ADMIN_PASSWORD = 'touristspot2004';
 
 let cachedGlobalPassword = null;
 
@@ -32,10 +32,9 @@ export const fetchGlobalAdminPassword = async () => {
   // 2. Direct Neon SQL query fallback
   try {
     const sql = await globalSyncService.getNeonSql();
-    const rows = await sql.query(
-      `SELECT payload FROM lagangilang_global_state WHERE state_key = $1`,
-      [GLOBAL_STATE_KEYS.ADMIN_PASSWORD]
-    );
+    const rows = await sql`
+      SELECT payload FROM lagangilang_global_state WHERE state_key = ${GLOBAL_STATE_KEYS.ADMIN_PASSWORD}
+    `;
     if (rows && rows.length > 0 && rows[0].payload?.password) {
       cachedGlobalPassword = String(rows[0].payload.password).trim();
       try {
@@ -102,13 +101,12 @@ export const setAdminPassword = async (newPassword) => {
   if (!saved) {
     try {
       const sql = await globalSyncService.getNeonSql();
-      await sql.query(
-        `INSERT INTO lagangilang_global_state (state_key, payload, updated_at)
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (state_key)
-         DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()`,
-        [GLOBAL_STATE_KEYS.ADMIN_PASSWORD, JSON.stringify(payload)]
-      );
+      await sql`
+        INSERT INTO lagangilang_global_state (state_key, payload, updated_at)
+        VALUES (${GLOBAL_STATE_KEYS.ADMIN_PASSWORD}, ${JSON.stringify(payload)}::jsonb, NOW())
+        ON CONFLICT (state_key)
+        DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()
+      `;
       saved = true;
     } catch (err) {
       console.warn('[AdminAuth] Direct Neon insert error:', err);
@@ -173,17 +171,21 @@ export default function AdminPasswordModal({
 
     setIsSubmitting(true);
 
-    // 1. Instant check against local cache
-    let isValid = checkAdminPassword(password);
+    let isValid = false;
 
-    // 2. If local check fails, verify with fresh Neon DB password (in case changed on Desktop)
-    if (!isValid && typeof navigator !== 'undefined' && navigator.onLine) {
+    // 1. If online, verify against fresh cloud password first (so changes on Desktop/other devices reflect immediately)
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
       try {
         const fresh = await fetchGlobalAdminPassword();
         if (fresh && String(password).trim() === fresh.trim()) {
           isValid = true;
         }
       } catch (_) {}
+    }
+
+    // 2. Fallback to local cache / default password if offline or network hiccup
+    if (!isValid) {
+      isValid = checkAdminPassword(password);
     }
 
     setIsSubmitting(false);
@@ -209,15 +211,19 @@ export default function AdminPasswordModal({
 
     setIsSubmitting(true);
 
-    // Verify current password with local cache + cloud fallback
-    let isCurrentValid = checkAdminPassword(currentPassword);
-    if (!isCurrentValid && typeof navigator !== 'undefined' && navigator.onLine) {
+    // Verify current password with fresh cloud first, then local fallback
+    let isCurrentValid = false;
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
       try {
         const fresh = await fetchGlobalAdminPassword();
         if (fresh && String(currentPassword).trim() === fresh.trim()) {
           isCurrentValid = true;
         }
       } catch (_) {}
+    }
+
+    if (!isCurrentValid) {
+      isCurrentValid = checkAdminPassword(currentPassword);
     }
 
     if (!isCurrentValid) {

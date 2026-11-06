@@ -15,6 +15,12 @@ const SEQUENCE_BRIDGES_STORAGE_KEY = 'mapillary_sequence_bridges_v1';
 const NEON_URL_KEY = 'lagangilang_neon_db_url';
 const DEFAULT_NEON_URL =
   'postgresql://neondb_owner:npg_lHhZV7o5xvMt@ep-silent-heart-azsxtkkj-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+
+function getEffectiveNeonUrl() {
+  const custom = typeof localStorage !== 'undefined' && localStorage.getItem(NEON_URL_KEY);
+  if (custom && custom.includes('ep-silent-heart-azsxtkkj')) return custom;
+  return DEFAULT_NEON_URL;
+}
 const MAPILLARY_GRAPH_API = 'https://graph.mapillary.com';
 const ACCESS_TOKEN = 'MLY|28125741697049683|b57c41e6691fc16e7559d980e08c82c9';
 
@@ -526,7 +532,7 @@ class StreetviewAlignmentService {
 
   async syncWithNeon() {
     try {
-      const dbUrl = (typeof localStorage !== 'undefined' && localStorage.getItem(NEON_URL_KEY)) || DEFAULT_NEON_URL;
+      const dbUrl = getEffectiveNeonUrl();
       const { neon } = await import('@neondatabase/serverless');
       const sql = neon(dbUrl);
       const rows = await sql`
@@ -584,7 +590,7 @@ class StreetviewAlignmentService {
 
     // 1. Save directly to Neon DB so ALL devices immediately receive it
     try {
-      const dbUrl = (typeof localStorage !== 'undefined' && localStorage.getItem(NEON_URL_KEY)) || DEFAULT_NEON_URL;
+      const dbUrl = getEffectiveNeonUrl();
       const { neon } = await import('@neondatabase/serverless');
       const sql = neon(dbUrl);
       await sql`
@@ -646,7 +652,7 @@ class StreetviewAlignmentService {
     this.saveLocal();
 
     try {
-      const dbUrl = (typeof localStorage !== 'undefined' && localStorage.getItem(NEON_URL_KEY)) || DEFAULT_NEON_URL;
+      const dbUrl = getEffectiveNeonUrl();
       const { neon } = await import('@neondatabase/serverless');
       const sql = neon(dbUrl);
       await sql`DELETE FROM public.aligned_sequences WHERE sequence_id = ${sequenceId}`;
