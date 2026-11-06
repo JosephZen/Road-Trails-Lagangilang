@@ -185,6 +185,7 @@ export default function MapView({
               type: 'raster',
               tiles: ['lagangilang-offline://{z}/{x}/{y}'],
               tileSize: 256,
+              maxzoom: 17,
               attribution: 'Offline Map &copy; Lagangilang Eco-Trails &bull; <em>This Offline Map may not reflect to the actual locations indicated, please cross reference the online version for more accurate information</em>',
             },
           },
@@ -194,7 +195,7 @@ export default function MapView({
               type: 'raster',
               source: 'offline-tiles',
               minzoom: 0,
-              maxzoom: 19,
+              maxzoom: 22,
             },
           ],
         };
@@ -207,6 +208,7 @@ export default function MapView({
             type: 'raster',
             tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
             tileSize: 256,
+            maxzoom: 18,
             attribution: 'Tiles &copy; Esri'
           }
         },
@@ -216,7 +218,7 @@ export default function MapView({
             type: 'raster',
             source: 'esri-satellite',
             minzoom: 0,
-            maxzoom: 19
+            maxzoom: 22
           }
         ]
       };
@@ -235,7 +237,7 @@ export default function MapView({
       style: getStyleObj(theme),
       center: mapCenter || [120.9842, 14.5995], // Default: Manila
       zoom: mapZoom || 15,
-      maxZoom: theme === 'satellite' ? 19 : 22,
+      maxZoom: 22,
       pitch: 0,
       antialias: true,
     });
@@ -1121,7 +1123,7 @@ export default function MapView({
     if (currentThemeRef.current === theme) return;
     currentThemeRef.current = theme;
 
-    mapRef.current.setMaxZoom(theme === 'satellite' ? 19 : 22);
+    mapRef.current.setMaxZoom(22);
     mapRef.current.setStyle(getStyleObj(theme));
     
     // We need to re-add the Mapillary layers and coverage lines after style changes

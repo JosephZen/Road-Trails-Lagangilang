@@ -5,7 +5,7 @@ import { touristSpotsService } from './touristSpotsService';
  * 
  * Powered by IndexedDB (`lagangilang_offline_db`) and Cache API.
  * Packages and persists:
- * 1. Base Map Tiles (Zoom levels 5 - 18 across Lagangilang bounding box)
+ * 1. Base Map Tiles (Zoom levels 5 - 17 across Lagangilang bounding box, overzooms to Zoom 22)
  * 2. Custom Map Overlays (Campus polygons, aligned streetview lines, local GeoJSON)
  * 3. Offline Road Network Routing Graph (lagangilang_roads_graph.json)
  * 4. POIs, Tourist Spots, Hotlines, and DENR Checkpoints

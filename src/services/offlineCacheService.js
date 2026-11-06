@@ -699,6 +699,7 @@ class OfflineCacheService {
       container: 'map',
       center: [120.7340, 17.6142],
       zoom: 13.8,
+      maxZoom: 22,
       attributionControl: false,
       style: {
         version: 8,
@@ -707,6 +708,7 @@ class OfflineCacheService {
             type: 'raster',
             tiles: ['offline-tile://{z}/{x}/{y}'],
             tileSize: 256,
+            maxzoom: 17,
             attribution: '© Esri • Lagangilang Eco-Trails'
           }
         },
@@ -716,7 +718,7 @@ class OfflineCacheService {
             type: 'raster',
             source: 'offline-raster',
             minzoom: 0,
-            maxzoom: 19
+            maxzoom: 22
           }
         ]
       }

@@ -54,7 +54,7 @@ export default function OfflineGuideModal({
         touristSpots,
         customGeoJSON,
         hotlines,
-        maxZoom: 18, // Complete offline map with regional overview & street detail (Zooms 5-18)
+        maxZoom: 17, // Clean native Esri tiles (Zooms 5-17), MapLibre overzooms smoothly up to Zoom 22 street level
         onProgress: (p) => setDownloadProgress(p),
       });
 
@@ -180,7 +180,7 @@ export default function OfflineGuideModal({
               {offlineStatus?.isReady ? `${offlineStatus.sizeMB} MB Downloaded & Stored` : '~55–65 MB Full Package'}
             </span>
             <span style={{ color: '#64748b' }}>•</span>
-            <span style={{ color: '#94a3b8' }}>Zooms 5–18 Tiles, Road Graph & 360° Panos</span>
+            <span style={{ color: '#94a3b8' }}>Zooms 5–17 Street Tiles (Zoom in to Level 22), Road Graph & 360° Panos</span>
           </div>
         </div>
 
@@ -204,7 +204,7 @@ export default function OfflineGuideModal({
                 ⭐ Unified Complete Offline Package
               </div>
               <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
-                Includes Zooms 5–18 regional & street tiles, 43+ landmarks, emergency hotlines, and HD 360° panoramas
+                Includes Zooms 5–17 regional & street tiles (zoomable to Level 22 close-up), 43+ landmarks, emergency hotlines, and HD 360° panoramas
               </div>
             </div>
             <span style={{ fontSize: '0.72rem', background: '#059669', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontWeight: 700 }}>
