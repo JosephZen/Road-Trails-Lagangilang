@@ -1200,6 +1200,7 @@ export default function App() {
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
                 backdropFilter: 'blur(8px)',
+                boxShadow: 'none',
                 cursor: 'pointer',
                 userSelect: 'none',
                 WebkitUserSelect: 'none',
@@ -1219,7 +1220,6 @@ export default function App() {
                 e.currentTarget.style.transform = 'scale(1)';
               }}
             >
-              <span>🌲</span>
               <span>Road & Trail</span>
             </div>
 
@@ -1243,7 +1243,7 @@ export default function App() {
                 background: 'rgba(15, 23, 42, 0.92)',
                 border: '1px solid rgba(239, 68, 68, 0.35)',
                 color: '#ffffff',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                boxShadow: 'none',
                 backdropFilter: 'blur(12px)',
               }}
             >
@@ -1266,6 +1266,7 @@ export default function App() {
                   background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                   border: 'none',
                   color: '#fff',
+                  boxShadow: 'none',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                   display: 'flex',
@@ -1295,7 +1296,7 @@ export default function App() {
                 background: 'rgba(15, 23, 42, 0.92)',
                 border: '1px solid rgba(16, 185, 129, 0.35)',
                 color: '#6ee7b7',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                boxShadow: 'none',
                 backdropFilter: 'blur(12px)',
               }}
             >

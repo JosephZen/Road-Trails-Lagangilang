@@ -253,6 +253,8 @@ body {
   transform: translate3d(0, 0, 0);
   isolation: isolate;
   will-change: transform;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .map-overlay-top > * {
@@ -274,6 +276,8 @@ body {
   scroll-behavior: smooth;
   touch-action: pan-x;
   overscroll-behavior-x: contain;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .nav-scroll-container::-webkit-scrollbar {
@@ -299,7 +303,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  box-shadow: none !important;
   transition: all var(--transition-fast);
   touch-action: manipulation;
   pointer-events: auto;
@@ -3085,7 +3089,7 @@ body {
 }
 
 .brand-pill {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: none !important;
   letter-spacing: -0.01em;
 }
 

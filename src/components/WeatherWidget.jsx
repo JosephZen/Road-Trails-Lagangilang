@@ -97,7 +97,7 @@ export default function WeatherWidget({ isCompact = false }) {
           background: 'rgba(15, 23, 42, 0.92)',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           color: '#ffffff',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+          boxShadow: 'none',
           backdropFilter: 'blur(12px)',
           cursor: 'pointer',
           fontSize: '0.78rem',

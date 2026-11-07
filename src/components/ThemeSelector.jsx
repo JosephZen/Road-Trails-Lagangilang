@@ -105,7 +105,7 @@ export default function ThemeSelector({ theme = 'light', onChange }) {
           fontSize: '0.8rem',
           fontWeight: 600,
           cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+          boxShadow: 'none',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           whiteSpace: 'nowrap',
