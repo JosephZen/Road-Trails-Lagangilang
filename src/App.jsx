@@ -1162,12 +1162,6 @@ export default function App() {
                 setSidebarTab('routing');
                 setSidebarOpen(true);
               }}
-              onStartStreetViewRoute={() => {
-                if (routeOrigin) {
-                  handleMapClick(routeOrigin[1], routeOrigin[0]);
-                  showToast('📷 Opening 360° Street View at route start');
-                }
-              }}
             />
           ) : (
             /* Horizontally scrollable/dynamic action bar across all aspect ratios */

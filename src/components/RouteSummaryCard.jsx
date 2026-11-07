@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  getRouteElevationProfile,
   calculateAdvancedETAs,
   formatMinutes,
   formatKm,
@@ -27,10 +26,8 @@ export default function RouteSummaryCard({
   isSplitView = false,
   weather = null,
   onChangeDestination,
-  onStartStreetViewRoute,
 }) {
   const [showSteps, setShowSteps] = useState(false);
-  const [elevationData, setElevationData] = useState(null);
 
   // Sync active mode from profile
   const activeMode = useMemo(() => {
@@ -54,29 +51,11 @@ export default function RouteSummaryCard({
 
   const destDisplayName = destinationSpot?.name || 'Destination';
 
-  // Fetch elevation profile for the route geometry
-  useEffect(() => {
-    if (!routeData?.geometry?.coordinates) return;
-
-    let isMounted = true;
-    getRouteElevationProfile(routeData.geometry.coordinates)
-      .then((elev) => {
-        if (isMounted) setElevationData(elev);
-      })
-      .catch((err) => {
-        console.warn('Could not fetch route elevation:', err);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [routeData]);
-
-  // Calculate advanced mode ETAs considering elevation and road conditions
+  // Calculate advanced mode ETAs considering road conditions
   const etas = useMemo(() => {
     if (!routeData) return null;
-    return calculateAdvancedETAs(routeData, elevationData, weather);
-  }, [routeData, elevationData, weather]);
+    return calculateAdvancedETAs(routeData, null, weather);
+  }, [routeData, weather]);
 
   if (!routeData || !etas) return null;
 
@@ -333,32 +312,6 @@ export default function RouteSummaryCard({
           }}
         >
           📋
-        </button>
-      )}
-
-      {/* 360° Street View at Start (if available) */}
-      {onStartStreetViewRoute && (
-        <button
-          onClick={onStartStreetViewRoute}
-          title="Open 360° Street View at route start"
-          style={{
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: '9999px',
-            color: '#cbd5e1',
-            width: '28px',
-            height: '28px',
-            padding: 0,
-            fontSize: '0.74rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            transition: 'all 0.15s ease',
-          }}
-        >
-          📷
         </button>
       )}
 
