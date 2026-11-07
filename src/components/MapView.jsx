@@ -87,6 +87,9 @@ export default function MapView({
   excludedSequences = [],
   excludedImageKeys = [],
   onCalibrateNodePosition,
+  selectedHandleIndex = null,
+  onSelectHandleIndex,
+  onRemoveHandle,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -115,6 +118,23 @@ export default function MapView({
   useEffect(() => {
     onSelectSequenceForAlignmentRef.current = onSelectSequenceForAlignment;
   }, [onSelectSequenceForAlignment]);
+
+  const selectedHandleIndexRef = useRef(selectedHandleIndex);
+  useEffect(() => {
+    selectedHandleIndexRef.current = selectedHandleIndex;
+  }, [selectedHandleIndex]);
+
+  const onSelectHandleIndexRef = useRef(onSelectHandleIndex);
+  useEffect(() => {
+    onSelectHandleIndexRef.current = onSelectHandleIndex;
+  }, [onSelectHandleIndex]);
+
+  const onRemoveHandleRef = useRef(onRemoveHandle);
+  useEffect(() => {
+    onRemoveHandleRef.current = onRemoveHandle;
+  }, [onRemoveHandle]);
+
+  const handlePopupRef = useRef(null);
 
   // Trigger map resize when viewer opens or closes to prevent blanking
   useEffect(() => {
@@ -437,9 +457,24 @@ export default function MapView({
         type: 'circle',
         source: 'active-align-handles-source',
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 14, 18, 18],
-          'circle-color': '#00f0ff',
-          'circle-stroke-width': 4,
+          'circle-radius': [
+            'case',
+            ['boolean', ['get', 'selected'], false],
+            ['interpolate', ['linear'], ['zoom'], 12, 14, 15, 18, 18, 22],
+            ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 14, 18, 18],
+          ],
+          'circle-color': [
+            'case',
+            ['boolean', ['get', 'selected'], false],
+            '#ef4444',
+            '#00f0ff',
+          ],
+          'circle-stroke-width': [
+            'case',
+            ['boolean', ['get', 'selected'], false],
+            5,
+            3,
+          ],
           'circle-stroke-color': '#ffffff',
           'circle-opacity': 1,
         },
@@ -960,6 +995,61 @@ export default function MapView({
       }
     });
 
+    let touchHoldTimer = null;
+    let touchStartPos = null;
+    let hasDraggedHandle = false;
+    let lastTapTimestamp = 0;
+    let lastTapIndex = null;
+
+    const removeHandleByIndex = (idx) => {
+      const seq = aligningSequenceRef.current;
+      if (!seq || idx === undefined || idx === null) return;
+      if (seq.controlPoints.length <= 2) {
+        showToast?.('⚠️ Sequence line requires at least 2 endpoints.');
+        return;
+      }
+      const newControlPoints = seq.controlPoints.filter((_, i) => i !== idx);
+      const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+        newControlPoints,
+        seq.images
+      );
+
+      const lineSrc = map.getSource('active-align-line-source');
+      const handlesSrc = map.getSource('active-align-handles-source');
+
+      if (lineSrc) {
+        lineSrc.setData({
+          type: 'FeatureCollection',
+          features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates } }],
+        });
+      }
+
+      if (handlesSrc) {
+        handlesSrc.setData({
+          type: 'FeatureCollection',
+          features: newControlPoints.map((cp, i) => ({
+            type: 'Feature',
+            properties: { index: i, selected: false },
+            geometry: { type: 'Point', coordinates: cp },
+          })),
+        });
+      }
+
+      if (handlePopupRef.current) {
+        handlePopupRef.current.remove();
+        handlePopupRef.current = null;
+      }
+
+      onUpdateAligningSequenceRef.current?.({
+        ...seq,
+        controlPoints: newControlPoints,
+        coordinates,
+        images: mappedImages,
+      });
+      onSelectHandleIndexRef.current?.(null);
+      showToast?.(`🗑️ Removed curve handle #${idx + 1}`);
+    };
+
     const onHandleDragStart = (e) => {
       if (!aligningSequenceRef.current) return;
       if (e.originalEvent) {
@@ -967,12 +1057,44 @@ export default function MapView({
         e.originalEvent.stopPropagation?.();
       }
       const feature = e.features?.[0];
-      if (feature && feature.properties?.index !== undefined) {
-        draggingHandleIndex.current = feature.properties.index;
-        map.dragPan.disable();
-        map.touchZoomRotate.disable();
-        map.getCanvas().style.cursor = 'grabbing';
+      const idx = feature?.properties?.index;
+      if (idx === undefined) return;
+
+      draggingHandleIndex.current = idx;
+      hasDraggedHandle = false;
+      const point = e.point || { x: 0, y: 0 };
+      touchStartPos = { x: point.x, y: point.y };
+
+      map.dragPan.disable();
+      map.touchZoomRotate.disable();
+      map.getCanvas().style.cursor = 'grabbing';
+
+      // Software touch double-tap detection
+      const now = Date.now();
+      if (lastTapIndex === idx && (now - lastTapTimestamp) < 360) {
+        lastTapTimestamp = 0;
+        lastTapIndex = null;
+        if (touchHoldTimer) clearTimeout(touchHoldTimer);
+        draggingHandleIndex.current = null;
+        map.dragPan.enable();
+        map.touchZoomRotate.enable();
+        removeHandleByIndex(idx);
+        return;
       }
+      lastTapTimestamp = now;
+      lastTapIndex = idx;
+
+      // Touch hold (long-press ~400ms) on mobile to delete node
+      if (touchHoldTimer) clearTimeout(touchHoldTimer);
+      touchHoldTimer = setTimeout(() => {
+        if (!hasDraggedHandle && draggingHandleIndex.current === idx) {
+          try { navigator.vibrate?.([40, 30, 40]); } catch (_) {}
+          draggingHandleIndex.current = null;
+          map.dragPan.enable();
+          map.touchZoomRotate.enable();
+          removeHandleByIndex(idx);
+        }
+      }, 420);
     };
 
     const onHandleDragMove = (e) => {
@@ -980,6 +1102,16 @@ export default function MapView({
         if (e.originalEvent) {
           e.originalEvent.preventDefault?.();
         }
+
+        if (touchStartPos && e.point) {
+          const dx = Math.abs(e.point.x - touchStartPos.x);
+          const dy = Math.abs(e.point.y - touchStartPos.y);
+          if (dx > 6 || dy > 6) {
+            hasDraggedHandle = true;
+            if (touchHoldTimer) clearTimeout(touchHoldTimer);
+          }
+        }
+
         const idx = draggingHandleIndex.current;
         const seq = aligningSequenceRef.current;
         let ptLng = e.lngLat.lng;
@@ -1015,7 +1147,7 @@ export default function MapView({
             type: 'FeatureCollection',
             features: newControlPoints.map((cp, i) => ({
               type: 'Feature',
-              properties: { index: i },
+              properties: { index: i, selected: i === selectedHandleIndexRef.current },
               geometry: { type: 'Point', coordinates: cp },
             })),
           });
@@ -1031,11 +1163,17 @@ export default function MapView({
     };
 
     const onGlobalDragEnd = () => {
+      if (touchHoldTimer) clearTimeout(touchHoldTimer);
       if (draggingHandleIndex.current !== null) {
+        const finishedIdx = draggingHandleIndex.current;
         draggingHandleIndex.current = null;
         map.dragPan.enable();
         map.touchZoomRotate.enable();
         map.getCanvas().style.cursor = '';
+
+        if (!hasDraggedHandle && finishedIdx !== null) {
+          onSelectHandleIndexRef.current?.(finishedIdx);
+        }
       }
     };
 
@@ -1049,6 +1187,52 @@ export default function MapView({
     map.on('touchend', onGlobalDragEnd);
     map.on('touchcancel', onGlobalDragEnd);
 
+    // Click/tap on handle to select it and show quick delete popup
+    map.on('click', 'active-align-handles-layer', (e) => {
+      if (!aligningSequenceRef.current) return;
+      e.originalEvent?.preventDefault?.();
+      e.originalEvent?.stopPropagation?.();
+      const feature = e.features?.[0];
+      const idx = feature?.properties?.index;
+      if (idx !== undefined) {
+        onSelectHandleIndexRef.current?.(idx);
+
+        const coord = feature.geometry.coordinates;
+        if (handlePopupRef.current) {
+          handlePopupRef.current.remove();
+        }
+
+        const popupDiv = document.createElement('div');
+        popupDiv.className = 'handle-touch-popup';
+        popupDiv.innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px; padding:2px;">
+            <span style="font-size:0.75rem; font-weight:700; color:#38bdf8;">Node #${idx + 1}</span>
+            <button id="quick-delete-handle-btn" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:4px 9px; font-size:0.72rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
+              🗑️ Delete
+            </button>
+          </div>
+        `;
+        const delBtn = popupDiv.querySelector('#quick-delete-handle-btn');
+        if (delBtn) {
+          delBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            removeHandleByIndex(idx);
+          };
+        }
+
+        const popup = new maplibregl.Popup({
+          offset: [0, -16],
+          closeButton: true,
+          className: 'handle-action-popup',
+        })
+          .setLngLat(coord)
+          .setDOMContent(popupDiv)
+          .addTo(map);
+
+        handlePopupRef.current = popup;
+      }
+    });
+
     // Double-click / Double-tap handle to remove it (for touch devices and mice)
     map.on('dblclick', 'active-align-handles-layer', (e) => {
       if (!aligningSequenceRef.current) return;
@@ -1056,41 +1240,8 @@ export default function MapView({
       e.originalEvent?.stopPropagation?.();
       const feature = e.features?.[0];
       const idx = feature?.properties?.index;
-      const seq = aligningSequenceRef.current;
-      if (seq && idx !== undefined && seq.controlPoints.length > 2) {
-        const newControlPoints = seq.controlPoints.filter((_, i) => i !== idx);
-        const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
-          newControlPoints,
-          seq.images
-        );
-
-        const lineSrc = map.getSource('active-align-line-source');
-        const handlesSrc = map.getSource('active-align-handles-source');
-
-        if (lineSrc) {
-          lineSrc.setData({
-            type: 'FeatureCollection',
-            features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates } }],
-          });
-        }
-
-        if (handlesSrc) {
-          handlesSrc.setData({
-            type: 'FeatureCollection',
-            features: newControlPoints.map((cp, i) => ({
-              type: 'Feature',
-              properties: { index: i },
-              geometry: { type: 'Point', coordinates: cp },
-            })),
-          });
-        }
-
-        onUpdateAligningSequenceRef.current?.({
-          ...seq,
-          controlPoints: newControlPoints,
-          coordinates,
-          images: mappedImages,
-        });
+      if (idx !== undefined) {
+        removeHandleByIndex(idx);
       }
     });
 
@@ -1853,6 +2004,10 @@ export default function MapView({
     if (!aligningSequence) {
       if (lineSrc) lineSrc.setData({ type: 'FeatureCollection', features: [] });
       if (handlesSrc) handlesSrc.setData({ type: 'FeatureCollection', features: [] });
+      if (handlePopupRef.current) {
+        handlePopupRef.current.remove();
+        handlePopupRef.current = null;
+      }
       return;
     }
 
@@ -1878,7 +2033,7 @@ export default function MapView({
         type: 'FeatureCollection',
         features: controlPoints.map((cp, idx) => ({
           type: 'Feature',
-          properties: { index: idx },
+          properties: { index: idx, selected: idx === selectedHandleIndex },
           geometry: {
             type: 'Point',
             coordinates: cp,
@@ -1886,7 +2041,7 @@ export default function MapView({
         })),
       });
     }
-  }, [aligningSequence]);
+  }, [aligningSequence, selectedHandleIndex]);
 
   return (
     <div className="map-container" ref={mapContainerRef} />

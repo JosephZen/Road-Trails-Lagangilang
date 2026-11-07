@@ -254,6 +254,33 @@ export default function App() {
   const [isSelectingAlignmentTarget, setIsSelectingAlignmentTarget] = useState(false);
   const [alignedGeoJSON, setAlignedGeoJSON] = useState(() => streetviewAlignmentService.toGeoJSON());
   const [isSavingAlignment, setIsSavingAlignment] = useState(false);
+  const [selectedHandleIndex, setSelectedHandleIndex] = useState(null);
+
+  const handleRemoveHandle = useCallback((indexToRemove) => {
+    if (!aligningSequence) return;
+    const targetIdx = (indexToRemove !== undefined && indexToRemove !== null) ? indexToRemove : selectedHandleIndex;
+    if (targetIdx === null || targetIdx === undefined) {
+      showToast('ℹ️ Tap any cyan node on the map to select and remove it.');
+      return;
+    }
+    if (aligningSequence.controlPoints.length <= 2) {
+      showToast('⚠️ Line requires at least 2 endpoints.');
+      return;
+    }
+    const newControlPoints = aligningSequence.controlPoints.filter((_, i) => i !== targetIdx);
+    const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+      newControlPoints,
+      aligningSequence.images
+    );
+    setAligningSequence({
+      ...aligningSequence,
+      controlPoints: newControlPoints,
+      coordinates,
+      images: mappedImages,
+    });
+    setSelectedHandleIndex(null);
+    showToast(`🗑️ Removed curve handle #${targetIdx + 1}`);
+  }, [aligningSequence, selectedHandleIndex, showToast]);
 
   const handleSelectSequenceForAlignment = useCallback(async (sequenceId, lat, lng) => {
     if (!isAdmin) {
@@ -1138,6 +1165,9 @@ export default function App() {
           excludedSequences={excludedSequences}
           excludedImageKeys={excludedImageKeys}
           onCalibrateNodePosition={handleCalibrateNodePosition}
+          selectedHandleIndex={selectedHandleIndex}
+          onSelectHandleIndex={setSelectedHandleIndex}
+          onRemoveHandle={handleRemoveHandle}
         />
 
         {/* Map top controls */}
@@ -1382,7 +1412,10 @@ export default function App() {
             onSave={handleSaveAlignment}
             onResetOriginal={handleResetAlignmentOriginal}
             onResetNodesGps={handleResetNodesToGps}
-            onCancel={() => setAligningSequence(null)}
+            onCancel={() => {
+              setAligningSequence(null);
+              setSelectedHandleIndex(null);
+            }}
             onDeleteAlignment={handleDeleteAlignment}
             onExcludeSequence={handleToggleExcludeSequence}
             isSaving={isSavingAlignment}
@@ -1397,6 +1430,9 @@ export default function App() {
             }}
             onToggleDots={() => setShowMapillaryDots(!showMapillaryDots)}
             onToggleLines={() => setShowMapillaryLines(!showMapillaryLines)}
+            selectedHandleIndex={selectedHandleIndex}
+            onSelectHandleIndex={setSelectedHandleIndex}
+            onRemoveHandle={handleRemoveHandle}
           />
         )}
 

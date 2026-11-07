@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 /**
  * StreetviewLineAligner Component
  * Floating editor bar for bending and re-aligning Mapillary streetview lines onto road curves.
+ * Fully optimized for touch devices, mobile viewports, and phones in portrait ratio.
  */
 export default function StreetviewLineAligner({
   aligningSequence,
@@ -19,20 +20,56 @@ export default function StreetviewLineAligner({
   onToggleStreetview,
   onToggleDots,
   onToggleLines,
+  selectedHandleIndex = null,
+  onSelectHandleIndex,
+  onRemoveHandle,
 }) {
+  const [isMinimized, setIsMinimized] = useState(false);
+
   if (!aligningSequence) return null;
 
   const { sequenceId, images = [], controlPoints = [], isAlreadyAligned } = aligningSequence;
 
-  return (
-    <div className="streetview-aligner-panel glass-panel">
-      <div className="aligner-header">
-        <div className="aligner-title-group">
-          <span className="aligner-badge">📐 Alignment Mode</span>
-          <span className="aligner-subtitle">
-            Sequence: <strong>{sequenceId.slice(0, 10)}...</strong> ({images.length} photos, {controlPoints.length} handles)
-          </span>
+  // Minimized Compact Pill Mode (Ultra space-saver on mobile phones)
+  if (isMinimized) {
+    return (
+      <div className="streetview-aligner-panel-minimized glass-panel">
+        <div
+          className="aligner-mini-summary"
+          onClick={() => setIsMinimized(false)}
+          title="Tap to expand alignment tools"
+        >
+          <span className="aligner-badge">📐 Aligning</span>
+          <span className="aligner-mini-nodes">{controlPoints.length} nodes</span>
         </div>
+
+        {selectedHandleIndex !== null && onRemoveHandle && (
+          <button
+            className="aligner-btn-delete-node-mini"
+            onClick={() => onRemoveHandle(selectedHandleIndex)}
+            title={`Delete selected handle #${selectedHandleIndex + 1}`}
+          >
+            🗑️ Delete #{selectedHandleIndex + 1}
+          </button>
+        )}
+
+        <button
+          className="btn-primary aligner-btn-save-mini"
+          onClick={onSave}
+          disabled={isSaving}
+          title="Save this bent alignment to map"
+        >
+          {isSaving ? '⏳' : '💾 Save'}
+        </button>
+
+        <button
+          className="aligner-toggle-btn"
+          onClick={() => setIsMinimized(false)}
+          title="Expand tools"
+        >
+          ▾ Tools
+        </button>
+
         <button
           className="aligner-close-btn"
           onClick={onCancel}
@@ -41,13 +78,70 @@ export default function StreetviewLineAligner({
           ✕
         </button>
       </div>
+    );
+  }
 
-      <div className="aligner-tips">
-        <span>💡 <strong>Touch & drag handles</strong> onto the road curve.</span>
-        <span>💡 <strong>Tap line</strong> to add curve handle.</span>
-        <span>💡 <strong>Double-tap or Right-click</strong> handle to remove.</span>
+  return (
+    <div className="streetview-aligner-panel glass-panel">
+      <div className="aligner-header">
+        <div className="aligner-title-group">
+          <span className="aligner-badge">📐 Alignment Mode</span>
+          <span className="aligner-subtitle">
+            Seq: <strong>{sequenceId.slice(0, 10)}...</strong> ({images.length} photos, {controlPoints.length} handles)
+          </span>
+        </div>
+        <div className="aligner-header-controls">
+          <button
+            className="aligner-minimize-btn"
+            onClick={() => setIsMinimized(true)}
+            title="Minimize toolbar to see map"
+          >
+            ▲ Minimize
+          </button>
+          <button
+            className="aligner-close-btn"
+            onClick={onCancel}
+            title="Exit alignment mode"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
+      <div className="aligner-tips">
+        <div className="aligner-tips-text">
+          <span>💡 <strong>Drag cyan nodes</strong> onto road.</span>
+          <span>💡 <strong>Tap line</strong> to add node.</span>
+          <span>💡 <strong>Tap node</strong> to select &amp; delete (or hold 1s).</span>
+        </div>
+      </div>
+
+      {/* Selected Node Action Bar */}
+      {selectedHandleIndex !== null && onRemoveHandle && (
+        <div className="aligner-selected-bar">
+          <span className="aligner-selected-label">
+            🎯 Node #{selectedHandleIndex + 1} Selected
+          </span>
+          <div className="aligner-selected-actions">
+            <button
+              className="btn-danger aligner-btn-delete-selected"
+              onClick={() => onRemoveHandle(selectedHandleIndex)}
+              title={`Delete node #${selectedHandleIndex + 1}`}
+            >
+              🗑️ Delete Node #{selectedHandleIndex + 1}
+            </button>
+            <button
+              className="btn-ghost aligner-btn-deselect"
+              onClick={() => onSelectHandleIndex?.(null)}
+              title="Deselect node"
+            >
+              ✕ Deselect
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Primary Action Row (Touch scrollable on mobile) */}
       <div className="aligner-actions">
         <button
           className="btn-primary aligner-btn-save"
@@ -58,54 +152,43 @@ export default function StreetviewLineAligner({
           {isSaving ? '⏳ Saving...' : '💾 Save Alignment'}
         </button>
 
+        {selectedHandleIndex === null && controlPoints.length > 2 && onRemoveHandle && (
+          <button
+            className="btn-secondary aligner-btn-remove-last"
+            onClick={() => onRemoveHandle(controlPoints.length - 2)}
+            title="Remove the last intermediate curve handle"
+          >
+            🗑️ Delete Node
+          </button>
+        )}
+
         {onToggleStreetview && (
           <button
             className={`btn-secondary aligner-btn-dots ${!showMapillaryStreetview ? 'dots-hidden' : ''}`}
             onClick={onToggleStreetview}
-            title={showMapillaryStreetview ? 'Hide raw Mapillary green lines & dots to focus on road & cyan curve' : 'Show Mapillary streetview overlay'}
+            title={showMapillaryStreetview ? 'Hide raw Mapillary overlay' : 'Show Mapillary streetview overlay'}
           >
-            {showMapillaryStreetview ? '🟢 Hide Streetview' : '⚪ Show Streetview'}
+            {showMapillaryStreetview ? '🟢 Hide Overlay' : '⚪ Show Overlay'}
           </button>
         )}
 
-        {onToggleLines && showMapillaryStreetview && (
+        {onResetOriginal && (
           <button
-            className={`btn-ghost aligner-btn-sub ${!showMapillaryLines ? 'sub-hidden' : ''}`}
-            onClick={onToggleLines}
-            title={showMapillaryLines ? 'Hide green lines' : 'Show green lines'}
-            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+            className="btn-secondary aligner-btn-reset"
+            onClick={onResetOriginal}
+            title="Revert back to raw GPS capture points"
           >
-            {showMapillaryLines ? 'Lines: ON' : 'Lines: OFF'}
+            ↺ Reset GPS
           </button>
         )}
-
-        {onToggleDots && showMapillaryStreetview && (
-          <button
-            className={`btn-ghost aligner-btn-sub ${!showMapillaryDots ? 'sub-hidden' : ''}`}
-            onClick={onToggleDots}
-            title={showMapillaryDots ? 'Hide green dots' : 'Show green dots'}
-            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-          >
-            {showMapillaryDots ? 'Dots: ON' : 'Dots: OFF'}
-          </button>
-        )}
-
-        <button
-          className="btn-secondary aligner-btn-reset"
-          onClick={onResetOriginal}
-          title="Revert back to raw GPS capture points"
-        >
-          ↺ Reset GPS
-        </button>
 
         {onResetNodesGps && (
           <button
             className="btn-secondary aligner-btn-reset-nodes"
             onClick={() => onResetNodesGps(sequenceId)}
             title="Revert all 360 photo coordinates back to original GPS while keeping visual road line"
-            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
           >
-            ↩️ Reset Nodes to GPS
+            ↩️ Reset Nodes
           </button>
         )}
 
@@ -118,14 +201,6 @@ export default function StreetviewLineAligner({
               }
             }}
             title="Delete custom aligned curve and revert to raw GPS"
-            style={{
-              background: 'rgba(239, 68, 68, 0.2)',
-              border: '1px solid #ef4444',
-              color: '#fca5a5',
-              fontSize: '0.8rem',
-              padding: '6px 10px',
-              borderRadius: 'var(--radius-md)',
-            }}
           >
             🗑️ Delete Alignment
           </button>
@@ -140,17 +215,8 @@ export default function StreetviewLineAligner({
               }
             }}
             title="Exclude and completely remove this sequence from display on the map"
-            style={{
-              background: '#b91c1c',
-              border: '1px solid #ef4444',
-              color: '#ffffff',
-              fontSize: '0.8rem',
-              padding: '6px 12px',
-              borderRadius: 'var(--radius-md)',
-              fontWeight: 600,
-            }}
           >
-            🚫 Exclude & Remove Line
+            🚫 Exclude Line
           </button>
         )}
 
