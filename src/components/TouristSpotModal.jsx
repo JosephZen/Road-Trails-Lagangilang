@@ -524,19 +524,94 @@ export default function TouristSpotModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-card glass-panel" style={{ maxWidth: '620px', maxHeight: '90vh', overflowY: 'auto' }}>
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      <div
+        className="glass-panel modal-content-spot admin-modal-card"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: '620px',
+          width: '94%',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 'var(--radius-xl, 16px)',
+          border:
+            spotType === 'tourist_spot'
+              ? '1.5px solid rgba(245, 158, 11, 0.45)'
+              : '1.5px solid rgba(6, 214, 160, 0.45)',
+          boxShadow:
+            spotType === 'tourist_spot'
+              ? '0 20px 50px rgba(0, 0, 0, 0.75), 0 0 25px rgba(245, 158, 11, 0.2)'
+              : '0 20px 50px rgba(0, 0, 0, 0.75), 0 0 25px rgba(6, 214, 160, 0.2)',
+          background: 'rgba(15, 23, 42, 0.96)',
+          backdropFilter: 'blur(20px)',
+          overflow: 'hidden',
+          animation: 'fadeInUp 0.25s ease-out',
+        }}
+      >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              {editingSpot ? '✎ Edit Location in System' : '⭐ Add New Location'}
-            </h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Admin Panel · Lagangilang, Abra GIS Database
-            </span>
+        <div
+          style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background:
+              spotType === 'tourist_spot'
+                ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(15, 23, 42, 0) 100%)'
+                : 'linear-gradient(135deg, rgba(6, 214, 160, 0.15) 0%, rgba(15, 23, 42, 0) 100%)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.4rem' }}>{spotType === 'tourist_spot' ? '⭐' : '🏪'}</span>
+            <div>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: '1.1rem',
+                  fontWeight: 800,
+                  color: spotType === 'tourist_spot' ? '#fbbf24' : '#34d399',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                {editingSpot ? 'Edit Location in System' : 'Add New Location'}
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.74rem', color: '#94a3b8' }}>
+                Admin Panel • Lagangilang, Abra GIS Database
+              </p>
+            </div>
           </div>
-          <button onClick={onClose} className="btn btn-ghost" style={{ fontSize: '1.2rem' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-ghost"
+            style={{
+              width: '32px',
+              height: '32px',
+              padding: 0,
+              borderRadius: '50%',
+              fontSize: '1rem',
+              color: '#94a3b8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="Close dialog"
+          >
             ✕
           </button>
         </div>
@@ -545,12 +620,11 @@ export default function TouristSpotModal({
         <div
           style={{
             display: 'flex',
+            alignItems: 'center',
+            padding: '10px 20px 8px 20px',
             gap: '8px',
-            background: 'rgba(0,0,0,0.3)',
-            padding: '4px',
-            borderRadius: 'var(--radius-full)',
-            marginBottom: '16px',
-            border: '1px solid var(--border-subtle)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+            background: 'rgba(15, 23, 42, 0.6)',
           }}
         >
           <button
@@ -559,8 +633,10 @@ export default function TouristSpotModal({
             style={{
               flex: 1,
               padding: '8px 12px',
-              borderRadius: 'var(--radius-full)',
-              border: 'none',
+              borderRadius: 'var(--radius-md, 8px)',
+              border: spotType === 'tourist_spot' ? '1px solid #f59e0b' : '1px solid transparent',
+              background: spotType === 'tourist_spot' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+              color: spotType === 'tourist_spot' ? '#fbbf24' : '#94a3b8',
               cursor: 'pointer',
               fontWeight: 700,
               fontSize: '0.82rem',
@@ -568,8 +644,6 @@ export default function TouristSpotModal({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
-              background: spotType === 'tourist_spot' ? 'linear-gradient(135deg, #ffd700 0%, #f59e0b 100%)' : 'transparent',
-              color: spotType === 'tourist_spot' ? '#1a1a2e' : 'var(--text-secondary)',
               transition: 'all 0.2s ease',
             }}
           >
@@ -582,8 +656,10 @@ export default function TouristSpotModal({
             style={{
               flex: 1,
               padding: '8px 12px',
-              borderRadius: 'var(--radius-full)',
-              border: 'none',
+              borderRadius: 'var(--radius-md, 8px)',
+              border: spotType === 'poi' ? '1px solid #10b981' : '1px solid transparent',
+              background: spotType === 'poi' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+              color: spotType === 'poi' ? '#6ee7b7' : '#94a3b8',
               cursor: 'pointer',
               fontWeight: 700,
               fontSize: '0.82rem',
@@ -591,8 +667,6 @@ export default function TouristSpotModal({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '6px',
-              background: spotType === 'poi' ? 'linear-gradient(135deg, #06d6a0 0%, #0284c7 100%)' : 'transparent',
-              color: spotType === 'poi' ? '#ffffff' : 'var(--text-secondary)',
               transition: 'all 0.2s ease',
             }}
           >
@@ -601,876 +675,935 @@ export default function TouristSpotModal({
           </button>
         </div>
 
-        <form onSubmit={handleSaveToSystem}>
-          {/* Name & Icon Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px', marginBottom: '8px' }}>
+        <form
+          onSubmit={handleSaveToSystem}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Scrollable Body with Generous Allowance for Display Boxes */}
+          <div
+            className="modal-body custom-scrollbar"
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            }}
+          >
+            {/* Name & Icon Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '10px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '4px' }}>
+                  {spotType === 'tourist_spot' ? 'Attraction Name *' : 'Facility / Business Name *'}
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  required
+                  placeholder={spotType === 'tourist_spot' ? 'e.g. Mount Mag-atong Eco-Trail' : 'e.g. Petron Gas Station / Poblacion Eatery'}
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="input-field"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '4px' }}>Icon</label>
+                <input
+                  type="text"
+                  name="categoryIcon"
+                  value={formData.categoryIcon}
+                  onChange={handleChange}
+                  className="input-field"
+                  style={{ width: '64px', boxSizing: 'border-box', textAlign: 'center', fontSize: '1.25rem' }}
+                  title="Marker emoji icon (pick below or type custom)"
+                />
+              </div>
+            </div>
+
+            {/* Quick Select Icon Palette Display Box */}
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: 'var(--radius-lg, 12px)',
+                padding: '12px 14px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>⚡</span> Quick Select Icon (or type above):
+                </span>
+                <span style={{ fontSize: '0.74rem', color: '#ffd700', fontWeight: 600 }}>
+                  Active: <strong style={{ fontSize: '1rem', marginLeft: '2px' }}>{formData.categoryIcon || '⭐'}</strong>
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {PRESET_ICONS.map((icon) => (
+                  <button
+                    key={icon}
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, categoryIcon: icon }))}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      border: formData.categoryIcon === icon ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.1)',
+                      background: formData.categoryIcon === icon ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255, 255, 255, 0.04)',
+                      fontSize: '1.15rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease',
+                      boxShadow: formData.categoryIcon === icon ? '0 0 10px rgba(255, 215, 0, 0.4)' : 'none',
+                      transform: formData.categoryIcon === icon ? 'scale(1.08)' : 'scale(1)',
+                    }}
+                    title={`Select ${icon}`}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Category & Barangay Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '4px' }}>Category</label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  className="input-field"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                >
+                  {currentCategoryList.map((cat) => (
+                    <option key={cat.name} value={cat.name}>
+                      {cat.icon} {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '4px' }}>Barangay (17 Total)</label>
+                <select
+                  name="barangay"
+                  value={formData.barangay}
+                  onChange={handleChange}
+                  className="input-field"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                >
+                  {LAGANGILANG_BARANGAYS.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* ========== Coherent Placement & Coordinates Display Box ========== */}
+            <div
+              className="placement-box"
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1.5px solid rgba(56, 189, 248, 0.3)',
+                borderRadius: 'var(--radius-lg, 12px)',
+                padding: '14px 16px',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.2rem' }}>📍</span>
+                  <div>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#f8fafc', display: 'block' }}>
+                      Map Placement & GPS Coordinates
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                      Precise WGS84 coordinates on Lagangilang Map
+                    </span>
+                  </div>
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    padding: '3px 10px',
+                    borderRadius: 'var(--radius-full, 9999px)',
+                    background: 'rgba(56, 189, 248, 0.18)',
+                    color: '#7dd3fc',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                  }}
+                >
+                  Brgy. {formData.barangay || 'Poblacion'}
+                </span>
+              </div>
+
+              {/* Coordinates Inputs */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#7dd3fc', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                    <span>🌐</span> Latitude (N) *
+                  </label>
+                  <input
+                    type="text"
+                    name="lat"
+                    required
+                    placeholder="e.g. 17.608250"
+                    value={formData.lat}
+                    onChange={handleChange}
+                    className="input-field"
+                    style={{
+                      width: '100%',
+                      fontFamily: 'monospace',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      color: '#38bdf8',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#7dd3fc', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                    <span>🌐</span> Longitude (E) *
+                  </label>
+                  <input
+                    type="text"
+                    name="lng"
+                    required
+                    placeholder="e.g. 120.738083"
+                    value={formData.lng}
+                    onChange={handleChange}
+                    className="input-field"
+                    style={{
+                      width: '100%',
+                      fontFamily: 'monospace',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      color: '#38bdf8',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Helper Hint */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  background: 'rgba(56, 189, 248, 0.08)',
+                  border: '1px dashed rgba(56, 189, 248, 0.25)',
+                  fontSize: '0.74rem',
+                  color: '#bae6fd',
+                  lineHeight: 1.4,
+                }}
+              >
+                <span style={{ fontSize: '0.9rem' }}>🎯</span>
+                <span>
+                  <strong>Placement:</strong> Coordinates are automatically set from your map click. You can also <strong>drag this marker on the map</strong> in Admin mode anytime to relocate it.
+                </span>
+              </div>
+            </div>
+
+            {/* Address */}
             <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                {spotType === 'tourist_spot' ? 'Attraction Name *' : 'Facility / Business Name *'}
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '4px' }}>Address / Landmark</label>
+              <input
+                type="text"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                className="input-field"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {/* Contact Numbers */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '4px' }}>
+                  📞 Phone / Hotline
+                </label>
+                <input
+                  type="text"
+                  name="phone"
+                  placeholder="e.g. 0998-598-7742"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="input-field"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '4px' }}>
+                  ☎️ Alt Phone / Landline
+                </label>
+                <input
+                  type="text"
+                  name="altPhone"
+                  placeholder="e.g. (074) 752-8234"
+                  value={formData.altPhone}
+                  onChange={handleChange}
+                  className="input-field"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '4px' }}>
+                🕒 Operating Hours & Schedule
               </label>
               <input
                 type="text"
-                name="name"
+                name="operatingHours"
+                placeholder="e.g. 24/7 Response or 8:00 AM - 5:00 PM Mon-Fri"
+                value={formData.operatingHours}
+                onChange={handleChange}
+                className="input-field"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#cbd5e1', marginBottom: '4px' }}>
+                Description & Visitor Info *
+              </label>
+              <textarea
+                name="description"
                 required
-                placeholder={spotType === 'tourist_spot' ? 'e.g. Mount Mag-atong Eco-Trail' : 'e.g. Petron Gas Station / Poblacion Eatery'}
-                value={formData.name}
+                rows={3}
+                placeholder={spotType === 'tourist_spot' ? 'Details about the attraction, visitor tips, accessibility...' : 'Opening hours, fuel types available, food specialty, room rates...'}
+                value={formData.description}
                 onChange={handleChange}
                 className="input-field"
-                style={{ width: '100%', marginTop: '4px' }}
+                style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
               />
             </div>
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Icon</label>
-              <input
-                type="text"
-                name="categoryIcon"
-                value={formData.categoryIcon}
-                onChange={handleChange}
-                className="input-field"
-                style={{ width: '60px', marginTop: '4px', textAlign: 'center', fontSize: '1.2rem' }}
-                title="Marker emoji icon (pick below or type custom)"
-              />
-            </div>
-          </div>
 
-          {/* Quick Select Icon Palette Grid */}
-          <div
-            style={{
-              marginBottom: '12px',
-              padding: '8px 10px',
-              borderRadius: 'var(--radius-sm)',
-              background: 'rgba(0, 0, 0, 0.25)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                ⚡ Quick Select Icon (or type above):
-              </span>
-              <span style={{ fontSize: '0.72rem', color: '#ffd700' }}>
-                Active: <strong style={{ fontSize: '0.95rem' }}>{formData.categoryIcon || '⭐'}</strong>
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-              {PRESET_ICONS.map((icon) => (
-                <button
-                  key={icon}
-                  type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, categoryIcon: icon }))}
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '6px',
-                    border: formData.categoryIcon === icon ? '2px solid #ffd700' : '1px solid rgba(255,255,255,0.12)',
-                    background: formData.categoryIcon === icon ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                    fontSize: '1.15rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.15s ease',
-                    boxShadow: formData.categoryIcon === icon ? '0 0 8px rgba(255, 215, 0, 0.4)' : 'none',
-                    transform: formData.categoryIcon === icon ? 'scale(1.08)' : 'scale(1)',
-                  }}
-                  title={`Select ${icon}`}
-                >
-                  {icon}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Category & Barangay Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px', marginBottom: '12px' }}>
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Category</label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                className="input-field"
-                style={{ width: '100%', marginTop: '4px' }}
-              >
-                {currentCategoryList.map((cat) => (
-                  <option key={cat.name} value={cat.name}>
-                    {cat.icon} {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Barangay (17 Total)</label>
-              <select
-                name="barangay"
-                value={formData.barangay}
-                onChange={handleChange}
-                className="input-field"
-                style={{ width: '100%', marginTop: '4px' }}
-              >
-                {LAGANGILANG_BARANGAYS.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* ========== Coherent Placement & Coordinates Box ========== */}
-          <div
-            className="placement-box"
-            style={{
-              padding: '12px 14px',
-              borderRadius: 'var(--radius-md)',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-              marginBottom: '14px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.15rem' }}>📍</span>
-                <div>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc', display: 'block' }}>
-                    Map Placement & GPS Coordinates
+            {/* ========== Card Visual Representation Display Box ========== */}
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: 'var(--radius-lg, 12px)',
+                padding: '14px 16px',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>🖼️</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc' }}>
+                    Card Visual Representation
                   </span>
-                  <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
-                    Precise WGS84 coordinates on Lagangilang Map
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', cursor: 'pointer', color: '#93c5fd', fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    name="usePseudoImage"
+                    checked={formData.usePseudoImage}
+                    onChange={handleChange}
+                  />
+                  Use Stylized Graphic
+                </label>
+              </div>
+
+              {formData.usePseudoImage ? (
+                <div>
+                  {/* 14 Themes Gradient Palette */}
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                        Theme Palette ({Object.keys(THEMES).length} Gradients):
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: '#ffd700', fontWeight: 600 }}>
+                        {THEMES[formData.pseudoTheme]?.name || 'Theme'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {Object.values(THEMES).map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setFormData((prev) => ({ ...prev, pseudoTheme: t.id }))}
+                          style={{
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '50%',
+                            border: formData.pseudoTheme === t.id ? '2.5px solid #ffd700' : '1px solid rgba(255,255,255,0.25)',
+                            background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
+                            cursor: 'pointer',
+                            boxShadow: formData.pseudoTheme === t.id ? '0 0 10px rgba(255, 215, 0, 0.7)' : 'none',
+                            transform: formData.pseudoTheme === t.id ? 'scale(1.15)' : 'scale(1)',
+                            transition: 'all 0.15s ease',
+                          }}
+                          title={t.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Card Icon Link Status */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', padding: '6px 12px', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-sm, 6px)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>
+                      Visual Card Icon:
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '1.15rem' }}>
+                        {formData.cardVisualIcon || formData.categoryIcon || '⭐'}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 600, color: !formData.cardVisualIcon ? '#34d399' : '#ffd700' }}>
+                        {!formData.cardVisualIcon ? '🔗 Synced with Location Marker' : 'Custom Card Icon'}
+                      </span>
+                      {formData.cardVisualIcon && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData((prev) => ({ ...prev, cardVisualIcon: null }))}
+                          className="btn btn-ghost"
+                          style={{ fontSize: '0.68rem', padding: '1px 6px', color: '#93c5fd' }}
+                          title="Reset to automatically follow location marker icon"
+                        >
+                          Reset to Sync
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Live Preview */}
+                  <PseudoImage
+                    title={formData.name || (spotType === 'tourist_spot' ? 'Sample Attraction' : 'Sample Facility')}
+                    category={formData.category}
+                    categoryIcon={formData.cardVisualIcon || formData.categoryIcon}
+                    theme={formData.pseudoTheme}
+                    height="100px"
+                    showWatermark={true}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', color: '#94a3b8', marginBottom: '4px' }}>Image URL or Path</label>
+                  <input
+                    type="text"
+                    name="image"
+                    placeholder="https://... or photo URL"
+                    value={formData.image}
+                    onChange={handleChange}
+                    className="input-field"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ========== Connected 360° Street View & Dedicated Panorama Image Section ========== */}
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: 'var(--radius-lg, 12px)',
+                padding: '14px 16px',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '1.15rem' }}>🌐</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8' }}>
+                    Connected 360° Street View & Panorama Node
                   </span>
                 </div>
               </div>
-              <span
+
+              {/* Source Switcher: Upload 360 Photo vs Mapillary Sequence */}
+              <div
                 style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  padding: '3px 10px',
-                  borderRadius: 'var(--radius-full)',
-                  background: 'rgba(67, 97, 238, 0.25)',
-                  color: '#93c5fd',
-                  border: '1px solid rgba(147, 197, 253, 0.35)',
+                  display: 'flex',
+                  gap: '6px',
+                  background: 'rgba(0,0,0,0.35)',
+                  padding: '4px',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  marginBottom: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
                 }}
               >
-                Brgy. {formData.barangay || 'Poblacion'}
-              </span>
-            </div>
-
-            {/* Coordinates Inputs */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '8px' }}>
-              <div>
-                <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                  <span>🌐</span> Latitude (N) *
-                </label>
-                <input
-                  type="text"
-                  name="lat"
-                  required
-                  placeholder="e.g. 17.608250"
-                  value={formData.lat}
-                  onChange={handleChange}
-                  className="input-field"
+                <button
+                  type="button"
+                  onClick={() => setPanoSourceTab('upload')}
                   style={{
-                    width: '100%',
-                    fontFamily: 'monospace',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
-                    color: '#38bdf8',
+                    flex: 1,
+                    padding: '7px 12px',
+                    borderRadius: 'var(--radius-sm, 6px)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: panoSourceTab === 'upload' ? 'rgba(56, 189, 248, 0.25)' : 'transparent',
+                    color: panoSourceTab === 'upload' ? '#7dd3fc' : '#94a3b8',
+                    transition: 'all 0.2s ease',
                   }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#93c5fd', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                  <span>🌐</span> Longitude (E) *
-                </label>
-                <input
-                  type="text"
-                  name="lng"
-                  required
-                  placeholder="e.g. 120.738083"
-                  value={formData.lng}
-                  onChange={handleChange}
-                  className="input-field"
+                >
+                  <span>📷</span>
+                  <span>Dedicated 360° Photo Upload</span>
+                  {formData.uploadedPanoUrl && <span style={{ color: '#34d399', fontSize: '0.75rem' }}>✓</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPanoSourceTab('mapillary')}
                   style={{
-                    width: '100%',
-                    fontFamily: 'monospace',
-                    fontSize: '0.88rem',
-                    fontWeight: 600,
-                    color: '#38bdf8',
+                    flex: 1,
+                    padding: '7px 12px',
+                    borderRadius: 'var(--radius-sm, 6px)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: panoSourceTab === 'mapillary' ? 'rgba(56, 189, 248, 0.25)' : 'transparent',
+                    color: panoSourceTab === 'mapillary' ? '#7dd3fc' : '#94a3b8',
+                    transition: 'all 0.2s ease',
                   }}
-                />
+                >
+                  <span>🌐</span>
+                  <span>Mapillary Sequence Link</span>
+                  {formData.connectedPanoId && panoSourceTab !== 'upload' && <span style={{ color: '#34d399', fontSize: '0.75rem' }}>✓</span>}
+                </button>
               </div>
-            </div>
 
-            {/* Helper Hint */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 10px',
-                borderRadius: 'var(--radius-sm)',
-                background: 'rgba(0, 0, 0, 0.3)',
-                border: '1px dashed rgba(255, 255, 255, 0.15)',
-                fontSize: '0.72rem',
-                color: '#cbd5e1',
-              }}
-            >
-              <span>🎯</span>
-              <span>
-                <strong>Placement:</strong> Coordinates are automatically set from your map click. You can also <strong>drag this marker on the map</strong> in Admin mode anytime to relocate it.
-              </span>
-            </div>
-          </div>
+              {panoSourceTab === 'upload' ? (
+                <div>
+                  {/* Upload Dropzone */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    onChange={handlePanoFileUpload}
+                    style={{ display: 'none' }}
+                  />
 
-          {/* Address */}
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Address / Landmark</label>
-            <input
-              type="text"
-              name="address"
-              value={formData.address}
-              onChange={handleChange}
-              className="input-field"
-              style={{ width: '100%', marginTop: '4px' }}
-            />
-          </div>
-
-          {/* Contact Numbers & Operating Schedule */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                📞 Phone / Hotline
-              </label>
-              <input
-                type="text"
-                name="phone"
-                placeholder="e.g. 0998-598-7742"
-                value={formData.phone}
-                onChange={handleChange}
-                className="input-field"
-                style={{ width: '100%', marginTop: '4px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                ☎️ Alt Phone / Landline
-              </label>
-              <input
-                type="text"
-                name="altPhone"
-                placeholder="e.g. (074) 752-8234"
-                value={formData.altPhone}
-                onChange={handleChange}
-                className="input-field"
-                style={{ width: '100%', marginTop: '4px' }}
-              />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              🕒 Operating Hours & Schedule
-            </label>
-            <input
-              type="text"
-              name="operatingHours"
-              placeholder="e.g. 24/7 Response or 8:00 AM - 5:00 PM Mon-Fri"
-              value={formData.operatingHours}
-              onChange={handleChange}
-              className="input-field"
-              style={{ width: '100%', marginTop: '4px' }}
-            />
-          </div>
-
-          {/* Description */}
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Description & Visitor Info *
-            </label>
-            <textarea
-              name="description"
-              required
-              rows={3}
-              placeholder={spotType === 'tourist_spot' ? 'Details about the attraction, visitor tips, accessibility...' : 'Opening hours, fuel types available, food specialty, room rates...'}
-              value={formData.description}
-              onChange={handleChange}
-              className="input-field"
-              style={{ width: '100%', marginTop: '4px', resize: 'vertical' }}
-            />
-          </div>
-
-          {/* ========== Card Visual Representation (14 Themes + Auto-Linked Icon) ========== */}
-          <div
-            style={{
-              padding: '12px',
-              borderRadius: 'var(--radius-md)',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              marginBottom: '14px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '1rem' }}>🖼️</span>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f8fafc' }}>
-                  Card Visual Representation
-                </span>
-              </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', cursor: 'pointer', color: '#93c5fd' }}>
-                <input
-                  type="checkbox"
-                  name="usePseudoImage"
-                  checked={formData.usePseudoImage}
-                  onChange={handleChange}
-                />
-                Use Stylized Graphic
-              </label>
-            </div>
-
-            {formData.usePseudoImage ? (
-              <div>
-                {/* 14 Themes Gradient Palette */}
-                <div style={{ marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      Theme Palette ({Object.keys(THEMES).length} Gradients):
-                    </span>
-                    <span style={{ fontSize: '0.72rem', color: '#ffd700', fontWeight: 600 }}>
-                      {THEMES[formData.pseudoTheme]?.name || 'Theme'}
-                    </span>
+                  {formData.uploadedPanoUrl ? (
+                    <div
+                      style={{
+                        position: 'relative',
+                        borderRadius: 'var(--radius-md, 8px)',
+                        overflow: 'hidden',
+                        border: '1px solid rgba(52, 211, 153, 0.5)',
+                        background: 'rgba(0,0,0,0.4)',
+                        padding: '10px',
+                        marginBottom: '10px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <img
+                          src={formData.uploadedPanoUrl}
+                          alt="360 Panorama Preview"
+                          style={{
+                            width: '110px',
+                            height: '60px',
+                            objectFit: 'cover',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#34d399' }}>
+                              ✓ Dedicated 360° Photo Attached
+                            </span>
+                            {(neonUploaded || String(formData.connectedPanoId || '').startsWith('pano_')) && (
+                              <span
+                                style={{
+                                  fontSize: '0.68rem',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  background: 'rgba(59, 130, 246, 0.25)',
+                                  color: '#60a5fa',
+                                  border: '1px solid rgba(96, 165, 250, 0.4)',
+                                }}
+                              >
+                                ☁ Neon Cloud Synced
+                              </span>
+                            )}
+                            {privacyBlurredCount > 0 && (
+                              <span
+                                style={{
+                                  fontSize: '0.68rem',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  background: 'rgba(52, 211, 153, 0.2)',
+                                  color: '#34d399',
+                                  border: '1px solid rgba(52, 211, 153, 0.4)',
+                                }}
+                              >
+                                🛡️ Privacy Anonymized ({privacyBlurredCount} zones)
+                              </span>
+                            )}
+                          </div>
+                          {uploadingNeon && (
+                            <div style={{ margin: '4px 0', fontSize: '0.72rem', color: '#ffd700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>⚡ Optimizing 360 texture & uploading directly to Neon Cloud DB...</span>
+                            </div>
+                          )}
+                          <p style={{ fontSize: '0.68rem', color: '#94a3b8', margin: '2px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            ID: {formData.connectedPanoId || 'local_panorama'}
+                          </p>
+                          <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => setShowBlurStudio(true)}
+                              className="btn btn-secondary"
+                              style={{
+                                fontSize: '0.72rem',
+                                padding: '3px 8px',
+                                background: 'rgba(16, 185, 129, 0.2)',
+                                color: '#34d399',
+                                borderColor: 'rgba(52, 211, 153, 0.4)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                              title="Open Privacy Blur Studio to outline & blur faces, license plates, and camera rigs"
+                            >
+                              <span>🛡️</span>
+                              <span>Privacy Blur (Faces & Plates)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="btn btn-ghost"
+                              style={{ fontSize: '0.68rem', padding: '2px 6px', color: '#93c5fd' }}
+                            >
+                              🔄 Replace Photo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  uploadedPanoUrl: '',
+                                  connectedPanoId: '',
+                                  connectedPanoType: 'mapillary',
+                                }))
+                              }
+                              className="btn btn-ghost"
+                              style={{ fontSize: '0.68rem', padding: '2px 6px', color: '#ef4444' }}
+                            >
+                              ✕ Remove
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        cursor: 'pointer',
+                        padding: '16px',
+                        borderRadius: 'var(--radius-md, 8px)',
+                        border: '2px dashed rgba(67, 97, 238, 0.45)',
+                        background: 'rgba(67, 97, 238, 0.08)',
+                        textAlign: 'center',
+                        marginBottom: '10px',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#ffd700';
+                        e.currentTarget.style.background = 'rgba(255, 215, 0, 0.08)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(67, 97, 238, 0.45)';
+                        e.currentTarget.style.background = 'rgba(67, 97, 238, 0.08)';
+                      }}
+                    >
+                      <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '4px' }}>📁</span>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f8fafc', display: 'block' }}>
+                        Click to Browse or Drag & Drop 360° Panorama Image
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                        Supports 360° equirectangular JPG / PNG photos taken at this location
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Mapillary Street View Linkage */
+                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr auto', gap: '8px', alignItems: 'end', marginBottom: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.74rem', color: '#cbd5e1', marginBottom: '4px' }}>Mapillary Image ID</label>
+                    <input
+                      type="text"
+                      name="connectedPanoId"
+                      placeholder="e.g. 1171410495001931"
+                      value={formData.connectedPanoId}
+                      onChange={handleChange}
+                      className="input-field"
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                    />
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {Object.values(THEMES).map((t) => (
+
+                  <div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleAutoDetectNearestPano}
+                      disabled={detectingMapillary}
+                      style={{ fontSize: '0.74rem', padding: '8px 12px', whiteSpace: 'nowrap' }}
+                      title="Detect nearest Mapillary 360 image from coordinates"
+                    >
+                      {detectingMapillary ? '⏳ Searching...' : '🔍 Detect Nearest'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Orientation Row: Heading & Pitch */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#cbd5e1', marginBottom: '4px' }}>Camera Initial Heading (°)</label>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      name="heading"
+                      value={formData.heading}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw === '' || /^\d*$/.test(raw)) {
+                          setFormData((prev) => ({ ...prev, heading: raw }));
+                        }
+                      }}
+                      onBlur={() => {
+                        let num = parseInt(formData.heading, 10);
+                        if (isNaN(num)) num = 0;
+                        num = ((num % 360) + 360) % 360;
+                        setFormData((prev) => ({ ...prev, heading: String(num) }));
+                      }}
+                      className="input-field"
+                      style={{ flex: 1, boxSizing: 'border-box' }}
+                      placeholder="0 - 360°"
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                       <button
-                        key={t.id}
                         type="button"
-                        onClick={() => setFormData((prev) => ({ ...prev, pseudoTheme: t.id }))}
-                        style={{
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '50%',
-                          border: formData.pseudoTheme === t.id ? '2.5px solid #ffd700' : '1px solid rgba(255,255,255,0.25)',
-                          background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
-                          cursor: 'pointer',
-                          boxShadow: formData.pseudoTheme === t.id ? '0 0 10px rgba(255, 215, 0, 0.7)' : 'none',
-                          transform: formData.pseudoTheme === t.id ? 'scale(1.15)' : 'scale(1)',
-                          transition: 'all 0.15s ease',
+                        className="btn btn-ghost"
+                        style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
+                        onClick={() => {
+                          const cur = parseInt(formData.heading, 10) || 0;
+                          setFormData((prev) => ({ ...prev, heading: String((cur + 5) % 360) }));
                         }}
-                        title={t.name}
-                      />
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
+                        onClick={() => {
+                          const cur = parseInt(formData.heading, 10) || 0;
+                          setFormData((prev) => ({ ...prev, heading: String(((cur - 5) % 360 + 360) % 360) }));
+                        }}
+                      >
+                        ▼
+                      </button>
+                    </div>
+                  </div>
+                  {/* Quick compass buttons */}
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                    {[
+                      { label: '0° N', val: 0 },
+                      { label: '90° E', val: 90 },
+                      { label: '180° S', val: 180 },
+                      { label: '270° W', val: 270 },
+                    ].map((d) => (
+                      <button
+                        key={d.val}
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setFormData((prev) => ({ ...prev, heading: String(d.val) }))}
+                        style={{
+                          fontSize: '0.65rem',
+                          padding: '2px 5px',
+                          borderRadius: 'var(--radius-sm, 4px)',
+                          background: String(formData.heading) === String(d.val) ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.06)',
+                          border: String(formData.heading) === String(d.val) ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
+                          color: String(formData.heading) === String(d.val) ? '#93c5fd' : '#cbd5e1',
+                        }}
+                      >
+                        {d.label}
+                      </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Card Icon Link Status */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', padding: '5px 10px', background: 'rgba(0,0,0,0.25)', borderRadius: 'var(--radius-sm)' }}>
-                  <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>
-                    Visual Card Icon:
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '1.15rem' }}>
-                      {formData.cardVisualIcon || formData.categoryIcon || '⭐'}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', color: !formData.cardVisualIcon ? '#34d399' : '#ffd700' }}>
-                      {!formData.cardVisualIcon ? '🔗 Synced with Location Marker' : 'Custom Card Icon'}
-                    </span>
-                    {formData.cardVisualIcon && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#cbd5e1', marginBottom: '4px' }}>Camera Initial Pitch (°)</label>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      name="pitch"
+                      value={formData.pitch}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw === '' || raw === '-' || /^-?\d*$/.test(raw)) {
+                          setFormData((prev) => ({ ...prev, pitch: raw }));
+                        }
+                      }}
+                      onBlur={() => {
+                        let num = parseInt(formData.pitch, 10);
+                        if (isNaN(num)) num = 0;
+                        num = Math.max(-90, Math.min(90, num));
+                        setFormData((prev) => ({ ...prev, pitch: String(num) }));
+                      }}
+                      className="input-field"
+                      style={{ flex: 1, boxSizing: 'border-box' }}
+                      placeholder="-90° to +90°"
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                       <button
                         type="button"
-                        onClick={() => setFormData((prev) => ({ ...prev, cardVisualIcon: null }))}
                         className="btn btn-ghost"
-                        style={{ fontSize: '0.68rem', padding: '1px 6px', color: '#93c5fd' }}
-                        title="Reset to automatically follow location marker icon"
-                      >
-                        Reset to Sync
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Live Preview */}
-                <PseudoImage
-                  title={formData.name || (spotType === 'tourist_spot' ? 'Sample Attraction' : 'Sample Facility')}
-                  category={formData.category}
-                  categoryIcon={formData.cardVisualIcon || formData.categoryIcon}
-                  theme={formData.pseudoTheme}
-                  height="100px"
-                  showWatermark={true}
-                />
-              </div>
-            ) : (
-              <div>
-                <label style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Image URL or Path</label>
-                <input
-                  type="text"
-                  name="image"
-                  placeholder="https://... or photo URL"
-                  value={formData.image}
-                  onChange={handleChange}
-                  className="input-field"
-                  style={{ width: '100%', marginTop: '4px' }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* ========== Connected 360° Street View & Dedicated Panorama Image Section ========== */}
-          <div
-            style={{
-              padding: '12px',
-              borderRadius: 'var(--radius-md)',
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              marginBottom: '16px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '1.1rem' }}>🌐</span>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent-glow)' }}>
-                  Connected 360° Street View & Panorama Node
-                </span>
-              </div>
-            </div>
-
-            {/* Source Switcher: Upload 360 Photo vs Mapillary Sequence */}
-            <div
-              style={{
-                display: 'flex',
-                gap: '6px',
-                background: 'rgba(0,0,0,0.3)',
-                padding: '3px',
-                borderRadius: 'var(--radius-md)',
-                marginBottom: '12px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setPanoSourceTab('upload')}
-                style={{
-                  flex: 1,
-                  padding: '6px 10px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  background: panoSourceTab === 'upload' ? 'rgba(67, 97, 238, 0.45)' : 'transparent',
-                  color: panoSourceTab === 'upload' ? '#ffffff' : 'var(--text-muted)',
-                }}
-              >
-                <span>📷</span>
-                <span>Dedicated 360° Photo Upload</span>
-                {formData.uploadedPanoUrl && <span style={{ color: '#34d399', fontSize: '0.75rem' }}>✓</span>}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPanoSourceTab('mapillary')}
-                style={{
-                  flex: 1,
-                  padding: '6px 10px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  background: panoSourceTab === 'mapillary' ? 'rgba(67, 97, 238, 0.45)' : 'transparent',
-                  color: panoSourceTab === 'mapillary' ? '#ffffff' : 'var(--text-muted)',
-                }}
-              >
-                <span>🌐</span>
-                <span>Mapillary Sequence Link</span>
-                {formData.connectedPanoId && panoSourceTab !== 'upload' && <span style={{ color: '#34d399', fontSize: '0.75rem' }}>✓</span>}
-              </button>
-            </div>
-
-            {panoSourceTab === 'upload' ? (
-              <div>
-                {/* Upload Dropzone */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  onChange={handlePanoFileUpload}
-                  style={{ display: 'none' }}
-                />
-
-                {formData.uploadedPanoUrl ? (
-                  <div
-                    style={{
-                      position: 'relative',
-                      borderRadius: 'var(--radius-sm)',
-                      overflow: 'hidden',
-                      border: '1px solid rgba(52, 211, 153, 0.5)',
-                      background: 'rgba(0,0,0,0.4)',
-                      padding: '8px',
-                      marginBottom: '10px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                      <img
-                        src={formData.uploadedPanoUrl}
-                        alt="360 Panorama Preview"
-                        style={{
-                          width: '110px',
-                          height: '60px',
-                          objectFit: 'cover',
-                          borderRadius: '4px',
-                          border: '1px solid rgba(255,255,255,0.2)',
+                        style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
+                        onClick={() => {
+                          const cur = parseInt(formData.pitch, 10) || 0;
+                          setFormData((prev) => ({ ...prev, pitch: String(Math.min(90, cur + 5)) }));
                         }}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#34d399' }}>
-                            ✓ Dedicated 360° Photo Attached
-                          </span>
-                          {(neonUploaded || String(formData.connectedPanoId || '').startsWith('pano_')) && (
-                            <span
-                              style={{
-                                fontSize: '0.68rem',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                background: 'rgba(59, 130, 246, 0.25)',
-                                color: '#60a5fa',
-                                border: '1px solid rgba(96, 165, 250, 0.4)',
-                              }}
-                            >
-                              ☁ Neon Cloud Synced
-                            </span>
-                          )}
-                          {privacyBlurredCount > 0 && (
-                            <span
-                              style={{
-                                fontSize: '0.68rem',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                background: 'rgba(52, 211, 153, 0.2)',
-                                color: '#34d399',
-                                border: '1px solid rgba(52, 211, 153, 0.4)',
-                              }}
-                            >
-                              🛡️ Privacy Anonymized ({privacyBlurredCount} zones)
-                            </span>
-                          )}
-                        </div>
-                        {uploadingNeon && (
-                          <div style={{ margin: '4px 0', fontSize: '0.72rem', color: '#ffd700', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span>⚡ Optimizing 360 texture & uploading directly to Neon Cloud DB...</span>
-                          </div>
-                        )}
-                        <p style={{ fontSize: '0.68rem', color: '#94a3b8', margin: '2px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          ID: {formData.connectedPanoId || 'local_panorama'}
-                        </p>
-                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            onClick={() => setShowBlurStudio(true)}
-                            className="btn btn-secondary"
-                            style={{
-                              fontSize: '0.72rem',
-                              padding: '3px 8px',
-                              background: 'rgba(16, 185, 129, 0.2)',
-                              color: '#34d399',
-                              borderColor: 'rgba(52, 211, 153, 0.4)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                            title="Open Privacy Blur Studio to outline & blur faces, license plates, and camera rigs"
-                          >
-                            <span>🛡️</span>
-                            <span>Privacy Blur (Faces & Plates)</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="btn btn-ghost"
-                            style={{ fontSize: '0.68rem', padding: '2px 6px', color: '#93c5fd' }}
-                          >
-                            🔄 Replace Photo
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                uploadedPanoUrl: '',
-                                connectedPanoId: '',
-                                connectedPanoType: 'mapillary',
-                              }))
-                            }
-                            className="btn btn-ghost"
-                            style={{ fontSize: '0.68rem', padding: '2px 6px', color: '#ef4444' }}
-                          >
-                            ✕ Remove
-                          </button>
-                        </div>
-                      </div>
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
+                        onClick={() => {
+                          const cur = parseInt(formData.pitch, 10) || 0;
+                          setFormData((prev) => ({ ...prev, pitch: String(Math.max(-90, cur - 5)) }));
+                        }}
+                      >
+                        ▼
+                      </button>
                     </div>
                   </div>
-                ) : (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{
-                      cursor: 'pointer',
-                      padding: '16px',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '2px dashed rgba(67, 97, 238, 0.45)',
-                      background: 'rgba(67, 97, 238, 0.08)',
-                      textAlign: 'center',
-                      marginBottom: '10px',
-                      transition: 'all 0.2s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#ffd700';
-                      e.currentTarget.style.background = 'rgba(255, 215, 0, 0.08)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(67, 97, 238, 0.45)';
-                      e.currentTarget.style.background = 'rgba(67, 97, 238, 0.08)';
-                    }}
-                  >
-                    <span style={{ fontSize: '1.5rem', display: 'block', marginBottom: '4px' }}>📁</span>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#f8fafc', display: 'block' }}>
-                      Click to Browse or Drag & Drop 360° Panorama Image
-                    </span>
-                    <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
-                      Supports 360° equirectangular JPG / PNG photos taken at this location
-                    </span>
+                  {/* Quick pitch presets */}
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                    {[
+                      { label: 'Level (0°)', val: 0 },
+                      { label: 'Up (+15°)', val: 15 },
+                      { label: 'Down (-15°)', val: -15 },
+                    ].map((p) => (
+                      <button
+                        key={p.val}
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setFormData((prev) => ({ ...prev, pitch: String(p.val) }))}
+                        style={{
+                          fontSize: '0.65rem',
+                          padding: '2px 5px',
+                          borderRadius: 'var(--radius-sm, 4px)',
+                          background: String(formData.pitch) === String(p.val) ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.06)',
+                          border: String(formData.pitch) === String(p.val) ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
+                          color: String(formData.pitch) === String(p.val) ? '#93c5fd' : '#cbd5e1',
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
                   </div>
-                )}
-              </div>
-            ) : (
-              /* Mapillary Street View Linkage */
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr auto', gap: '8px', alignItems: 'end', marginBottom: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Mapillary Image ID</label>
-                  <input
-                    type="text"
-                    name="connectedPanoId"
-                    placeholder="e.g. 1171410495001931"
-                    value={formData.connectedPanoId}
-                    onChange={handleChange}
-                    className="input-field"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-
-                <div>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={handleAutoDetectNearestPano}
-                    disabled={detectingMapillary}
-                    style={{ fontSize: '0.72rem', padding: '7px 10px', whiteSpace: 'nowrap' }}
-                    title="Detect nearest Mapillary 360 image from coordinates"
-                  >
-                    {detectingMapillary ? '⏳ Searching...' : '🔍 Detect Nearest'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Orientation Row: Heading & Pitch */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Camera Initial Heading (°)</label>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    name="heading"
-                    value={formData.heading}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (raw === '' || /^\d*$/.test(raw)) {
-                        setFormData((prev) => ({ ...prev, heading: raw }));
-                      }
-                    }}
-                    onBlur={() => {
-                      let num = parseInt(formData.heading, 10);
-                      if (isNaN(num)) num = 0;
-                      num = ((num % 360) + 360) % 360;
-                      setFormData((prev) => ({ ...prev, heading: String(num) }));
-                    }}
-                    className="input-field"
-                    style={{ flex: 1 }}
-                    placeholder="0 - 360°"
-                  />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
-                      onClick={() => {
-                        const cur = parseInt(formData.heading, 10) || 0;
-                        setFormData((prev) => ({ ...prev, heading: String((cur + 5) % 360) }));
-                      }}
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
-                      onClick={() => {
-                        const cur = parseInt(formData.heading, 10) || 0;
-                        setFormData((prev) => ({ ...prev, heading: String(((cur - 5) % 360 + 360) % 360) }));
-                      }}
-                    >
-                      ▼
-                    </button>
-                  </div>
-                </div>
-                {/* Quick compass buttons */}
-                <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                  {[
-                    { label: '0° N', val: 0 },
-                    { label: '90° E', val: 90 },
-                    { label: '180° S', val: 180 },
-                    { label: '270° W', val: 270 },
-                  ].map((d) => (
-                    <button
-                      key={d.val}
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => setFormData((prev) => ({ ...prev, heading: String(d.val) }))}
-                      style={{
-                        fontSize: '0.65rem',
-                        padding: '2px 5px',
-                        borderRadius: 'var(--radius-sm)',
-                        background: String(formData.heading) === String(d.val) ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.06)',
-                        border: String(formData.heading) === String(d.val) ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
-                        color: String(formData.heading) === String(d.val) ? '#93c5fd' : 'var(--text-muted)',
-                      }}
-                    >
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Camera Initial Pitch (°)</label>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    name="pitch"
-                    value={formData.pitch}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (raw === '' || raw === '-' || /^-?\d*$/.test(raw)) {
-                        setFormData((prev) => ({ ...prev, pitch: raw }));
-                      }
-                    }}
-                    onBlur={() => {
-                      let num = parseInt(formData.pitch, 10);
-                      if (isNaN(num)) num = 0;
-                      num = Math.max(-90, Math.min(90, num));
-                      setFormData((prev) => ({ ...prev, pitch: String(num) }));
-                    }}
-                    className="input-field"
-                    style={{ flex: 1 }}
-                    placeholder="-90° to +90°"
-                  />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
-                      onClick={() => {
-                        const cur = parseInt(formData.pitch, 10) || 0;
-                        setFormData((prev) => ({ ...prev, pitch: String(Math.min(90, cur + 5)) }));
-                      }}
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      style={{ padding: '0 4px', fontSize: '0.65rem', lineHeight: 1 }}
-                      onClick={() => {
-                        const cur = parseInt(formData.pitch, 10) || 0;
-                        setFormData((prev) => ({ ...prev, pitch: String(Math.max(-90, cur - 5)) }));
-                      }}
-                    >
-                      ▼
-                    </button>
-                  </div>
-                </div>
-                {/* Quick pitch presets */}
-                <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                  {[
-                    { label: 'Level (0°)', val: 0 },
-                    { label: 'Up (+15°)', val: 15 },
-                    { label: 'Down (-15°)', val: -15 },
-                  ].map((p) => (
-                    <button
-                      key={p.val}
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => setFormData((prev) => ({ ...prev, pitch: String(p.val) }))}
-                      style={{
-                        fontSize: '0.65rem',
-                        padding: '2px 5px',
-                        borderRadius: 'var(--radius-sm)',
-                        background: String(formData.pitch) === String(p.val) ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.06)',
-                        border: String(formData.pitch) === String(p.val) ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
-                        color: String(formData.pitch) === String(p.val) ? '#93c5fd' : 'var(--text-muted)',
-                      }}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
-            {editingSpot && (
+          {/* Fixed / Docked Modal Footer */}
+          <div
+            className="modal-footer"
+            style={{
+              padding: '12px 20px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'rgba(10, 15, 29, 0.95)',
+            }}
+          >
+            {editingSpot ? (
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
                 className="btn btn-secondary"
-                style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', marginRight: 'auto' }}
+                style={{
+                  color: '#f87171',
+                  borderColor: 'rgba(239, 68, 68, 0.45)',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  padding: '7px 14px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                }}
               >
                 {deleting ? 'Deleting...' : '🗑️ Delete Location'}
               </button>
+            ) : (
+              <div />
             )}
 
-            <button type="button" onClick={onClose} className="btn btn-secondary">
-              Cancel
-            </button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn btn-secondary"
+                style={{ padding: '7px 16px', fontSize: '0.82rem' }}
+              >
+                Cancel
+              </button>
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="btn btn-primary"
-              style={{
-                background:
-                  spotType === 'tourist_spot'
-                    ? 'linear-gradient(135deg, #ffd700 0%, #f59e0b 100%)'
-                    : 'linear-gradient(135deg, #06d6a0 0%, #0284c7 100%)',
-                color: spotType === 'tourist_spot' ? '#1a1a2e' : '#ffffff',
-                fontWeight: 700,
-                border: 'none',
-              }}
-            >
-              {saving ? 'Saving...' : editingSpot ? '💾 Save Changes' : '⭐ Add Location'}
-            </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="btn btn-primary"
+                style={{
+                  padding: '7px 18px',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  background:
+                    spotType === 'tourist_spot'
+                      ? 'linear-gradient(135deg, #ffd700 0%, #f59e0b 100%)'
+                      : 'linear-gradient(135deg, #06d6a0 0%, #0284c7 100%)',
+                  color: spotType === 'tourist_spot' ? '#1a1a2e' : '#ffffff',
+                  border: 'none',
+                  boxShadow:
+                    spotType === 'tourist_spot'
+                      ? '0 2px 10px rgba(245, 158, 11, 0.35)'
+                      : '0 2px 10px rgba(6, 214, 160, 0.35)',
+                }}
+              >
+                {saving ? 'Saving...' : editingSpot ? '💾 Save Changes' : '⭐ Add Location'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
