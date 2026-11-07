@@ -295,6 +295,10 @@ export default function App() {
         seqData.controlPoints,
         seqData.images
       );
+      // Auto-enable Mapillary streetview, dots and lines so user can see photo dots along road
+      setShowMapillaryStreetview(true);
+      setShowMapillaryDots(true);
+      setShowMapillaryLines(true);
       setAligningSequence({
         ...seqData,
         coordinates,
@@ -322,6 +326,10 @@ export default function App() {
         seqData.controlPoints,
         seqData.images
       );
+      // Auto-enable Mapillary streetview, dots and lines so user can see photo dots along road
+      setShowMapillaryStreetview(true);
+      setShowMapillaryDots(true);
+      setShowMapillaryLines(true);
       setAligningSequence({
         ...seqData,
         coordinates,

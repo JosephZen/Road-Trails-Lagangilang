@@ -661,6 +661,20 @@ export default function MapView({
 
         // 0a. If in alignment mode, clicking/tapping on the active bent line inserts a new curve handle
         if (aligningSequenceRef.current && map.getLayer('active-align-line-inner')) {
+          // Guard: if tap was on or within 26px of an existing handle, NEVER insert a line handle!
+          if (map.getLayer('active-align-handles-layer')) {
+            const handleBox = [
+              [e.point.x - 26, e.point.y - 26],
+              [e.point.x + 26, e.point.y + 26],
+            ];
+            const handleFeatures = map.queryRenderedFeatures(handleBox, {
+              layers: ['active-align-handles-layer'],
+            });
+            if (handleFeatures.length > 0) {
+              return;
+            }
+          }
+
           const lineBox = [
             [e.point.x - 16, e.point.y - 16],
             [e.point.x + 16, e.point.y + 16],
@@ -695,6 +709,8 @@ export default function MapView({
               coordinates,
               images: mappedImages,
             });
+            onSelectHandleIndexRef.current?.(bestIdx);
+            showToast?.(`✨ Added curve handle #${bestIdx + 1}`);
             return;
           }
         }
@@ -1205,19 +1221,22 @@ export default function MapView({
         const popupDiv = document.createElement('div');
         popupDiv.className = 'handle-touch-popup';
         popupDiv.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px; padding:2px;">
-            <span style="font-size:0.75rem; font-weight:700; color:#38bdf8;">Node #${idx + 1}</span>
-            <button id="quick-delete-handle-btn" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:4px 9px; font-size:0.72rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px;">
+          <div style="display:flex; align-items:center; gap:8px; padding:2px 4px;">
+            <span style="font-size:0.8rem; font-weight:700; color:#38bdf8; white-space:nowrap;">Node #${idx + 1}</span>
+            <button id="quick-delete-handle-btn" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:5px 12px; font-size:0.75rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(0,0,0,0.3); touch-action:manipulation;">
               🗑️ Delete
             </button>
           </div>
         `;
         const delBtn = popupDiv.querySelector('#quick-delete-handle-btn');
         if (delBtn) {
-          delBtn.onclick = (ev) => {
+          const doDelete = (ev) => {
             ev.stopPropagation();
+            ev.preventDefault();
             removeHandleByIndex(idx);
           };
+          delBtn.onclick = doDelete;
+          delBtn.ontouchend = doDelete;
         }
 
         const popup = new maplibregl.Popup({
@@ -1454,9 +1473,24 @@ export default function MapView({
           type: 'circle',
           source: 'active-align-handles-source',
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 14, 18, 18],
-            'circle-color': '#00f0ff',
-            'circle-stroke-width': 4,
+            'circle-radius': [
+              'case',
+              ['==', ['get', 'selected'], true],
+              ['interpolate', ['linear'], ['zoom'], 12, 14, 15, 18, 18, 22],
+              ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 14, 18, 18],
+            ],
+            'circle-color': [
+              'case',
+              ['==', ['get', 'selected'], true],
+              '#ef4444',
+              '#00f0ff',
+            ],
+            'circle-stroke-width': [
+              'case',
+              ['==', ['get', 'selected'], true],
+              5,
+              3,
+            ],
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 1,
           },
@@ -2010,6 +2044,13 @@ export default function MapView({
       }
       return;
     }
+
+    // Ensure alignment line and handles are drawn on top of all roads and buildings
+    try {
+      if (mapRef.current.getLayer('active-align-line-casing')) mapRef.current.moveLayer('active-align-line-casing');
+      if (mapRef.current.getLayer('active-align-line-inner')) mapRef.current.moveLayer('active-align-line-inner');
+      if (mapRef.current.getLayer('active-align-handles-layer')) mapRef.current.moveLayer('active-align-handles-layer');
+    } catch (_) {}
 
     const { coordinates = [], controlPoints = [] } = aligningSequence;
 

@@ -43,7 +43,7 @@ export default function StreetviewLineAligner({
           <span className="aligner-mini-nodes">{controlPoints.length} nodes</span>
         </div>
 
-        {selectedHandleIndex !== null && onRemoveHandle && (
+        {selectedHandleIndex !== null && onRemoveHandle ? (
           <button
             className="aligner-btn-delete-node-mini"
             onClick={() => onRemoveHandle(selectedHandleIndex)}
@@ -51,6 +51,16 @@ export default function StreetviewLineAligner({
           >
             🗑️ Delete #{selectedHandleIndex + 1}
           </button>
+        ) : (
+          controlPoints.length > 2 && onRemoveHandle && (
+            <button
+              className="aligner-btn-delete-node-mini"
+              onClick={() => onRemoveHandle(controlPoints.length - 2)}
+              title="Delete last added curve handle"
+            >
+              🗑️ Delete
+            </button>
+          )
         )}
 
         <button
@@ -112,7 +122,7 @@ export default function StreetviewLineAligner({
         <div className="aligner-tips-text">
           <span>💡 <strong>Drag cyan nodes</strong> onto road.</span>
           <span>💡 <strong>Tap line</strong> to add node.</span>
-          <span>💡 <strong>Tap node</strong> to select &amp; delete (or hold 1s).</span>
+          <span>💡 <strong>Tap node</strong> to delete (or hold / dbl-tap).</span>
         </div>
       </div>
 
@@ -152,14 +162,24 @@ export default function StreetviewLineAligner({
           {isSaving ? '⏳ Saving...' : '💾 Save Alignment'}
         </button>
 
-        {selectedHandleIndex === null && controlPoints.length > 2 && onRemoveHandle && (
+        {selectedHandleIndex !== null && onRemoveHandle ? (
           <button
-            className="btn-secondary aligner-btn-remove-last"
-            onClick={() => onRemoveHandle(controlPoints.length - 2)}
-            title="Remove the last intermediate curve handle"
+            className="btn-danger aligner-btn-delete-selected-inline"
+            onClick={() => onRemoveHandle(selectedHandleIndex)}
+            title={`Delete selected handle #${selectedHandleIndex + 1}`}
           >
-            🗑️ Delete Node
+            🗑️ Delete Node #{selectedHandleIndex + 1}
           </button>
+        ) : (
+          controlPoints.length > 2 && onRemoveHandle && (
+            <button
+              className="btn-secondary aligner-btn-remove-last"
+              onClick={() => onRemoveHandle(controlPoints.length - 2)}
+              title="Remove the last intermediate curve handle"
+            >
+              🗑️ Delete Node
+            </button>
+          )
         )}
 
         {onToggleStreetview && (
@@ -168,7 +188,27 @@ export default function StreetviewLineAligner({
             onClick={onToggleStreetview}
             title={showMapillaryStreetview ? 'Hide raw Mapillary overlay' : 'Show Mapillary streetview overlay'}
           >
-            {showMapillaryStreetview ? '🟢 Hide Overlay' : '⚪ Show Overlay'}
+            {showMapillaryStreetview ? '🟢 Hide Streetview' : '⚪ Show Streetview'}
+          </button>
+        )}
+
+        {onToggleLines && showMapillaryStreetview && (
+          <button
+            className={`btn-secondary aligner-btn-sub ${!showMapillaryLines ? 'sub-hidden' : ''}`}
+            onClick={onToggleLines}
+            title={showMapillaryLines ? 'Hide green lines' : 'Show green lines'}
+          >
+            {showMapillaryLines ? 'Lines: ON' : 'Lines: OFF'}
+          </button>
+        )}
+
+        {onToggleDots && showMapillaryStreetview && (
+          <button
+            className={`btn-secondary aligner-btn-sub ${!showMapillaryDots ? 'sub-hidden' : ''}`}
+            onClick={onToggleDots}
+            title={showMapillaryDots ? 'Hide photo dots' : 'Show photo dots'}
+          >
+            {showMapillaryDots ? 'Dots: ON' : 'Dots: OFF'}
           </button>
         )}
 
