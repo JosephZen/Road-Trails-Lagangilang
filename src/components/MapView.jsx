@@ -90,6 +90,7 @@ export default function MapView({
   selectedHandleIndex = null,
   onSelectHandleIndex,
   onRemoveHandle,
+  onAddHandleNext,
 }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -133,6 +134,11 @@ export default function MapView({
   useEffect(() => {
     onRemoveHandleRef.current = onRemoveHandle;
   }, [onRemoveHandle]);
+
+  const onAddHandleNextRef = useRef(onAddHandleNext);
+  useEffect(() => {
+    onAddHandleNextRef.current = onAddHandleNext;
+  }, [onAddHandleNext]);
 
   const handlePopupRef = useRef(null);
 
@@ -609,6 +615,306 @@ export default function MapView({
       return null;
     };
 
+    // Alignment Handle Helpers: Remove, Add, Insert, and Options Popups
+    let touchHoldTimer = null;
+    let touchStartPos = null;
+    let hasDraggedHandle = false;
+
+    const removeHandleByIndex = (idx) => {
+      const seq = aligningSequenceRef.current;
+      if (!seq || idx === undefined || idx === null) return;
+      if (seq.controlPoints.length <= 2) {
+        showToast?.('⚠️ Sequence line requires at least 2 endpoints.');
+        return;
+      }
+      const newControlPoints = seq.controlPoints.filter((_, i) => i !== idx);
+      const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+        newControlPoints,
+        seq.images
+      );
+
+      const lineSrc = map.getSource('active-align-line-source');
+      const handlesSrc = map.getSource('active-align-handles-source');
+
+      if (lineSrc) {
+        lineSrc.setData({
+          type: 'FeatureCollection',
+          features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates } }],
+        });
+      }
+
+      if (handlesSrc) {
+        handlesSrc.setData({
+          type: 'FeatureCollection',
+          features: newControlPoints.map((cp, i) => ({
+            type: 'Feature',
+            properties: { index: i, selected: false },
+            geometry: { type: 'Point', coordinates: cp },
+          })),
+        });
+      }
+
+      if (handlePopupRef.current) {
+        handlePopupRef.current.remove();
+        handlePopupRef.current = null;
+      }
+
+      onUpdateAligningSequenceRef.current?.({
+        ...seq,
+        controlPoints: newControlPoints,
+        coordinates,
+        images: mappedImages,
+      });
+      onSelectHandleIndexRef.current?.(null);
+      showToast?.(`🗑️ Removed curve handle #${idx + 1}`);
+    };
+
+    const addHandleNextTo = (idx) => {
+      const seq = aligningSequenceRef.current;
+      if (!seq) return;
+      const cps = seq.controlPoints;
+      if (cps.length < 2) return;
+
+      let insertIdx = idx + 1;
+      let newCoord;
+      if (idx < cps.length - 1) {
+        newCoord = [
+          (cps[idx][0] + cps[idx + 1][0]) / 2,
+          (cps[idx][1] + cps[idx + 1][1]) / 2,
+        ];
+      } else {
+        newCoord = [
+          (cps[idx - 1][0] + cps[idx][0]) / 2,
+          (cps[idx - 1][1] + cps[idx][1]) / 2,
+        ];
+        insertIdx = idx;
+      }
+
+      const newControlPoints = [...cps];
+      newControlPoints.splice(insertIdx, 0, newCoord);
+
+      const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+        newControlPoints,
+        seq.images
+      );
+
+      const lineSrc = map.getSource('active-align-line-source');
+      const handlesSrc = map.getSource('active-align-handles-source');
+
+      if (lineSrc) {
+        lineSrc.setData({
+          type: 'FeatureCollection',
+          features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates } }],
+        });
+      }
+
+      if (handlesSrc) {
+        handlesSrc.setData({
+          type: 'FeatureCollection',
+          features: newControlPoints.map((cp, i) => ({
+            type: 'Feature',
+            properties: { index: i, selected: i === insertIdx },
+            geometry: { type: 'Point', coordinates: cp },
+          })),
+        });
+      }
+
+      if (handlePopupRef.current) {
+        handlePopupRef.current.remove();
+        handlePopupRef.current = null;
+      }
+
+      onUpdateAligningSequenceRef.current?.({
+        ...seq,
+        controlPoints: newControlPoints,
+        coordinates,
+        images: mappedImages,
+      });
+      onSelectHandleIndexRef.current?.(insertIdx);
+      showToast?.(`✨ Added curve handle #${insertIdx + 1}`);
+    };
+
+    const insertHandleAtCoord = (coord, insertIdx) => {
+      const seq = aligningSequenceRef.current;
+      if (!seq) return;
+      const cps = seq.controlPoints;
+      const newControlPoints = [...cps];
+      newControlPoints.splice(insertIdx, 0, coord);
+
+      const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+        newControlPoints,
+        seq.images
+      );
+
+      const lineSrc = map.getSource('active-align-line-source');
+      const handlesSrc = map.getSource('active-align-handles-source');
+
+      if (lineSrc) {
+        lineSrc.setData({
+          type: 'FeatureCollection',
+          features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates } }],
+        });
+      }
+
+      if (handlesSrc) {
+        handlesSrc.setData({
+          type: 'FeatureCollection',
+          features: newControlPoints.map((cp, i) => ({
+            type: 'Feature',
+            properties: { index: i, selected: i === insertIdx },
+            geometry: { type: 'Point', coordinates: cp },
+          })),
+        });
+      }
+
+      if (handlePopupRef.current) {
+        handlePopupRef.current.remove();
+        handlePopupRef.current = null;
+      }
+
+      onUpdateAligningSequenceRef.current?.({
+        ...seq,
+        controlPoints: newControlPoints,
+        coordinates,
+        images: mappedImages,
+      });
+      onSelectHandleIndexRef.current?.(insertIdx);
+      showToast?.(`✨ Added curve handle #${insertIdx + 1}`);
+    };
+
+    const showHandleOptionsPopup = (idx, coord) => {
+      const seq = aligningSequenceRef.current;
+      if (!seq || idx === undefined || idx === null) return;
+
+      onSelectHandleIndexRef.current?.(idx);
+
+      if (handlePopupRef.current) {
+        handlePopupRef.current.remove();
+      }
+
+      const popupDiv = document.createElement('div');
+      popupDiv.className = 'handle-touch-popup';
+      popupDiv.innerHTML = `
+        <div class="handle-popup-header">
+          <span class="handle-popup-badge">🎯 Node #${idx + 1}</span>
+          <button class="handle-popup-close-btn" title="Close">✕</button>
+        </div>
+        <div class="handle-popup-actions">
+          <button id="quick-add-handle-btn" class="handle-btn-add">
+            ➕ Add Node
+          </button>
+          <button id="quick-delete-handle-btn" class="handle-btn-delete">
+            🗑️ Delete Node
+          </button>
+        </div>
+      `;
+
+      const closeBtn = popupDiv.querySelector('.handle-popup-close-btn');
+      if (closeBtn) {
+        const doClose = (ev) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+          handlePopupRef.current?.remove();
+          handlePopupRef.current = null;
+        };
+        closeBtn.onclick = doClose;
+        closeBtn.ontouchend = doClose;
+      }
+
+      const addBtn = popupDiv.querySelector('#quick-add-handle-btn');
+      if (addBtn) {
+        const doAdd = (ev) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+          addHandleNextTo(idx);
+          handlePopupRef.current?.remove();
+          handlePopupRef.current = null;
+        };
+        addBtn.onclick = doAdd;
+        addBtn.ontouchend = doAdd;
+      }
+
+      const delBtn = popupDiv.querySelector('#quick-delete-handle-btn');
+      if (delBtn) {
+        const doDel = (ev) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+          removeHandleByIndex(idx);
+          handlePopupRef.current?.remove();
+          handlePopupRef.current = null;
+        };
+        delBtn.onclick = doDel;
+        delBtn.ontouchend = doDel;
+      }
+
+      const popup = new maplibregl.Popup({
+        offset: [0, -18],
+        closeButton: false,
+        className: 'handle-action-popup',
+      })
+        .setLngLat(coord || seq.controlPoints[idx])
+        .setDOMContent(popupDiv)
+        .addTo(mapRef.current || map);
+
+      handlePopupRef.current = popup;
+    };
+
+    const showLineAddPopup = (lngLat, bestIdx) => {
+      if (handlePopupRef.current) {
+        handlePopupRef.current.remove();
+      }
+
+      const popupDiv = document.createElement('div');
+      popupDiv.className = 'handle-touch-popup';
+      popupDiv.innerHTML = `
+        <div class="handle-popup-header">
+          <span class="handle-popup-badge">📍 Curve Point</span>
+          <button class="handle-popup-close-btn" title="Close">✕</button>
+        </div>
+        <div class="handle-popup-actions">
+          <button id="quick-add-line-btn" class="handle-btn-add">
+            ➕ Add Node Here
+          </button>
+        </div>
+      `;
+
+      const closeBtn = popupDiv.querySelector('.handle-popup-close-btn');
+      if (closeBtn) {
+        const doClose = (ev) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+          handlePopupRef.current?.remove();
+          handlePopupRef.current = null;
+        };
+        closeBtn.onclick = doClose;
+        closeBtn.ontouchend = doClose;
+      }
+
+      const addBtn = popupDiv.querySelector('#quick-add-line-btn');
+      if (addBtn) {
+        const doAdd = (ev) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+          insertHandleAtCoord([lngLat.lng, lngLat.lat], bestIdx);
+          handlePopupRef.current?.remove();
+          handlePopupRef.current = null;
+        };
+        addBtn.onclick = doAdd;
+        addBtn.ontouchend = doAdd;
+      }
+
+      const popup = new maplibregl.Popup({
+        offset: [0, -14],
+        closeButton: false,
+        className: 'handle-action-popup',
+      })
+        .setLngLat(lngLat)
+        .setDOMContent(popupDiv)
+        .addTo(mapRef.current || map);
+
+      handlePopupRef.current = popup;
+    };
+
     // Handle clicks on Mapillary features or the map in general
     map.on('click', (e) => {
       // Suppress synthetic clicks following a touch long-press gesture
@@ -654,30 +960,39 @@ export default function MapView({
           }
         }
 
-        // 0a. If in alignment mode, clicking/tapping on the active bent line inserts a new curve handle
+        // 0a. If in alignment mode, handle line / handle clicks cleanly
         if (aligningSequenceRef.current && map.getLayer('active-align-line-inner')) {
-          // Guard: if tap was on or within 26px of an existing handle, NEVER insert a line handle!
+          // Check if click was on or within 22px of an existing cyan handle
           if (map.getLayer('active-align-handles-layer')) {
             const handleBox = [
-              [e.point.x - 26, e.point.y - 26],
-              [e.point.x + 26, e.point.y + 26],
+              [e.point.x - 22, e.point.y - 22],
+              [e.point.x + 22, e.point.y + 22],
             ];
             const handleFeatures = map.queryRenderedFeatures(handleBox, {
               layers: ['active-align-handles-layer'],
             });
             if (handleFeatures.length > 0) {
+              const idx = handleFeatures[0].properties?.index;
+              if (idx !== undefined) {
+                onSelectHandleIndexRef.current?.(idx);
+                const isTouch = e.originalEvent?.pointerType === 'touch' || e.originalEvent instanceof TouchEvent;
+                if (isTouch) {
+                  showHandleOptionsPopup(idx, handleFeatures[0].geometry.coordinates);
+                }
+              }
               return;
             }
           }
 
           const lineBox = [
-            [e.point.x - 16, e.point.y - 16],
-            [e.point.x + 16, e.point.y + 16],
+            [e.point.x - 18, e.point.y - 18],
+            [e.point.x + 18, e.point.y + 18],
           ];
           const lineFeatures = map.queryRenderedFeatures(lineBox, {
             layers: ['active-align-line-inner', 'active-align-line-casing'],
           });
           if (lineFeatures.length > 0) {
+            const isTouch = e.originalEvent?.pointerType === 'touch' || e.originalEvent instanceof TouchEvent;
             const clickCoord = [e.lngLat.lng, e.lngLat.lat];
             const seq = aligningSequenceRef.current;
             const cps = seq.controlPoints;
@@ -692,20 +1007,14 @@ export default function MapView({
                 bestIdx = i + 1;
               }
             }
-            const newControlPoints = [...cps];
-            newControlPoints.splice(bestIdx, 0, clickCoord);
-            const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
-              newControlPoints,
-              seq.images
-            );
-            onUpdateAligningSequenceRef.current?.({
-              ...seq,
-              controlPoints: newControlPoints,
-              coordinates,
-              images: mappedImages,
-            });
-            onSelectHandleIndexRef.current?.(bestIdx);
-            showToast?.(`✨ Added curve handle #${bestIdx + 1}`);
+
+            if (!isTouch) {
+              // Desktop Left Click: Directly add node at clicked position!
+              insertHandleAtCoord(clickCoord, bestIdx);
+            } else {
+              // Mobile / Touchscreen: Show "Add Node Here" option popup so panning doesn't add nodes
+              showLineAddPopup(e.lngLat, bestIdx);
+            }
             return;
           }
         }
@@ -789,26 +1098,21 @@ export default function MapView({
     map.on('contextmenu', (e) => {
       e.originalEvent?.preventDefault();
 
-      // If in alignment mode, right-clicking on a handle removes that handle!
+      // If in alignment mode, right-clicking on a handle immediately deletes that handle on desktop!
       if (aligningSequenceRef.current && map.getLayer('active-align-handles-layer')) {
-        const handleFeatures = map.queryRenderedFeatures(e.point, {
+        const hitBox = [
+          [e.point.x - 20, e.point.y - 20],
+          [e.point.x + 20, e.point.y + 20],
+        ];
+        const handleFeatures = map.queryRenderedFeatures(hitBox, {
           layers: ['active-align-handles-layer'],
         });
         if (handleFeatures.length > 0) {
+          e.originalEvent?.preventDefault();
+          e.originalEvent?.stopPropagation();
           const idx = handleFeatures[0].properties?.index;
-          const seq = aligningSequenceRef.current;
-          if (idx !== undefined && seq.controlPoints.length > 2) {
-            const newControlPoints = seq.controlPoints.filter((_, i) => i !== idx);
-            const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
-              newControlPoints,
-              seq.images
-            );
-            onUpdateAligningSequenceRef.current?.({
-              ...seq,
-              controlPoints: newControlPoints,
-              coordinates,
-              images: mappedImages,
-            });
+          if (idx !== undefined) {
+            removeHandleByIndex(idx);
             return;
           }
         }
@@ -1006,61 +1310,6 @@ export default function MapView({
       }
     });
 
-    let touchHoldTimer = null;
-    let touchStartPos = null;
-    let hasDraggedHandle = false;
-    let lastTapTimestamp = 0;
-    let lastTapIndex = null;
-
-    const removeHandleByIndex = (idx) => {
-      const seq = aligningSequenceRef.current;
-      if (!seq || idx === undefined || idx === null) return;
-      if (seq.controlPoints.length <= 2) {
-        showToast?.('⚠️ Sequence line requires at least 2 endpoints.');
-        return;
-      }
-      const newControlPoints = seq.controlPoints.filter((_, i) => i !== idx);
-      const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
-        newControlPoints,
-        seq.images
-      );
-
-      const lineSrc = map.getSource('active-align-line-source');
-      const handlesSrc = map.getSource('active-align-handles-source');
-
-      if (lineSrc) {
-        lineSrc.setData({
-          type: 'FeatureCollection',
-          features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates } }],
-        });
-      }
-
-      if (handlesSrc) {
-        handlesSrc.setData({
-          type: 'FeatureCollection',
-          features: newControlPoints.map((cp, i) => ({
-            type: 'Feature',
-            properties: { index: i, selected: false },
-            geometry: { type: 'Point', coordinates: cp },
-          })),
-        });
-      }
-
-      if (handlePopupRef.current) {
-        handlePopupRef.current.remove();
-        handlePopupRef.current = null;
-      }
-
-      onUpdateAligningSequenceRef.current?.({
-        ...seq,
-        controlPoints: newControlPoints,
-        coordinates,
-        images: mappedImages,
-      });
-      onSelectHandleIndexRef.current?.(null);
-      showToast?.(`🗑️ Removed curve handle #${idx + 1}`);
-    };
-
     const onHandleDragStart = (e) => {
       if (!aligningSequenceRef.current) return;
       if (e.originalEvent) {
@@ -1080,32 +1329,17 @@ export default function MapView({
       map.touchZoomRotate.disable();
       map.getCanvas().style.cursor = 'grabbing';
 
-      // Software touch double-tap detection
-      const now = Date.now();
-      if (lastTapIndex === idx && (now - lastTapTimestamp) < 360) {
-        lastTapTimestamp = 0;
-        lastTapIndex = null;
-        if (touchHoldTimer) clearTimeout(touchHoldTimer);
-        draggingHandleIndex.current = null;
-        map.dragPan.enable();
-        map.touchZoomRotate.enable();
-        removeHandleByIndex(idx);
-        return;
-      }
-      lastTapTimestamp = now;
-      lastTapIndex = idx;
-
-      // Touch hold (long-press ~400ms) on mobile to delete node
+      // Touch hold (long-press ~380ms) on touchscreen to show Add / Delete options popup
       if (touchHoldTimer) clearTimeout(touchHoldTimer);
       touchHoldTimer = setTimeout(() => {
         if (!hasDraggedHandle && draggingHandleIndex.current === idx) {
-          try { navigator.vibrate?.([40, 30, 40]); } catch (_) {}
+          try { navigator.vibrate?.([30, 25, 30]); } catch (_) {}
           draggingHandleIndex.current = null;
           map.dragPan.enable();
           map.touchZoomRotate.enable();
-          removeHandleByIndex(idx);
+          showHandleOptionsPopup(idx, feature.geometry?.coordinates);
         }
-      }, 420);
+      }, 380);
     };
 
     const onHandleDragMove = (e) => {
@@ -1183,7 +1417,9 @@ export default function MapView({
         map.getCanvas().style.cursor = '';
 
         if (!hasDraggedHandle && finishedIdx !== null) {
-          onSelectHandleIndexRef.current?.(finishedIdx);
+          const seq = aligningSequenceRef.current;
+          const coord = seq?.controlPoints?.[finishedIdx];
+          showHandleOptionsPopup(finishedIdx, coord);
         }
       }
     };
@@ -1198,7 +1434,7 @@ export default function MapView({
     map.on('touchend', onGlobalDragEnd);
     map.on('touchcancel', onGlobalDragEnd);
 
-    // Click/tap on handle to select it and show quick delete popup
+    // Click/tap on handle to select it and show options on touch
     map.on('click', 'active-align-handles-layer', (e) => {
       if (!aligningSequenceRef.current) return;
       e.originalEvent?.preventDefault?.();
@@ -1207,55 +1443,10 @@ export default function MapView({
       const idx = feature?.properties?.index;
       if (idx !== undefined) {
         onSelectHandleIndexRef.current?.(idx);
-
-        const coord = feature.geometry.coordinates;
-        if (handlePopupRef.current) {
-          handlePopupRef.current.remove();
+        const isTouch = e.originalEvent?.pointerType === 'touch' || e.originalEvent instanceof TouchEvent;
+        if (isTouch) {
+          showHandleOptionsPopup(idx, feature.geometry.coordinates);
         }
-
-        const popupDiv = document.createElement('div');
-        popupDiv.className = 'handle-touch-popup';
-        popupDiv.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px; padding:2px 4px;">
-            <span style="font-size:0.8rem; font-weight:700; color:#38bdf8; white-space:nowrap;">Node #${idx + 1}</span>
-            <button id="quick-delete-handle-btn" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:5px 12px; font-size:0.75rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(0,0,0,0.3); touch-action:manipulation;">
-              🗑️ Delete
-            </button>
-          </div>
-        `;
-        const delBtn = popupDiv.querySelector('#quick-delete-handle-btn');
-        if (delBtn) {
-          const doDelete = (ev) => {
-            ev.stopPropagation();
-            ev.preventDefault();
-            removeHandleByIndex(idx);
-          };
-          delBtn.onclick = doDelete;
-          delBtn.ontouchend = doDelete;
-        }
-
-        const popup = new maplibregl.Popup({
-          offset: [0, -16],
-          closeButton: true,
-          className: 'handle-action-popup',
-        })
-          .setLngLat(coord)
-          .setDOMContent(popupDiv)
-          .addTo(map);
-
-        handlePopupRef.current = popup;
-      }
-    });
-
-    // Double-click / Double-tap handle to remove it (for touch devices and mice)
-    map.on('dblclick', 'active-align-handles-layer', (e) => {
-      if (!aligningSequenceRef.current) return;
-      e.originalEvent?.preventDefault?.();
-      e.originalEvent?.stopPropagation?.();
-      const feature = e.features?.[0];
-      const idx = feature?.properties?.index;
-      if (idx !== undefined) {
-        removeHandleByIndex(idx);
       }
     });
 

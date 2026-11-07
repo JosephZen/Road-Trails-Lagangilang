@@ -23,6 +23,7 @@ export default function StreetviewLineAligner({
   selectedHandleIndex = null,
   onSelectHandleIndex,
   onRemoveHandle,
+  onAddHandleNext,
 }) {
   const [isMinimized, setIsMinimized] = useState(false);
 
@@ -43,13 +44,23 @@ export default function StreetviewLineAligner({
           <span className="aligner-mini-nodes">{controlPoints.length} nodes</span>
         </div>
 
+        {onAddHandleNext && (
+          <button
+            className="aligner-btn-add-node-mini"
+            onClick={() => onAddHandleNext(selectedHandleIndex ?? (controlPoints.length - 2))}
+            title="Add a new node along the curve"
+          >
+            ➕ Add
+          </button>
+        )}
+
         {selectedHandleIndex !== null && onRemoveHandle ? (
           <button
             className="aligner-btn-delete-node-mini"
             onClick={() => onRemoveHandle(selectedHandleIndex)}
             title={`Delete selected handle #${selectedHandleIndex + 1}`}
           >
-            🗑️ Delete #{selectedHandleIndex + 1}
+            🗑️ #{selectedHandleIndex + 1}
           </button>
         ) : (
           controlPoints.length > 2 && onRemoveHandle && (
@@ -58,7 +69,7 @@ export default function StreetviewLineAligner({
               onClick={() => onRemoveHandle(controlPoints.length - 2)}
               title="Delete last added curve handle"
             >
-              🗑️ Delete
+              🗑️ Del
             </button>
           )
         )}
@@ -120,26 +131,36 @@ export default function StreetviewLineAligner({
 
       <div className="aligner-tips">
         <div className="aligner-tips-text">
-          <span>💡 <strong>Drag cyan nodes</strong> onto road.</span>
-          <span>💡 <strong>Tap line</strong> to add node.</span>
-          <span>💡 <strong>Tap node</strong> to delete (or hold / dbl-tap).</span>
+          <span>💡 <strong>Desktop:</strong> Left-click line to add · Right-click node to delete.</span>
+          <span>💡 <strong>Touch:</strong> Drag node to bend · Hold node for Add / Delete options.</span>
         </div>
       </div>
 
       {/* Selected Node Action Bar */}
-      {selectedHandleIndex !== null && onRemoveHandle && (
+      {selectedHandleIndex !== null && (
         <div className="aligner-selected-bar">
           <span className="aligner-selected-label">
             🎯 Node #{selectedHandleIndex + 1} Selected
           </span>
           <div className="aligner-selected-actions">
-            <button
-              className="btn-danger aligner-btn-delete-selected"
-              onClick={() => onRemoveHandle(selectedHandleIndex)}
-              title={`Delete node #${selectedHandleIndex + 1}`}
-            >
-              🗑️ Delete Node #{selectedHandleIndex + 1}
-            </button>
+            {onAddHandleNext && (
+              <button
+                className="btn-secondary aligner-btn-add-selected"
+                onClick={() => onAddHandleNext(selectedHandleIndex)}
+                title={`Add a new curve node next to node #${selectedHandleIndex + 1}`}
+              >
+                ➕ Add Node Next
+              </button>
+            )}
+            {onRemoveHandle && (
+              <button
+                className="btn-danger aligner-btn-delete-selected"
+                onClick={() => onRemoveHandle(selectedHandleIndex)}
+                title={`Delete node #${selectedHandleIndex + 1}`}
+              >
+                🗑️ Delete Node #{selectedHandleIndex + 1}
+              </button>
+            )}
             <button
               className="btn-ghost aligner-btn-deselect"
               onClick={() => onSelectHandleIndex?.(null)}
@@ -161,6 +182,16 @@ export default function StreetviewLineAligner({
         >
           {isSaving ? '⏳ Saving...' : '💾 Save Alignment'}
         </button>
+
+        {onAddHandleNext && (
+          <button
+            className="btn-secondary aligner-btn-add-inline"
+            onClick={() => onAddHandleNext(selectedHandleIndex ?? (controlPoints.length - 2))}
+            title="Add a new node along this curve"
+          >
+            ➕ Add Node
+          </button>
+        )}
 
         {selectedHandleIndex !== null && onRemoveHandle ? (
           <button

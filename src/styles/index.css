@@ -3177,14 +3177,117 @@ body {
   background: #0f172a !important;
   color: #f8fafc !important;
   border: 1.5px solid #00f0ff !important;
-  border-radius: 10px !important;
-  padding: 6px 8px !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8) !important;
-  min-width: 130px !important;
+  border-radius: 12px !important;
+  padding: 6px 10px !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.85) !important;
+  min-width: 175px !important;
 }
 
 .handle-action-popup .maplibregl-popup-tip {
   border-top-color: #00f0ff !important;
+}
+
+.handle-touch-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.handle-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 4px;
+}
+
+.handle-popup-badge {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.handle-popup-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.handle-popup-close-btn:hover {
+  color: #fff;
+}
+
+.handle-popup-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.handle-btn-add {
+  background: rgba(14, 165, 233, 0.25);
+  border: 1px solid #0284c7;
+  color: #38bdf8;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.handle-btn-add:hover,
+.handle-btn-add:active {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.handle-btn-delete {
+  background: rgba(239, 68, 68, 0.25);
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.handle-btn-delete:hover,
+.handle-btn-delete:active {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.streetview-aligner-panel .aligner-btn-add-inline,
+.streetview-aligner-panel .aligner-btn-add-selected {
+  background: rgba(14, 165, 233, 0.2);
+  border: 1px solid #0284c7;
+  color: #38bdf8;
+}
+
+.streetview-aligner-panel .aligner-btn-add-inline:hover,
+.streetview-aligner-panel .aligner-btn-add-selected:hover {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.streetview-aligner-panel-minimized .aligner-btn-add-node-mini {
+  background: rgba(14, 165, 233, 0.25);
+  border: 1px solid #0284c7;
+  color: #38bdf8;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
 }
 
 @media (max-width: 640px) {

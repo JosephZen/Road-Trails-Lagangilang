@@ -282,6 +282,45 @@ export default function App() {
     showToast(`🗑️ Removed curve handle #${targetIdx + 1}`);
   }, [aligningSequence, selectedHandleIndex, showToast]);
 
+  const handleAddHandleNext = useCallback((idx) => {
+    if (!aligningSequence) return;
+    const cps = aligningSequence.controlPoints;
+    if (cps.length < 2) return;
+
+    const targetIdx = (idx !== undefined && idx !== null) ? idx : (selectedHandleIndex ?? (cps.length - 2));
+    let insertIdx = targetIdx + 1;
+    let newCoord;
+    if (targetIdx < cps.length - 1) {
+      newCoord = [
+        (cps[targetIdx][0] + cps[targetIdx + 1][0]) / 2,
+        (cps[targetIdx][1] + cps[targetIdx + 1][1]) / 2,
+      ];
+    } else {
+      newCoord = [
+        (cps[targetIdx - 1][0] + cps[targetIdx][0]) / 2,
+        (cps[targetIdx - 1][1] + cps[targetIdx][1]) / 2,
+      ];
+      insertIdx = targetIdx;
+    }
+
+    const newControlPoints = [...cps];
+    newControlPoints.splice(insertIdx, 0, newCoord);
+
+    const { coordinates, mappedImages } = streetviewAlignmentService.generateBentGeometry(
+      newControlPoints,
+      aligningSequence.images
+    );
+
+    setAligningSequence({
+      ...aligningSequence,
+      controlPoints: newControlPoints,
+      coordinates,
+      images: mappedImages,
+    });
+    setSelectedHandleIndex(insertIdx);
+    showToast(`✨ Added curve handle #${insertIdx + 1}`);
+  }, [aligningSequence, selectedHandleIndex, showToast]);
+
   const handleSelectSequenceForAlignment = useCallback(async (sequenceId, lat, lng) => {
     if (!isAdmin) {
       showToast('🔒 Line alignment is restricted to Admin only.');
@@ -1176,6 +1215,7 @@ export default function App() {
           selectedHandleIndex={selectedHandleIndex}
           onSelectHandleIndex={setSelectedHandleIndex}
           onRemoveHandle={handleRemoveHandle}
+          onAddHandleNext={handleAddHandleNext}
         />
 
         {/* Map top controls */}
@@ -1441,6 +1481,7 @@ export default function App() {
             selectedHandleIndex={selectedHandleIndex}
             onSelectHandleIndex={setSelectedHandleIndex}
             onRemoveHandle={handleRemoveHandle}
+            onAddHandleNext={handleAddHandleNext}
           />
         )}
 
