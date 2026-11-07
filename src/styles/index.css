@@ -2067,18 +2067,19 @@ body {
   transition: all var(--transition-fast);
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: none !important;
 }
 
 .role-indicator.admin {
   background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
   border: 1px solid rgba(248, 113, 113, 0.6);
   color: #ffffff;
+  box-shadow: none !important;
 }
 
 .role-indicator.admin:hover {
   background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
+  box-shadow: none !important;
   transform: translateY(-1px);
 }
 
@@ -2414,10 +2415,7 @@ body {
 
 /* Separator line for map overlay controls */
 .controls-separator {
-  width: 1px;
-  height: 24px;
-  background: rgba(255, 255, 255, 0.15);
-  flex-shrink: 0;
+  display: none !important;
 }
 
 /* ========== Map Location Picking Banner ========== */

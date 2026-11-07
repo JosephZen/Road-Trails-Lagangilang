@@ -16,7 +16,6 @@ import {
   MAPILLARY_CAMPUS_GATE_IMAGE_ID,
 } from './utils/streetViewJunctions';
 import RoutePlanner from './components/RoutePlanner';
-import NavigationView from './components/NavigationView';
 import RouteSummaryCard from './components/RouteSummaryCard';
 import { getRoute } from './services/routingService';
 import { streetviewAlignmentService } from './services/streetviewAlignmentService';
@@ -1316,23 +1315,18 @@ export default function App() {
 
             {/* Admin-only controls & Status (Only shown when Admin is logged in) */}
             {isAdmin && (
-              <>
-                <div className="controls-separator" />
-
-                {/* Role Indicator Badge (Click to open Admin Tools drawer) */}
-                <div
-                  className="role-indicator admin"
-                  onClick={() => {
-                    setSidebarTab('tools');
-                    setSidebarOpen(true);
-                  }}
-                  title="Admin Mode Active — Click to open Admin Tools drawer"
-                  style={{ cursor: 'pointer' }}
-                >
-                  <span className="role-indicator-dot" />
-                  <span className="role-indicator-title">🛡️ Admin</span>
-                </div>
-              </>
+              <div
+                className="role-indicator admin"
+                onClick={() => {
+                  setSidebarTab('tools');
+                  setSidebarOpen(true);
+                }}
+                title="Admin Mode Active — Click to open Admin Tools drawer"
+                style={{ cursor: 'pointer', boxShadow: 'none' }}
+              >
+                <span className="role-indicator-dot" />
+                <span className="role-indicator-title">🛡️ Admin</span>
+              </div>
             )}
           </div>
           )}
@@ -1910,7 +1904,6 @@ export default function App() {
               onSetProfile={setRoutingProfile}
               onClearRoute={handleClearRoute}
               onRouteCalculated={handleRouteCalculated}
-              onStartNavigation={handleStartNavigation}
               onSetOrigin={setRouteOrigin}
               onSetDestination={setRouteDestination}
               onUseMyLocation={handleUseMyLocation}

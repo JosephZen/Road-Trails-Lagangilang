@@ -248,23 +248,6 @@ export default function RouteSummaryCard({
         >
           · {etas.distanceKm}
         </span>
-        {etas.ascent > 8 && (
-          <span
-            className="mode-text-desktop"
-            title={`Elevation gain: +${etas.ascent}m`}
-            style={{
-              fontSize: '0.62rem',
-              color: '#cbd5e1',
-              background: 'rgba(255, 255, 255, 0.12)',
-              padding: '1px 4px',
-              borderRadius: '9999px',
-              fontWeight: 600,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            ⛰️+{etas.ascent}m
-          </span>
-        )}
       </div>
 
       {/* Destination Chip & Quick Switcher Button */}
@@ -442,7 +425,6 @@ export default function RouteSummaryCard({
             }}
           >
             <span>🛣️ {etas.surfaceType}</span>
-            <span>⛰️ {etas.ascent > 0 ? `+${etas.ascent}m ascent` : 'Flat terrain'}</span>
             <span>🔄 {etas.turnCount} turns</span>
           </div>
 

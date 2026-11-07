@@ -313,25 +313,6 @@ export default function RoutePlanner({
           </button>
         )}
 
-        {/* Navigation button */}
-        {routeData && (
-          <button
-            className="btn btn-block"
-            style={{
-              background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '0.88rem',
-              boxShadow: '0 4px 15px rgba(5, 150, 105, 0.4)',
-            }}
-            onClick={() => onStartNavigation(routeData)}
-            disabled={isNavigating}
-          >
-            🧭 Start Turn-by-Turn Navigation
-          </button>
-        )}
-
         {/* Clear Route */}
         {(routeOrigin || routeDestination || routeData) && (
           <button
@@ -374,10 +355,6 @@ export default function RoutePlanner({
               <span className="route-stat-value">{formatDuration(routeData.duration)}</span>
               <span className="route-stat-label">Est. Time</span>
             </div>
-            <div className="route-stat">
-              <span className="route-stat-value">{steps.length}</span>
-              <span className="route-stat-label">Turns</span>
-            </div>
           </div>
         </div>
       )}
@@ -385,7 +362,7 @@ export default function RoutePlanner({
       {/* Step-by-Step Directions */}
       {steps.length > 0 && (
         <div className="route-steps" style={{ marginTop: '14px' }}>
-          <h4 className="route-steps-title">Turn-by-Turn Directions</h4>
+          <h4 className="route-steps-title">Route Directions</h4>
           <div className="route-steps-list">
             {steps.map((step, i) => (
               <div key={i} className="route-step">

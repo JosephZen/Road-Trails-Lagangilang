@@ -217,15 +217,15 @@ export function calculateAdvancedETAs(routeData, elevationData = null, weatherIn
   // Turn delay: 7s per turn maneuver in Abra
   const carTurnDelay = road.turnCount * 7;
 
-  // Elevation delay: 1.4s per meter ascent (engine load on winding inclines)
-  const carElevationDelay = ascent * 1.4;
+  // Elevation delay removed per user instruction (inaccurate topography model)
+  const carElevationDelay = 0;
 
   // Road condition delay: +20% on rough trails, +12% if wet
   let carConditionMultiplier = 1.0;
   if (road.isTrailPresent) carConditionMultiplier += 0.20;
   if (isWetWeather) carConditionMultiplier += 0.12;
 
-  const totalCarSeconds = Math.round((carBaseTime + carTurnDelay + carElevationDelay) * carConditionMultiplier);
+  const totalCarSeconds = Math.round((carBaseTime + carTurnDelay) * carConditionMultiplier);
 
   // ==========================================
   // 2. MOTORCYCLE (🏍️)
@@ -245,15 +245,15 @@ export function calculateAdvancedETAs(routeData, elevationData = null, weatherIn
   // Turn delay: 5s per turn
   const motoTurnDelay = road.turnCount * 5;
 
-  // Elevation delay: 1.8s per meter ascent (climbing mountain grades on 125-150cc engines)
-  const motoElevationDelay = ascent * 1.8;
+  // Elevation delay removed
+  const motoElevationDelay = 0;
 
   // Road condition delay: +22% on rough trails, +20% on wet roads (slip caution)
   let motoConditionMultiplier = 1.0;
   if (road.isTrailPresent) motoConditionMultiplier += 0.22;
   if (isWetWeather) motoConditionMultiplier += 0.20;
 
-  const totalMotoSeconds = Math.round((motoBaseTime + motoTurnDelay + motoElevationDelay) * motoConditionMultiplier);
+  const totalMotoSeconds = Math.round((motoBaseTime + motoTurnDelay) * motoConditionMultiplier);
 
   // ==========================================
   // 3. PERSON / WALKING (🚶)
@@ -262,21 +262,20 @@ export function calculateAdvancedETAs(routeData, elevationData = null, weatherIn
   const flatWalkingSpeed = road.isTrailPresent ? 1.05 : 1.25;
   const walkBaseTime = distance / flatWalkingSpeed;
 
-  // Tobler's Hiking function & Naismith's rule:
-  // Every 10m of ascent adds ~1 min (+6s per meter) to walking time.
-  const walkElevationDelay = ascent * 6.0;
+  // Elevation delay removed
+  const walkElevationDelay = 0;
 
   // Weather & trail condition multiplier: +15% if wet mud/rain
   let walkConditionMultiplier = 1.0;
   if (isWetWeather) walkConditionMultiplier += 0.25;
 
-  const totalWalkSeconds = Math.round((walkBaseTime + walkElevationDelay) * walkConditionMultiplier);
+  const totalWalkSeconds = Math.round(walkBaseTime * walkConditionMultiplier);
 
   return {
     distance,
     distanceKm: (distance / 1000).toFixed(1) + ' km',
     distanceFormatted: formatKm(distance),
-    ascent,
+    ascent: 0,
     surfaceType: road.surfaceType,
     turnCount: road.turnCount,
     isWetWeather,
@@ -287,7 +286,7 @@ export function calculateAdvancedETAs(routeData, elevationData = null, weatherIn
       seconds: totalCarSeconds,
       formatted: formatMinutes(totalCarSeconds),
       minutes: Math.max(1, Math.round(totalCarSeconds / 60)),
-      delayNote: ascent > 10 ? `+${Math.round(carElevationDelay / 60)}m elev` : null,
+      delayNote: null,
     },
     motorcycle: {
       id: 'motorcycle',
@@ -296,7 +295,7 @@ export function calculateAdvancedETAs(routeData, elevationData = null, weatherIn
       seconds: totalMotoSeconds,
       formatted: formatMinutes(totalMotoSeconds),
       minutes: Math.max(1, Math.round(totalMotoSeconds / 60)),
-      delayNote: ascent > 10 ? `+${Math.round(motoElevationDelay / 60)}m elev` : null,
+      delayNote: null,
     },
     person: {
       id: 'walking',
@@ -305,7 +304,7 @@ export function calculateAdvancedETAs(routeData, elevationData = null, weatherIn
       seconds: totalWalkSeconds,
       formatted: formatMinutes(totalWalkSeconds),
       minutes: Math.max(1, Math.round(totalWalkSeconds / 60)),
-      delayNote: ascent > 10 ? `+${Math.round(walkElevationDelay / 60)}m climb` : null,
+      delayNote: null,
     },
   };
 }
