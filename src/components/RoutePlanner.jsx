@@ -28,6 +28,7 @@ export default function RoutePlanner({
   onSetDestination,
   onUseMyLocation,
   onSwapPoints,
+  onSelectRouteIndex,
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -356,6 +357,107 @@ export default function RoutePlanner({
               <span className="route-stat-label">Est. Time</span>
             </div>
           </div>
+
+          {/* Alternate Routes Selector */}
+          {routeData.allRoutes && routeData.allRoutes.length > 1 && (
+            <div
+              style={{
+                marginTop: '12px',
+                padding: '8px 10px',
+                background: 'rgba(15, 23, 42, 0.75)',
+                borderRadius: '8px',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  color: '#94a3b8',
+                  marginBottom: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                <span>🛣️ Alternate Routes ({routeData.allRoutes.length})</span>
+                <span style={{ fontSize: '0.68rem', color: '#38bdf8' }}>Click to switch</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {routeData.allRoutes.map((r, idx) => {
+                  const isActive = (routeData.activeRouteIndex ?? 0) === idx;
+                  const mins = Math.max(1, Math.round(r.duration / 60));
+                  const km = (r.distance / 1000).toFixed(1);
+                  const routeSummary = r.legs?.[0]?.summary || `Route ${idx + 1}`;
+
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => onSelectRouteIndex?.(idx)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: isActive
+                          ? '1.5px solid #22c55e'
+                          : '1px solid rgba(255, 255, 255, 0.1)',
+                        background: isActive
+                          ? 'rgba(34, 197, 94, 0.15)'
+                          : 'rgba(255, 255, 255, 0.03)',
+                        color: isActive ? '#f8fafc' : '#cbd5e1',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            background: isActive ? '#22c55e' : 'rgba(255, 255, 255, 0.15)',
+                            color: isActive ? '#064e3b' : '#94a3b8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {idx + 1}
+                        </span>
+                        <div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>
+                            {routeSummary} {isActive && <span style={{ color: '#22c55e', fontSize: '0.7rem' }}>• Active</span>}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                            {r.legs?.[0]?.steps?.length || 0} turn directions
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 800, color: isActive ? '#22c55e' : '#f8fafc' }}>
+                          {mins} min
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                          {km} km
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

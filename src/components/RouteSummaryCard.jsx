@@ -26,6 +26,7 @@ export default function RouteSummaryCard({
   isSplitView = false,
   weather = null,
   onChangeDestination,
+  onSelectRouteIndex,
 }) {
   const [showSteps, setShowSteps] = useState(false);
 
@@ -191,6 +192,58 @@ export default function RouteSummaryCard({
           <span className="mode-text-desktop">Walk</span>
         </button>
       </div>
+
+      {/* Alternate Routes Switcher (when multiple paths exist) */}
+      {routeData?.allRoutes && routeData.allRoutes.length > 1 && (
+        <div
+          className="route-alternatives-segmented"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+            background: 'rgba(2, 6, 23, 0.7)',
+            padding: '2px 3px',
+            borderRadius: '9999px',
+            border: '1px solid rgba(56, 189, 248, 0.35)',
+            flexShrink: 0,
+          }}
+        >
+          {routeData.allRoutes.map((r, idx) => {
+            const isActive = (routeData.activeRouteIndex ?? 0) === idx;
+            const mins = Math.max(1, Math.round(r.duration / 60));
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => onSelectRouteIndex?.(idx)}
+                style={{
+                  background: isActive
+                    ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                    : 'transparent',
+                  color: isActive ? '#ffffff' : '#94a3b8',
+                  border: 'none',
+                  borderRadius: '9999px',
+                  padding: '2px 6px',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  boxShadow: isActive ? '0 2px 6px rgba(2, 132, 199, 0.4)' : 'none',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+                title={`Route ${idx + 1}: ${mins} min (${(r.distance / 1000).toFixed(1)} km)`}
+              >
+                <span>{isActive ? '✓' : '⚡'}</span>
+                <span>R{idx + 1}</span>
+                <span style={{ opacity: 0.85, fontSize: '0.66rem', fontWeight: 600 }}>{mins}m</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Core Stats: ETA, KM, Minutes */}
       <div

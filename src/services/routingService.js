@@ -26,7 +26,7 @@ export async function getRoute(origin, destination, profile = 'driving') {
   }
 
   const coords = `${origin[0]},${origin[1]};${destination[0]},${destination[1]}`;
-  const url = `${OSRM_URL}/route/v1/${osrmProfile}/${coords}?steps=true&geometries=geojson&overview=full&annotations=duration,distance`;
+  const url = `${OSRM_URL}/route/v1/${osrmProfile}/${coords}?steps=true&geometries=geojson&overview=full&annotations=duration,distance&alternatives=3`;
   
   try {
     const res = await fetch(url);
@@ -37,17 +37,25 @@ export async function getRoute(origin, destination, profile = 'driving') {
       throw new Error(data.message || 'No route found');
     }
     
-    return data.routes[0];
+    const primary = data.routes[0];
+    primary.allRoutes = data.routes;
+    primary.alternatives = data.routes.slice(1);
+    primary.activeRouteIndex = 0;
+    return primary;
   } catch (err) {
     // If foot route fails (e.g. no pedestrian tags on rural Abra road), fallback to driving geometry
     if (osrmProfile === 'foot') {
       try {
-        const fallbackUrl = `${OSRM_URL}/route/v1/driving/${coords}?steps=true&geometries=geojson&overview=full&annotations=duration,distance`;
+        const fallbackUrl = `${OSRM_URL}/route/v1/driving/${coords}?steps=true&geometries=geojson&overview=full&annotations=duration,distance&alternatives=3`;
         const fallbackRes = await fetch(fallbackUrl);
         if (fallbackRes.ok) {
           const fallbackData = await fallbackRes.json();
           if (fallbackData.code === 'Ok' && fallbackData.routes?.length) {
-            return fallbackData.routes[0];
+            const primary = fallbackData.routes[0];
+            primary.allRoutes = fallbackData.routes;
+            primary.alternatives = fallbackData.routes.slice(1);
+            primary.activeRouteIndex = 0;
+            return primary;
           }
         }
       } catch (fallbackErr) {
@@ -57,7 +65,11 @@ export async function getRoute(origin, destination, profile = 'driving') {
 
     // 100% Offline Client-Side Graph Routing Fallback
     console.warn('Online routing API failed or offline. Switching to client-side offline graph router:', err.message);
-    return await calculateOfflineRoute(origin, destination, profile);
+    const offRoute = await calculateOfflineRoute(origin, destination, profile);
+    offRoute.allRoutes = [offRoute];
+    offRoute.alternatives = [];
+    offRoute.activeRouteIndex = 0;
+    return offRoute;
   }
 }
 

@@ -525,6 +525,21 @@ export default function App() {
     };
   }, [routeOrigin, routeDestination, routingProfile, showToast]);
 
+  // Switch active navigation route among alternatives
+  const handleSelectRouteIndex = useCallback((index) => {
+    setRouteData((prev) => {
+      if (!prev?.allRoutes || !prev.allRoutes[index]) return prev;
+      const target = prev.allRoutes[index];
+      return {
+        ...target,
+        allRoutes: prev.allRoutes,
+        alternatives: prev.allRoutes.filter((_, i) => i !== index),
+        activeRouteIndex: index,
+      };
+    });
+    showToast(`🔄 Switched to Route ${index + 1}`);
+  }, [showToast]);
+
   // Right-click / Touchscreen Long-Press context menu handler
   const lastContextMenuTime = useRef(0);
   const handleMapContextMenu = useCallback((lat, lng, screenX, screenY, sequenceId = null, imageId = null) => {
@@ -782,15 +797,29 @@ export default function App() {
         /^\d+$/.test(String(customPanoId)) &&
         (String(customPanoId) !== '1532761357806896' || spot.id === 'poi_ua_main_gate');
 
+      // 2. Find nearest cyan node along any aligned streetview sequence across Lagangilang
+      const nearestAligned = (typeof lat === 'number' && typeof lng === 'number')
+        ? streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, 3000)
+        : null;
+      const nearestMapillaryId = nearestAligned?.image?.id ? String(nearestAligned.image.id) : null;
+      const effectiveMapillaryId = isDedicatedPanoId
+        ? String(customPanoId)
+        : (nearestMapillaryId || MAPILLARY_CAMPUS_GATE_IMAGE_ID);
+
+      // Always preset mapillaryImageId so switching to Mapillary jumps directly to the closest cyan node
+      setMapillaryImageId(effectiveMapillaryId);
+
       if (isLocalPano) {
         setViewerPanoMode('dedicated');
         setStreetViewPos({ lat, lng, id: String(customPanoId || spot.id) });
-      } else if (isInsideUACampus(lat, lng) || isDedicatedPanoId) {
-        // Area inside UA Campus has no Google Street View vehicle coverage; default directly to Mapillary Campus Trail
+      } else if (viewerPanoMode === 'mapillary' || isInsideUACampus(lat, lng) || isDedicatedPanoId) {
+        // Area inside UA Campus or user already in Mapillary mode: position directly on the nearest cyan node
         setViewerPanoMode('mapillary');
-        const chosenId = String(customPanoId || MAPILLARY_CAMPUS_GATE_IMAGE_ID);
-        setMapillaryImageId(chosenId);
-        setStreetViewPos({ lat, lng, id: chosenId });
+        setStreetViewPos({
+          lat: nearestAligned?.image?.lat ?? lat,
+          lng: nearestAligned?.image?.lng ?? lng,
+          id: effectiveMapillaryId,
+        });
       } else {
         // Default to Google Street View for general road / highway locations
         setViewerPanoMode('google');
@@ -809,12 +838,45 @@ export default function App() {
         });
       }
     },
-    []
+    [viewerPanoMode]
   );
 
-  const handleToggleViewerMode = useCallback((mode) => {
+  const handleToggleViewerMode = useCallback((mode, spot = null) => {
     setViewerPanoMode(mode);
-  }, []);
+    if (mode === 'mapillary') {
+      const targetSpot = spot || activeTouristSpot;
+      const customPanoId = targetSpot?.connected360?.targetId || targetSpot?.primary_pano_id;
+      const isDedicatedPanoId =
+        customPanoId &&
+        String(customPanoId).length >= 10 &&
+        /^\d+$/.test(String(customPanoId)) &&
+        (String(customPanoId) !== '1532761357806896' || targetSpot?.id === 'poi_ua_main_gate');
+
+      if (isDedicatedPanoId) {
+        const dedicatedId = String(customPanoId);
+        setMapillaryImageId(dedicatedId);
+        setStreetViewPos((prev) => (prev ? { ...prev, id: dedicatedId } : { lat: 17.60811, lng: 120.73816, id: dedicatedId }));
+        return;
+      }
+
+      const targetLat = targetSpot?.location?.lat ?? targetSpot?.lat ?? streetViewPos?.lat;
+      const targetLng = targetSpot?.location?.lng ?? targetSpot?.lng ?? streetViewPos?.lng;
+      if (typeof targetLat === 'number' && typeof targetLng === 'number') {
+        const nearest = streetviewAlignmentService.findClosestImageAcrossAll(targetLat, targetLng, 3000);
+        if (nearest?.image?.id) {
+          const nearestId = String(nearest.image.id);
+          setMapillaryImageId(nearestId);
+          setStreetViewPos({
+            lat: nearest.image.lat,
+            lng: nearest.image.lng,
+            id: nearestId,
+          });
+          return;
+        }
+      }
+      setMapillaryImageId(MAPILLARY_CAMPUS_GATE_IMAGE_ID);
+    }
+  }, [activeTouristSpot, streetViewPos]);
 
   // Steering camera helper
   const handleSteerHeading = useCallback((heading, pitch) => {
@@ -1046,8 +1108,10 @@ export default function App() {
     const lng = activeTouristSpot?.location?.lng ?? activeTouristSpot?.lng;
     if (lat && lng && isInsideUACampus(lat, lng)) {
       setViewerPanoMode('mapillary');
-      setMapillaryImageId(MAPILLARY_CAMPUS_GATE_IMAGE_ID);
-      setStreetViewPos({ lat, lng, id: MAPILLARY_CAMPUS_GATE_IMAGE_ID });
+      const nearest = streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, 3000);
+      const fallbackId = nearest?.image?.id ? String(nearest.image.id) : MAPILLARY_CAMPUS_GATE_IMAGE_ID;
+      setMapillaryImageId(fallbackId);
+      setStreetViewPos({ lat: nearest?.image?.lat ?? lat, lng: nearest?.image?.lng ?? lng, id: fallbackId });
     } else if (lat && lng) {
       setViewerPanoMode('google');
       setStreetViewPos({ lat, lng, id: activeTouristSpot?.id || 'streetview' });
@@ -1197,6 +1261,7 @@ export default function App() {
           routeOrigin={routeOrigin}
           routeDestination={routeDestination}
           routingProfile={routingProfile}
+          onSelectRouteIndex={handleSelectRouteIndex}
           routingMode={routingMode || !!pickingTarget}
           pickingMode={pickingTarget}
           isAdmin={isAdmin}
@@ -1240,6 +1305,7 @@ export default function App() {
                 setSidebarTab('routing');
                 setSidebarOpen(true);
               }}
+              onSelectRouteIndex={handleSelectRouteIndex}
             />
           ) : (
             /* Horizontally scrollable/dynamic action bar across all aspect ratios */
@@ -1987,6 +2053,7 @@ export default function App() {
               onSetDestination={setRouteDestination}
               onUseMyLocation={handleUseMyLocation}
               onSwapPoints={handleSwapPoints}
+              onSelectRouteIndex={handleSelectRouteIndex}
             />
           )}
 

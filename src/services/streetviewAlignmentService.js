@@ -440,12 +440,17 @@ class StreetviewAlignmentService {
       if (!Array.isArray(aligned.images)) continue;
 
       for (const img of aligned.images) {
+        if (!img || !img.id) continue;
         if (this.isImageExcluded(img.id)) continue;
-        const d = getHaversineDistance(lat, lng, img.lat, img.lng);
+        const imgLat = typeof img.lat === 'number' ? img.lat : img.originalLat;
+        const imgLng = typeof img.lng === 'number' ? img.lng : img.originalLng;
+        if (typeof imgLat !== 'number' || typeof imgLng !== 'number') continue;
+
+        const d = getHaversineDistance(lat, lng, imgLat, imgLng);
         if (d < minD && d <= maxDistanceMeters) {
           minD = d;
           closest = {
-            image: img,
+            image: { ...img, lat: imgLat, lng: imgLng },
             sequenceId: seqId,
             distance: Math.round(d),
           };
@@ -454,6 +459,14 @@ class StreetviewAlignmentService {
     }
 
     return closest;
+  }
+
+  /**
+   * Find nearest aligned cyan node to any given POI, landmark, or GPS coordinate.
+   * Scans all active aligned sequences across Lagangilang (default radius 3000m).
+   */
+  findNearestAlignedNode(lat, lng, maxDistanceMeters = 3000) {
+    return this.findClosestImageAcrossAll(lat, lng, maxDistanceMeters);
   }
 
   getExcludedSequences() {

@@ -1,3 +1,5 @@
+import { THEMES } from '../components/PseudoImage';
+
 /**
  * Unified POI & Checkpoint Icon Registry
  * 
@@ -54,6 +56,13 @@ export const POI_COLOR_PALETTE = {
     border: '#fcd34d',
     shadow: 'rgba(217, 119, 6, 0.6)',
   },
+  // Bank & ATM / Financial Services: Emerald Green
+  bank: {
+    bg: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+    color: '#10b981',
+    border: '#6ee7b7',
+    shadow: 'rgba(16, 185, 129, 0.6)',
+  },
   // Terminals, Gas, Water & Commercial POIs: Sky Blue
   service: {
     bg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
@@ -68,6 +77,21 @@ export const POI_COLOR_PALETTE = {
  * Always respects custom selected icons (customIcon || icon || cardVisualIcon) first!
  */
 export function getPoiVisualConfig(spot = {}) {
+  const visual = _resolvePoiVisualConfig(spot);
+  if (spot.pseudoTheme && THEMES[spot.pseudoTheme]) {
+    const t = THEMES[spot.pseudoTheme];
+    visual.palette = {
+      ...visual.palette,
+      bg: `linear-gradient(135deg, ${t.from} 0%, ${t.to} 100%)`,
+      color: t.color || t.to,
+      border: t.accent || '#ffffff',
+      shadow: 'rgba(0, 0, 0, 0.4)',
+    };
+  }
+  return visual;
+}
+
+function _resolvePoiVisualConfig(spot = {}) {
   const name = (spot.name || '').toLowerCase();
   const cat = (spot.category || spot.type || '').toLowerCase();
   const spotType = (spot.spotType || '').toLowerCase();
@@ -196,7 +220,35 @@ export function getPoiVisualConfig(spot = {}) {
     };
   }
 
-  // 6. Terminals, Transport, Campus & Local Services (Sky Blue #0284C7)
+  // 6. Bank & ATM / Financial Services (Emerald Green #059669)
+  if (
+    cat.includes('bank') ||
+    cat.includes('atm') ||
+    cat.includes('finance') ||
+    name.includes('bank') ||
+    name.includes('atm') ||
+    name.includes('landbank')
+  ) {
+    let palette = POI_COLOR_PALETTE.bank;
+    if (spot.pseudoTheme && THEMES[spot.pseudoTheme]) {
+      const t = THEMES[spot.pseudoTheme];
+      palette = {
+        bg: `linear-gradient(135deg, ${t.from} 0%, ${t.to} 100%)`,
+        color: t.color || t.to,
+        border: t.accent || '#ffffff',
+        shadow: 'rgba(16, 185, 129, 0.6)',
+      };
+    }
+    return {
+      typeKey: 'bank',
+      pinClass: 'pin-bank',
+      icon: customSelectedIcon || '🏧',
+      label: spot.category || 'Bank & ATM',
+      palette,
+    };
+  }
+
+  // 7. Terminals, Transport, Campus & Local Services (Sky Blue #0284C7)
   let serviceIcon = '📍';
   if (cat.includes('school') || cat.includes('campus') || name.includes('university') || name.includes('school')) serviceIcon = '🏫';
   else if (cat.includes('transport') || cat.includes('terminal') || name.includes('terminal')) serviceIcon = '🚌';
@@ -205,14 +257,24 @@ export function getPoiVisualConfig(spot = {}) {
   else if (cat.includes('store') || cat.includes('market') || cat.includes('convenience')) serviceIcon = '🛒';
   else if (cat.includes('dining') || cat.includes('eatery')) serviceIcon = '🍲';
   else if (cat.includes('hotel')) serviceIcon = '🏨';
-  else if (cat.includes('bank') || cat.includes('atm')) serviceIcon = '🏧';
+
+  let palette = POI_COLOR_PALETTE.service;
+  if (spot.pseudoTheme && THEMES[spot.pseudoTheme]) {
+    const t = THEMES[spot.pseudoTheme];
+    palette = {
+      ...palette,
+      bg: `linear-gradient(135deg, ${t.from} 0%, ${t.to} 100%)`,
+      color: t.color || t.to,
+      border: t.accent || '#ffffff',
+    };
+  }
 
   return {
     typeKey: 'service',
     pinClass: 'pin-service',
     icon: customSelectedIcon || serviceIcon,
     label: spot.category || 'Public Service & POI',
-    palette: POI_COLOR_PALETTE.service,
+    palette,
   };
 }
 
@@ -224,10 +286,13 @@ export function renderTeardropPinHtml(spot, options = {}) {
   const size = options.size || 30;
   const showLabel = options.showLabel !== false;
   const isDragging = options.isDragging || false;
+  const customPinStyle = config.palette?.bg
+    ? `background: ${config.palette.bg} !important; border-color: ${config.palette.border || '#ffffff'} !important;`
+    : '';
 
   return `
     <div class="poi-marker-inner ${config.pinClass} ${isDragging ? 'is-dragging' : ''}">
-      <div class="poi-marker-pin ${config.pinClass}" style="width: ${size}px; height: ${size}px;">
+      <div class="poi-marker-pin ${config.pinClass}" style="width: ${size}px; height: ${size}px; ${customPinStyle}">
         <span class="poi-marker-icon">${config.icon}</span>
       </div>
       ${showLabel ? `<div class="poi-marker-label">${spot.name || 'Spot'}</div>` : ''}

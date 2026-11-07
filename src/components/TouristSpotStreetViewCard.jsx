@@ -458,7 +458,7 @@ export default function TouristSpotStreetViewCard({
           }}
         >
           <button
-            onClick={() => onToggleViewerMode?.('google')}
+            onClick={() => onToggleViewerMode?.('google', spot)}
             style={{
               flex: 1,
               padding: '4px 2px',
@@ -487,7 +487,7 @@ export default function TouristSpotStreetViewCard({
           </button>
 
           <button
-            onClick={() => onToggleViewerMode?.('mapillary')}
+            onClick={() => onToggleViewerMode?.('mapillary', spot)}
             style={{
               flex: 1,
               padding: '4px 2px',
@@ -517,7 +517,7 @@ export default function TouristSpotStreetViewCard({
 
           {hasDedicatedPano && (
             <button
-              onClick={() => onToggleViewerMode?.('dedicated')}
+              onClick={() => onToggleViewerMode?.('dedicated', spot)}
               style={{
                 flex: 1,
                 padding: '4px 2px',

@@ -70,6 +70,7 @@ export default function MapView({
   routeOrigin,
   routeDestination,
   routingProfile = 'driving',
+  onSelectRouteIndex,
   showCustomOSM = true,
   routingMode = false,
   pickingMode = null,
@@ -124,6 +125,11 @@ export default function MapView({
   useEffect(() => {
     selectedHandleIndexRef.current = selectedHandleIndex;
   }, [selectedHandleIndex]);
+
+  const onSelectRouteIndexRef = useRef(onSelectRouteIndex);
+  useEffect(() => {
+    onSelectRouteIndexRef.current = onSelectRouteIndex;
+  }, [onSelectRouteIndex]);
 
   const onSelectHandleIndexRef = useRef(onSelectHandleIndex);
   useEffect(() => {
@@ -360,6 +366,52 @@ export default function MapView({
           'fill-color': '#4cc9f0',
           'fill-opacity': 0.2,
         },
+      });
+
+      // Alternate routes source & layers (clickable dashed line with hover)
+      map.addSource('route-alternatives', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'route-alternatives-casing',
+        type: 'line',
+        source: 'route-alternatives',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#0f172a',
+          'line-width': 8,
+          'line-opacity': 0.75,
+        },
+      });
+
+      map.addLayer({
+        id: 'route-alternatives-layer',
+        type: 'line',
+        source: 'route-alternatives',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#38bdf8',
+          'line-width': 4.5,
+          'line-opacity': 0.9,
+          'line-dasharray': [2, 1.5],
+        },
+      });
+
+      map.on('click', 'route-alternatives-layer', (e) => {
+        const routeIndex = e.features?.[0]?.properties?.routeIndex;
+        if (typeof routeIndex === 'number' && onSelectRouteIndexRef.current) {
+          onSelectRouteIndexRef.current(routeIndex);
+        }
+      });
+
+      map.on('mouseenter', 'route-alternatives-layer', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.on('mouseleave', 'route-alternatives-layer', () => {
+        map.getCanvas().style.cursor = '';
       });
 
       // Route line source & layer
@@ -1570,6 +1622,32 @@ export default function MapView({
         });
       }
 
+      if (!mapRef.current.getSource('route-alternatives')) {
+        mapRef.current.addSource('route-alternatives', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+        mapRef.current.addLayer({
+          id: 'route-alternatives-casing',
+          type: 'line',
+          source: 'route-alternatives',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#0f172a', 'line-width': 8, 'line-opacity': 0.75 },
+        });
+        mapRef.current.addLayer({
+          id: 'route-alternatives-layer',
+          type: 'line',
+          source: 'route-alternatives',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': 4.5,
+            'line-opacity': 0.9,
+            'line-dasharray': [2, 1.5],
+          },
+        });
+      }
+
       if (!mapRef.current.getSource('route-line')) {
         mapRef.current.addSource('route-line', {
           type: 'geojson',
@@ -1878,9 +1956,13 @@ export default function MapView({
       el.dataset.poiId = spot.id;
       el.title = canDrag ? `${spot.name} • Drag to reposition` : spot.name;
 
+      const customPinStyle = visual.palette?.bg
+        ? `background: ${visual.palette.bg} !important; border-color: ${visual.palette.border || '#ffffff'} !important; ${visual.palette.shadow ? `box-shadow: 0 4px 14px ${visual.palette.shadow} !important;` : ''}`
+        : '';
+
       el.innerHTML = `
         <div class="poi-marker-inner">
-          <div class="poi-marker-pin ${visual.pinClass}">
+          <div class="poi-marker-pin ${visual.pinClass}" style="${customPinStyle}">
             <span class="poi-marker-icon">${visual.icon}</span>
           </div>
           <div class="poi-marker-label">${spot.name}</div>
@@ -1975,6 +2057,7 @@ export default function MapView({
 
     const updateRoute = () => {
       const source = mapRef.current?.getSource('route-line');
+      const altSource = mapRef.current?.getSource('route-alternatives');
       if (!source) return;
 
       if (routeGeoJSON) {
@@ -1983,20 +2066,47 @@ export default function MapView({
           geometry: routeGeoJSON,
           properties: {},
         });
-        // Explicit layer ordering: Layer bright green route line ON TOP OF cyan streetview lines
+
+        // Update alternate routes
+        if (altSource) {
+          const all = routeData?.allRoutes || [];
+          const activeIdx = routeData?.activeRouteIndex ?? 0;
+          const altFeatures = all
+            .map((r, idx) => ({ r, idx }))
+            .filter(({ idx }) => idx !== activeIdx)
+            .map(({ r, idx }) => ({
+              type: 'Feature',
+              properties: {
+                routeIndex: idx,
+                duration: r.duration,
+                distance: r.distance,
+              },
+              geometry: r.geometry,
+            }));
+
+          altSource.setData({
+            type: 'FeatureCollection',
+            features: altFeatures,
+          });
+        }
+
+        // Explicit layer ordering: Layer alternate routes then bright green route line ON TOP OF cyan streetview lines
         try {
+          if (map.getLayer('route-alternatives-casing')) map.moveLayer('route-alternatives-casing');
+          if (map.getLayer('route-alternatives-layer')) map.moveLayer('route-alternatives-layer');
           if (map.getLayer('route-line-casing')) map.moveLayer('route-line-casing');
           if (map.getLayer('route-line-layer')) map.moveLayer('route-line-layer');
         } catch (_) {}
       } else {
         source.setData({ type: 'FeatureCollection', features: [] });
+        if (altSource) altSource.setData({ type: 'FeatureCollection', features: [] });
       }
     };
 
     updateRoute();
     window.addEventListener('map-style-loaded', updateRoute);
     return () => window.removeEventListener('map-style-loaded', updateRoute);
-  }, [routeGeoJSON]);
+  }, [routeGeoJSON, routeData]);
 
   // Route origin & destination markers with Pop-up POI that automatically disappears
   const routeMarkersRef = useRef([]);
