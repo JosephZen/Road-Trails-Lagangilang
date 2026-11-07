@@ -457,23 +457,18 @@ export default function MapView({
         type: 'circle',
         source: 'active-align-handles-source',
         paint: {
-          'circle-radius': [
-            'case',
-            ['boolean', ['get', 'selected'], false],
-            ['interpolate', ['linear'], ['zoom'], 12, 14, 15, 18, 18, 22],
-            ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 14, 18, 18],
-          ],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 14, 18, 18],
           'circle-color': [
             'case',
-            ['boolean', ['get', 'selected'], false],
+            ['==', ['get', 'selected'], true],
             '#ef4444',
             '#00f0ff',
           ],
           'circle-stroke-width': [
             'case',
-            ['boolean', ['get', 'selected'], false],
-            5,
-            3,
+            ['==', ['get', 'selected'], true],
+            6,
+            3.5,
           ],
           'circle-stroke-color': '#ffffff',
           'circle-opacity': 1,
@@ -1473,12 +1468,7 @@ export default function MapView({
           type: 'circle',
           source: 'active-align-handles-source',
           paint: {
-            'circle-radius': [
-              'case',
-              ['==', ['get', 'selected'], true],
-              ['interpolate', ['linear'], ['zoom'], 12, 14, 15, 18, 18, 22],
-              ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 14, 18, 18],
-            ],
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 14, 18, 18],
             'circle-color': [
               'case',
               ['==', ['get', 'selected'], true],
@@ -1488,8 +1478,8 @@ export default function MapView({
             'circle-stroke-width': [
               'case',
               ['==', ['get', 'selected'], true],
-              5,
-              3,
+              6,
+              3.5,
             ],
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 1,
