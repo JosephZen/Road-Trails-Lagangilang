@@ -1,34 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { touristSpotsService } from '../services/touristSpotsService';
 
-const PRESETS_STORAGE_KEY = 'lagangilang_privacy_presets_v1';
-const DEFAULT_PRESET_KEY = 'lagangilang_default_privacy_preset_id';
-
-// Default built-in presets for common 360 camera rigs
-const DEFAULT_PRESETS = [
-  {
-    id: 'preset_tripod_nadir',
-    name: '📷 Tripod / Selfie Stick Nadir',
-    description: 'Blurs the bottom center tripod mount',
-    zones: [
-      { xPct: 0.42, yPct: 0.84, wPct: 0.16, hPct: 0.16, type: 'pixelate', strength: 16 },
-    ],
-  },
-  {
-    id: 'preset_vehicle_hood',
-    name: '🚗 Survey Vehicle Hood & Roof',
-    description: 'Blurs bottom vehicle hood and roof rack',
-    zones: [
-      { xPct: 0.25, yPct: 0.82, wPct: 0.50, hPct: 0.18, type: 'pixelate', strength: 18 },
-    ],
-  },
-];
-
 /**
  * PrivacyBlurStudio
  * Allows users to manually outline/draw blur regions over faces, vehicle plates,
- * or camera rigs in raw 360 panoramas before saving to database.
- * Supports saving and applying reusable blur presets across all or certain images.
+ * or camera rigs in raw 360 panoramas before saving.
  */
 export default function PrivacyBlurStudio({
   isOpen,
@@ -51,35 +27,11 @@ export default function PrivacyBlurStudio({
   const [startPoint, setStartPoint] = useState(null);
   const [currentRect, setCurrentRect] = useState(null);
 
-  // Zoom & Pan state
+  // Zoom state
   const [zoomLevel, setZoomLevel] = useState(1);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const imgElementRef = useRef(null);
-
-  // Presets state
-  const [presets, setPresets] = useState(() => {
-    try {
-      const stored = localStorage.getItem(PRESETS_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return Array.isArray(parsed) ? parsed : DEFAULT_PRESETS;
-      }
-    } catch (_) {}
-    return DEFAULT_PRESETS;
-  });
-  const [selectedPresetId, setSelectedPresetId] = useState('');
-  const [autoApplyDefaultPreset, setAutoApplyDefaultPreset] = useState(() => {
-    return !!localStorage.getItem(DEFAULT_PRESET_KEY);
-  });
-
-  // Save presets to localStorage
-  const savePresetsToStorage = (newPresets) => {
-    setPresets(newPresets);
-    try {
-      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(newPresets));
-    } catch (_) {}
-  };
 
   // Load image onto canvas with automatic Neon Cloud DB resolution
   useEffect(() => {
@@ -128,15 +80,6 @@ export default function PrivacyBlurStudio({
         ctx.drawImage(img, 0, 0);
         setImageLoaded(true);
         setLoadError(null);
-
-        // Check if default preset is configured
-        const defaultId = localStorage.getItem(DEFAULT_PRESET_KEY);
-        if (defaultId) {
-          const found = presets.find((p) => p.id === defaultId);
-          if (found) {
-            applyPresetZones(found.zones, canvas.width, canvas.height);
-          }
-        }
       };
 
       img.onerror = async () => {
@@ -331,84 +274,6 @@ export default function PrivacyBlurStudio({
     redrawCanvas([]);
   };
 
-  // Apply preset zones
-  const applyPresetZones = (presetZones, canvasWidth, canvasHeight) => {
-    const w = canvasWidth || canvasRef.current?.width || 1;
-    const h = canvasHeight || canvasRef.current?.height || 1;
-
-    const newZones = presetZones.map((pz) => ({
-      id: `preset_zone_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      x: Math.round(pz.xPct * w),
-      y: Math.round(pz.yPct * h),
-      w: Math.round(pz.wPct * w),
-      h: Math.round(pz.hPct * h),
-      xPct: pz.xPct,
-      yPct: pz.yPct,
-      wPct: pz.wPct,
-      hPct: pz.hPct,
-      type: pz.type || blurMode,
-      strength: pz.strength || blurStrength,
-    }));
-
-    const combined = [...zones, ...newZones];
-    setHistory((prev) => [...prev, zones]);
-    setZones(combined);
-    redrawCanvas(combined);
-  };
-
-  const handleApplySelectedPreset = () => {
-    const preset = presets.find((p) => p.id === selectedPresetId);
-    if (!preset) {
-      alert('Please select a preset from the dropdown first.');
-      return;
-    }
-    applyPresetZones(preset.zones);
-  };
-
-  // Save current zones as a new reusable preset
-  const handleSaveCurrentAsPreset = () => {
-    if (zones.length === 0) {
-      alert('Draw at least one blur zone first before saving as a preset.');
-      return;
-    }
-
-    const name = window.prompt(
-      'Enter a name for this Privacy Blur Preset (e.g., "Survey Rig Nadir Mask" or "Car Roof Mask"):',
-      `Custom Preset (${zones.length} zones)`
-    );
-    if (!name || !name.trim()) return;
-
-    const newPreset = {
-      id: `preset_${Date.now()}`,
-      name: name.trim(),
-      description: `User-defined preset with ${zones.length} zone(s)`,
-      zones: zones.map((z) => ({
-        xPct: z.xPct,
-        yPct: z.yPct,
-        wPct: z.wPct,
-        hPct: z.hPct,
-        type: z.type,
-        strength: z.strength,
-      })),
-    };
-
-    const updated = [...presets, newPreset];
-    savePresetsToStorage(updated);
-    setSelectedPresetId(newPreset.id);
-    alert(`Preset "${newPreset.name}" saved! You can now apply it to any image with 1 click.`);
-  };
-
-  // Toggle default preset across all images
-  const handleToggleDefaultPreset = (e) => {
-    const checked = e.target.checked;
-    setAutoApplyDefaultPreset(checked);
-    if (checked && selectedPresetId) {
-      localStorage.setItem(DEFAULT_KEY, selectedPresetId);
-    } else {
-      localStorage.removeItem(DEFAULT_KEY);
-    }
-  };
-
   // Final export and save
   const handleSaveAndApply = () => {
     const canvas = canvasRef.current;
@@ -440,7 +305,7 @@ export default function PrivacyBlurStudio({
           maxHeight: '94vh',
           display: 'flex',
           flexDirection: 'column',
-          borderRadius: 'var(--radius-lg)',
+          borderRadius: 'var(--radius-lg, 14px)',
           overflow: 'hidden',
           border: '1.5px solid rgba(67, 97, 238, 0.4)',
           boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
@@ -453,156 +318,143 @@ export default function PrivacyBlurStudio({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '12px 18px',
+            padding: '12px 20px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
             background: 'rgba(0, 0, 0, 0.3)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.4rem' }}>🛡️</span>
+            <span style={{ fontSize: '1.3rem' }}>🛡️</span>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc' }}>
-                Privacy Blur Studio · RA 10173 Compliance
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc' }}>
+                360° Photo Anonymizer
               </h3>
-              <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                Outline and anonymize faces, license plates, and vehicle rigs ({imageName})
+              <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                {imageName || '360° Panorama'}
               </span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span
               style={{
                 fontSize: '0.72rem',
-                padding: '3px 8px',
-                borderRadius: 'var(--radius-full)',
-                background: zones.length > 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                color: zones.length > 0 ? '#34d399' : '#cbd5e1',
-                border: zones.length > 0 ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.2)',
+                fontWeight: 600,
+                padding: '3px 10px',
+                borderRadius: 'var(--radius-full, 9999px)',
+                background: zones.length > 0 ? 'rgba(52, 211, 153, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                color: zones.length > 0 ? '#34d399' : '#94a3b8',
+                border: zones.length > 0 ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(255, 255, 255, 0.15)',
               }}
             >
-              {zones.length} Zone(s) Blurred
+              {zones.length} {zones.length === 1 ? 'Zone' : 'Zones'} Blurred
             </span>
-            <button onClick={onClose} className="btn btn-ghost" style={{ fontSize: '1.2rem' }}>
+            <button
+              onClick={onClose}
+              className="btn btn-ghost"
+              style={{
+                width: '32px',
+                height: '32px',
+                padding: 0,
+                borderRadius: '50%',
+                fontSize: '1rem',
+                color: '#94a3b8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              title="Close editor"
+            >
               ✕
             </button>
           </div>
         </div>
 
-        {/* Toolbar: Blur Type, Strength, Presets, Undo */}
+        {/* Toolbar: Blur Type, Strength, Undo & Clear */}
         <div
           style={{
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '10px',
-            padding: '10px 18px',
+            gap: '12px',
+            padding: '10px 20px',
             background: 'rgba(0, 0, 0, 0.25)',
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
           }}
         >
-          {/* Mode Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600 }}>Filter:</span>
-            <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.4)', padding: '2px', borderRadius: 'var(--radius-sm)' }}>
-              <button
-                type="button"
-                onClick={() => setBlurMode('pixelate')}
-                className="btn btn-ghost"
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '0.75rem',
-                  borderRadius: '4px',
-                  background: blurMode === 'pixelate' ? 'rgba(67, 97, 238, 0.4)' : 'transparent',
-                  color: blurMode === 'pixelate' ? '#ffffff' : '#94a3b8',
-                }}
-              >
-                ⬛ Mosaic / Pixelate
-              </button>
-              <button
-                type="button"
-                onClick={() => setBlurMode('blur')}
-                className="btn btn-ghost"
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '0.75rem',
-                  borderRadius: '4px',
-                  background: blurMode === 'blur' ? 'rgba(67, 97, 238, 0.4)' : 'transparent',
-                  color: blurMode === 'blur' ? '#ffffff' : '#94a3b8',
-                }}
-              >
-                🌫️ Smooth Blur
-              </button>
-              <button
-                type="button"
-                onClick={() => setBlurMode('blackout')}
-                className="btn btn-ghost"
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '0.75rem',
-                  borderRadius: '4px',
-                  background: blurMode === 'blackout' ? 'rgba(67, 97, 238, 0.4)' : 'transparent',
-                  color: blurMode === 'blackout' ? '#ffffff' : '#94a3b8',
-                }}
-              >
-                🖤 Blackout Mask
-              </button>
+          {/* Filter Mode & Strength */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px' }}>
+            {/* Mode Switcher */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600 }}>Filter:</span>
+              <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.4)', padding: '2px', borderRadius: 'var(--radius-sm, 6px)' }}>
+                <button
+                  type="button"
+                  onClick={() => setBlurMode('pixelate')}
+                  className="btn btn-ghost"
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.75rem',
+                    fontWeight: blurMode === 'pixelate' ? 700 : 500,
+                    borderRadius: '4px',
+                    background: blurMode === 'pixelate' ? 'rgba(67, 97, 238, 0.4)' : 'transparent',
+                    color: blurMode === 'pixelate' ? '#ffffff' : '#94a3b8',
+                  }}
+                >
+                  ⬛ Mosaic / Pixelate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBlurMode('blur')}
+                  className="btn btn-ghost"
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.75rem',
+                    fontWeight: blurMode === 'blur' ? 700 : 500,
+                    borderRadius: '4px',
+                    background: blurMode === 'blur' ? 'rgba(67, 97, 238, 0.4)' : 'transparent',
+                    color: blurMode === 'blur' ? '#ffffff' : '#94a3b8',
+                  }}
+                >
+                  🌫️ Smooth Blur
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBlurMode('blackout')}
+                  className="btn btn-ghost"
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.75rem',
+                    fontWeight: blurMode === 'blackout' ? 700 : 500,
+                    borderRadius: '4px',
+                    background: blurMode === 'blackout' ? 'rgba(67, 97, 238, 0.4)' : 'transparent',
+                    color: blurMode === 'blackout' ? '#ffffff' : '#94a3b8',
+                  }}
+                >
+                  🖤 Blackout Mask
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* Strength Slider */}
-          {blurMode !== 'blackout' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600 }}>Strength:</span>
-              <input
-                type="range"
-                min="6"
-                max="36"
-                step="2"
-                value={blurStrength}
-                onChange={(e) => setBlurStrength(parseInt(e.target.value, 10))}
-                style={{ width: '90px', cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: '0.72rem', color: '#f8fafc', minWidth: '32px' }}>{blurStrength}px</span>
-            </div>
-          )}
-
-          {/* Preset Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '0.74rem', color: '#ffd700', fontWeight: 600 }}>⚡ Presets:</span>
-            <select
-              value={selectedPresetId}
-              onChange={(e) => setSelectedPresetId(e.target.value)}
-              className="input-field"
-              style={{ width: '180px', padding: '4px 8px', fontSize: '0.75rem', height: '28px' }}
-            >
-              <option value="">-- Choose Preset --</option>
-              {presets.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleApplySelectedPreset}
-              disabled={!selectedPresetId}
-              className="btn btn-secondary"
-              style={{ fontSize: '0.72rem', padding: '4px 8px', height: '28px' }}
-              title="Apply saved preset zones to this image"
-            >
-              Apply Preset
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveCurrentAsPreset}
-              className="btn btn-ghost"
-              style={{ fontSize: '0.72rem', padding: '4px 8px', height: '28px', color: '#ffd700' }}
-              title="Save current drawn blur boxes as reusable preset for all images"
-            >
-              💾 Save Preset
-            </button>
+            {/* Strength Slider */}
+            {blurMode !== 'blackout' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600 }}>Strength:</span>
+                <input
+                  type="range"
+                  min="6"
+                  max="36"
+                  step="2"
+                  value={blurStrength}
+                  onChange={(e) => setBlurStrength(parseInt(e.target.value, 10))}
+                  style={{ width: '90px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '0.72rem', color: '#f8fafc', minWidth: '32px', fontFamily: 'monospace' }}>
+                  {blurStrength}px
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Action buttons: Undo & Clear */}
@@ -612,7 +464,7 @@ export default function PrivacyBlurStudio({
               onClick={handleUndo}
               disabled={zones.length === 0}
               className="btn btn-ghost"
-              style={{ fontSize: '0.75rem', padding: '4px 8px', height: '28px' }}
+              style={{ fontSize: '0.75rem', padding: '5px 10px', height: '30px' }}
               title="Undo last drawn blur box"
             >
               ↩ Undo
@@ -622,7 +474,7 @@ export default function PrivacyBlurStudio({
               onClick={handleClearAll}
               disabled={zones.length === 0}
               className="btn btn-ghost"
-              style={{ fontSize: '0.75rem', padding: '4px 8px', height: '28px', color: '#ef4444' }}
+              style={{ fontSize: '0.75rem', padding: '5px 10px', height: '30px', color: '#ef4444' }}
               title="Clear all blur zones"
             >
               🗑️ Clear
@@ -630,7 +482,7 @@ export default function PrivacyBlurStudio({
           </div>
         </div>
 
-        {/* Interactive Canvas Workspace */}
+        {/* Interactive Canvas Workspace (Unobstructed, zero overlay) */}
         <div
           ref={containerRef}
           style={{
@@ -711,70 +563,64 @@ export default function PrivacyBlurStudio({
               />
             )}
           </div>
-
-          {/* Quick Zoom Controls Floating Overlay */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '24px',
-              right: '24px',
-              display: 'flex',
-              gap: '4px',
-              background: 'rgba(15, 23, 42, 0.85)',
-              padding: '4px 6px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setZoomLevel((z) => Math.min(2.5, z + 0.25))}
-              className="btn btn-ghost"
-              style={{ padding: '2px 8px', fontSize: '0.85rem' }}
-              title="Zoom In"
-            >
-              +
-            </button>
-            <span style={{ fontSize: '0.72rem', color: '#cbd5e1', alignSelf: 'center', minWidth: '40px', textAlign: 'center' }}>
-              {Math.round(zoomLevel * 100)}%
-            </span>
-            <button
-              type="button"
-              onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
-              className="btn btn-ghost"
-              style={{ padding: '2px 8px', fontSize: '0.85rem' }}
-              title="Zoom Out"
-            >
-              -
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoomLevel(1)}
-              className="btn btn-ghost"
-              style={{ padding: '2px 6px', fontSize: '0.7rem', color: '#93c5fd' }}
-              title="Reset Zoom"
-            >
-              Fit
-            </button>
-          </div>
         </div>
 
-        {/* Bottom Footer: Instructions & Final Save */}
+        {/* Bottom Footer: Zoom Controls (Outside Panorama) & Actions */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '12px 18px',
+            padding: '12px 20px',
             borderTop: '1px solid rgba(255, 255, 255, 0.12)',
             background: 'rgba(0, 0, 0, 0.4)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.74rem', color: '#94a3b8' }}>
-            <span>💡</span>
-            <span>
-              <strong>Tip:</strong> Click & drag directly over faces, vehicle plates, or house signs to anonymize them.
-            </span>
+          {/* Zoom Controls Outside Panoramic Border */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 600 }}>Zoom:</span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '2px',
+                background: 'rgba(15, 23, 42, 0.85)',
+                padding: '2px 4px',
+                borderRadius: 'var(--radius-sm, 6px)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setZoomLevel((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+                className="btn btn-ghost"
+                style={{ padding: '3px 8px', fontSize: '0.85rem', lineHeight: 1 }}
+                title="Zoom Out"
+              >
+                −
+              </button>
+              <span style={{ fontSize: '0.74rem', color: '#cbd5e1', minWidth: '44px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>
+                {Math.round(zoomLevel * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => setZoomLevel((z) => Math.min(2.5, +(z + 0.25).toFixed(2)))}
+                className="btn btn-ghost"
+                style={{ padding: '3px 8px', fontSize: '0.85rem', lineHeight: 1 }}
+                title="Zoom In"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoomLevel(1)}
+                className="btn btn-ghost"
+                style={{ padding: '3px 8px', fontSize: '0.72rem', color: '#93c5fd', fontWeight: 600 }}
+                title="Reset to 100% Fit"
+              >
+                Fit
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
@@ -800,7 +646,7 @@ export default function PrivacyBlurStudio({
               }}
             >
               <span>✓</span>
-              <span>Apply & Save Privacy Blur ({zones.length} Zones)</span>
+              <span>Apply & Save Blur ({zones.length} {zones.length === 1 ? 'Zone' : 'Zones'})</span>
             </button>
           </div>
         </div>

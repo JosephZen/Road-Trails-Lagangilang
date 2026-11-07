@@ -262,7 +262,7 @@ export default function UploadModal({ isOpen, onClose, onUploadComplete }) {
                     e.stopPropagation();
                     setActiveBlurIndex(index);
                   }}
-                  title="Open Privacy Blur Studio for this image"
+                  title="Blur and anonymize faces, license plates, and camera rigs"
                 >
                   <span>🛡️</span>
                   <span>{preview.blurred ? `Blurred (${preview.zoneCount})` : 'Privacy Blur'}</span>

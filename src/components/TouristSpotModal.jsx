@@ -1285,7 +1285,7 @@ export default function TouristSpotModal({
                                 alignItems: 'center',
                                 gap: '4px',
                               }}
-                              title="Open Privacy Blur Studio to outline & blur faces, license plates, and camera rigs"
+                              title="Outline and blur faces, license plates, and camera rigs"
                             >
                               <span>🛡️</span>
                               <span>Privacy Blur (Faces & Plates)</span>
