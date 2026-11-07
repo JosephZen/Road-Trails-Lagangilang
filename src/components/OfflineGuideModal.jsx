@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import offlineMapManager from '../services/offlineMapManager';
 import offlineCacheService from '../services/offlineCacheService';
 import hotlinesService from '../services/hotlinesService';
+import { touristSpotsService } from '../services/touristSpotsService';
 
 /**
  * OfflineGuideModal Component
@@ -86,11 +87,17 @@ export default function OfflineGuideModal({
         offlineMapManager.getAllTileDataUris().catch(() => ({})),
         offlineMapManager.getAll360Media().catch(() => ({})),
       ]);
-      offlineCacheService.downloadOfflineMapHtml(touristSpots, tileDict, media360Dict);
+      const currentSpots = (touristSpots && touristSpots.length > 0)
+        ? touristSpots
+        : touristSpotsService.getAllSpots();
+      offlineCacheService.downloadOfflineMapHtml(currentSpots, tileDict, media360Dict);
       showToast?.('💾 Standalone offline map file downloaded to your device!');
     } catch (e) {
       console.error('Standalone HTML export error:', e);
-      offlineCacheService.downloadOfflineMapHtml(touristSpots, {}, {});
+      const currentSpots = (touristSpots && touristSpots.length > 0)
+        ? touristSpots
+        : touristSpotsService.getAllSpots();
+      offlineCacheService.downloadOfflineMapHtml(currentSpots, {}, {});
       showToast?.('💾 Standalone offline map generated!');
     }
   };

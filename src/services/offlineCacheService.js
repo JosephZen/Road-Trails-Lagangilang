@@ -735,6 +735,7 @@ class OfflineCacheService {
     function getVisual(spot) {
       const name = (spot.name || '').toLowerCase();
       const cat = (spot.category || '').toLowerCase();
+      const spotType = (spot.spotType || spot.type || '').toLowerCase();
       const customIcon = spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon;
 
       if (spot.isCheckpoint || cat.includes('checkpoint') || cat.includes('denr') || name.includes('checkpoint')) {
@@ -760,7 +761,11 @@ class OfflineCacheService {
           label: spot.category || 'Emergency Unit'
         };
       }
-      if (cat.includes('nature') || cat.includes('river') || cat.includes('cave') || cat.includes('spring') || cat.includes('viewpoint')) {
+
+      // Check if spot is a POI (explicitly marked as POI, or public facility/service)
+      const isPoi = spotType === 'poi' || (spotType !== 'tourist_spot' && (cat.includes('school') || cat.includes('campus') || cat.includes('service') || cat.includes('terminal') || cat.includes('gas') || cat.includes('convenience') || cat.includes('market')));
+
+      if (!isPoi && (cat.includes('nature') || cat.includes('river') || cat.includes('cave') || cat.includes('spring') || cat.includes('viewpoint') || cat.includes('adventure') || cat.includes('waterfall'))) {
         let ic = '🏞️';
         if (cat.includes('cave') || name.includes('cave')) ic = '🧗';
         else if (cat.includes('spring') || name.includes('river')) ic = '🌊';
@@ -772,7 +777,7 @@ class OfflineCacheService {
           label: spot.category || 'Nature & Eco-Tourism'
         };
       }
-      if (cat.includes('heritage') || cat.includes('religious') || cat.includes('church') || cat.includes('civic') || name.includes('university') || name.includes('school') || cat.includes('tourist')) {
+      if (!isPoi && (cat.includes('heritage') || cat.includes('religious') || cat.includes('church') || cat.includes('civic') || cat.includes('tourist') || spotType === 'tourist_spot')) {
         let ic = '🏛️';
         if (cat.includes('religious') || name.includes('church') || name.includes('parish')) ic = '⛪';
         else if (name.includes('university') || name.includes('school')) ic = '🏫';
@@ -786,16 +791,22 @@ class OfflineCacheService {
       }
 
       let sIcon = '📍';
-      if (cat.includes('transport') || cat.includes('terminal')) sIcon = '🚌';
+      if (cat.includes('school') || cat.includes('campus') || name.includes('university') || name.includes('school')) sIcon = '🏫';
+      else if (cat.includes('transport') || cat.includes('terminal')) sIcon = '🚌';
       else if (cat.includes('gas') || cat.includes('fuel')) sIcon = '⛽';
       else if (name.includes('water')) sIcon = '💧';
-      else if (cat.includes('store') || cat.includes('market') || cat.includes('commercial')) sIcon = '🛒';
+      else if (cat.includes('store') || cat.includes('market') || cat.includes('commercial') || cat.includes('convenience')) sIcon = '🛒';
       else if (cat.includes('cafe') || cat.includes('bakery')) sIcon = '☕';
+
+      // For school/campus POIs, ensure an appropriate school icon rather than classical heritage temple
+      const chosenIcon = ((cat.includes('school') || cat.includes('campus') || name.includes('university')) && (!customIcon || customIcon === '🏛️'))
+        ? '🏫'
+        : (customIcon || sIcon);
 
       return {
         pinClass: 'pin-service',
         badgeClass: 'spot-badge-poi',
-        icon: customIcon || sIcon,
+        icon: chosenIcon,
         categoryGroup: '🏪 Local Services, Terminals & POIs',
         label: spot.category || 'Local Service & POI'
       };
@@ -939,9 +950,10 @@ class OfflineCacheService {
     function getFilteredSpots() {
       return spots.filter(function(s) {
         const cat = (s.category || '').toLowerCase();
+        const spotType = (s.spotType || s.type || '').toLowerCase();
         const isCheckpoint = s.isCheckpoint || cat.includes('checkpoint') || cat.includes('denr');
         const isEmergency = cat.includes('emergency') || cat.includes('police') || cat.includes('rescue');
-        const isPoi = (s.spotType === 'poi' || s.type === 'poi') && !isEmergency && !isCheckpoint;
+        const isPoi = spotType === 'poi' || (!isEmergency && !isCheckpoint && (cat.includes('school') || cat.includes('campus') || cat.includes('service') || cat.includes('terminal') || cat.includes('gas') || cat.includes('store')));
         const isTouristSpot = !isPoi && !isEmergency && !isCheckpoint;
 
         if (activeFilter === 'tourist_spot' && !isTouristSpot) return false;

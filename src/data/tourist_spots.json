@@ -188,9 +188,9 @@
     "spotType": "poi",
     "category": "School & Campus Landmark",
     "categoryIcon": "🏫",
-    "customIcon": "🏛️",
-    "cardVisualIcon": "🏛️",
-    "icon": "🏛️",
+    "customIcon": "🏫",
+    "cardVisualIcon": "🏫",
+    "icon": "🏫",
     "barangay": "Poblacion",
     "location": {
       "lat": 17.60825,

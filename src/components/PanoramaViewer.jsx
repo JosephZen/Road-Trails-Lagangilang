@@ -498,16 +498,8 @@ export default function PanoramaViewer({
       {/* Pannellum container */}
       <div ref={containerRef} className="panorama-container" />
 
-      {/* Zoom and action controls */}
+      {/* Zoom controls */}
       <div className="zoom-controls glass-panel-sm">
-        <button
-          className="zoom-btn"
-          onClick={() => fileInputRef.current?.click()}
-          title="Upload or Replace 360 Photo for this Landmark"
-          style={{ fontSize: '0.9rem' }}
-        >
-          📷
-        </button>
         <button className="zoom-btn" onClick={zoomIn} title="Zoom in">+</button>
         <button className="zoom-btn" onClick={zoomOut} title="Zoom out">−</button>
       </div>

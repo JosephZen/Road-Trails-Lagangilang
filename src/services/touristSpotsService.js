@@ -386,6 +386,15 @@ export const touristSpotsService = {
               changed = true;
             }
           }
+          if (s.id === 'poi_ua_main_campus' && (s.spotType !== 'poi' || s.customIcon === '🏛️' || s.icon === '🏛️')) {
+            s.spotType = 'poi';
+            s.category = 'School & Campus Landmark';
+            s.categoryIcon = '🏫';
+            s.icon = '🏫';
+            s.customIcon = '🏫';
+            s.cardVisualIcon = '🏫';
+            changed = true;
+          }
           if (s.id === 'poi_ugiao_river' && String(s.connected360?.targetId).includes('1793021939158_npst')) {
             const seedMatch = Array.isArray(seedSpots) ? seedSpots.find((seed) => seed.id === s.id) : null;
             if (seedMatch) {
