@@ -1,49 +1,69 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'fs';
 import { DOMParser } from '@xmldom/xmldom';
 import osmtogeojson from 'osmtogeojson';
-import { resolve, dirname } from 'path';
+import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Candidate input OSM files (prioritizing root map-1.osm or map.osm)
-const candidateInputs = [
-  resolve(__dirname, '../map-1.osm'),
-  resolve(__dirname, '../map.osm'),
-  resolve(__dirname, '../../UA_Lagangilang_Map/map.osm'),
-];
-
-const OSM_INPUT = candidateInputs.find(p => existsSync(p)) || candidateInputs[0];
+const CUSTOM_MAPS_DIR = resolve(__dirname, '../CustomMaps');
 const GEOJSON_OUTPUT = resolve(__dirname, '../public/data/lagangilang-custom.geojson');
 
 console.log('📍 Converting OSM XML → GeoJSON...');
-console.log(`   Input:  ${OSM_INPUT}`);
-console.log(`   Output: ${GEOJSON_OUTPUT}`);
+console.log(`   Scanning: ${CUSTOM_MAPS_DIR}`);
+console.log(`   Output:   ${GEOJSON_OUTPUT}`);
 
-if (!existsSync(OSM_INPUT)) {
-  console.error(`❌ OSM input file not found at: ${OSM_INPUT}`);
+// Collect all input files
+let inputFiles = [];
+
+if (existsSync(CUSTOM_MAPS_DIR)) {
+  const dirFiles = readdirSync(CUSTOM_MAPS_DIR)
+    .filter(f => f.endsWith('.osm') || f.endsWith('.xml'))
+    .map(f => join(CUSTOM_MAPS_DIR, f));
+  if (dirFiles.length > 0) {
+    inputFiles = dirFiles;
+  }
+}
+
+// Fallback candidates if CustomMaps has no .osm files
+if (inputFiles.length === 0) {
+  const fallbacks = [
+    resolve(__dirname, '../map.osm'),
+    resolve(__dirname, '../map-1.osm'),
+    resolve(__dirname, '../../UA_Lagangilang_Map/map.osm'),
+  ];
+  const found = fallbacks.find(p => existsSync(p));
+  if (found) inputFiles = [found];
+}
+
+if (inputFiles.length === 0) {
+  console.error(`❌ No .osm input files found in CustomMaps/ or project root!`);
   process.exit(1);
 }
 
-// Read OSM XML
-const osmXml = readFileSync(OSM_INPUT, 'utf-8');
+console.log(`   Found ${inputFiles.length} OSM file(s) to process:`);
+inputFiles.forEach(f => console.log(`   • ${f}`));
 
-// Parse XML to DOM
 const parser = new DOMParser();
-const dom = parser.parseFromString(osmXml, 'text/xml');
+const mergedFeaturesMap = new Map();
 
-// Convert to GeoJSON with flattened properties
-const geojson = osmtogeojson(dom, { flatProperties: true });
+for (const filePath of inputFiles) {
+  const osmXml = readFileSync(filePath, 'utf-8');
+  const dom = parser.parseFromString(osmXml, 'text/xml');
+  const geojson = osmtogeojson(dom, { flatProperties: true });
 
-// Ensure any nested tags are also spread at top-level of properties
-geojson.features = (geojson.features || []).map(f => {
-  if (!f.properties) f.properties = {};
-  if (f.properties.tags && typeof f.properties.tags === 'object') {
-    f.properties = { ...f.properties.tags, ...f.properties };
-  }
-  return f;
-});
+  (geojson.features || []).forEach(f => {
+    if (!f.properties) f.properties = {};
+    if (f.properties.tags && typeof f.properties.tags === 'object') {
+      f.properties = { ...f.properties.tags, ...f.properties };
+    }
+    const id = f.id || `${f.properties.type || 'feat'}/${f.properties.id || Math.random()}`;
+    mergedFeaturesMap.set(id, f);
+  });
+}
+
+const allFeatures = Array.from(mergedFeaturesMap.values());
 
 // Calculate bounds dynamically from features
 let minLon = 180, maxLon = -180, minLat = 90, maxLat = -90;
@@ -59,24 +79,28 @@ function expandBounds(coords) {
   }
   coords.forEach(expandBounds);
 }
-geojson.features.forEach(f => {
+allFeatures.forEach(f => {
   if (f.geometry?.coordinates) expandBounds(f.geometry.coordinates);
 });
 
-geojson.metadata = {
-  source: 'OpenStreetMap export - Lagangilang, Abra',
-  convertedAt: new Date().toISOString(),
-  inputFile: OSM_INPUT,
-  featureCount: geojson.features.length,
-  bounds: { minlat: minLat, minlon: minLon, maxlat: maxLat, maxlon: maxLon }
+const resultGeoJSON = {
+  type: 'FeatureCollection',
+  metadata: {
+    source: 'OpenStreetMap export - Lagangilang, Abra',
+    convertedAt: new Date().toISOString(),
+    inputFiles: inputFiles.map(f => f.split(/[\\/]/).pop()),
+    featureCount: allFeatures.length,
+    bounds: { minlat: minLat, minlon: minLon, maxlat: maxLat, maxlon: maxLon }
+  },
+  features: allFeatures
 };
 
-console.log(`   Features: ${geojson.features.length}`);
-console.log(`   Calculated Bounds:`, geojson.metadata.bounds);
+console.log(`   Total Merged Features: ${allFeatures.length}`);
+console.log(`   Calculated Bounds:`, resultGeoJSON.metadata.bounds);
 
 // Count feature types
 const types = {};
-geojson.features.forEach(f => {
+allFeatures.forEach(f => {
   const t = f.properties?.highway || f.properties?.building || f.properties?.barrier || f.properties?.natural || f.properties?.landuse || 'other';
   types[t] = (types[t] || 0) + 1;
 });
@@ -89,5 +113,5 @@ if (!existsSync(outDir)) {
 }
 
 // Write GeoJSON
-writeFileSync(GEOJSON_OUTPUT, JSON.stringify(geojson, null, 2));
+writeFileSync(GEOJSON_OUTPUT, JSON.stringify(resultGeoJSON, null, 2));
 console.log('✅ Conversion complete! Output written to public/data/lagangilang-custom.geojson');

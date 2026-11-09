@@ -1,5 +1,19 @@
 {
   "type": "FeatureCollection",
+  "metadata": {
+    "source": "OpenStreetMap export - Lagangilang, Abra",
+    "convertedAt": "2026-11-09T06:08:12.553Z",
+    "inputFiles": [
+      "map.osm"
+    ],
+    "featureCount": 1141,
+    "bounds": {
+      "minlat": 17.5778368,
+      "minlon": 120.7261366,
+      "maxlat": 17.6195297,
+      "maxlon": 120.7845799
+    }
+  },
   "features": [
     {
       "type": "Feature",
@@ -52681,17 +52695,5 @@
         ]
       }
     }
-  ],
-  "metadata": {
-    "source": "OpenStreetMap export - Lagangilang, Abra",
-    "convertedAt": "2026-11-09T05:25:12.979Z",
-    "inputFile": "C:\\Users\\Joseph Zen\\Downloads\\School-Programming\\Capstone\\Map_v2\\map-1.osm",
-    "featureCount": 1141,
-    "bounds": {
-      "minlat": 17.5778368,
-      "minlon": 120.7261366,
-      "maxlat": 17.6195297,
-      "maxlon": 120.7845799
-    }
-  }
+  ]
 }

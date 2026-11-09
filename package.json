@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "vite --host",
     "dev:server": "node server/index.cjs",
-    "build": "vite build",
+    "build": "node scripts/convert-osm.js && vite build",
     "preview": "vite preview",
     "convert-osm": "node scripts/convert-osm.js"
   },
