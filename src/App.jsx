@@ -1575,65 +1575,56 @@ export default function App() {
 
         {/* Sidebar - Tabs: Tourist Spots, Route Planner */}
         <div className={`sidebar glass-panel ${sidebarOpen ? 'open' : ''}`}>
-          {/* Brand Header inside Hamburger Drawer (5-tap secret Admin Access; hidden when Admin is active) */}
-          {!isAdmin && (
-            <div
-              className="sidebar-brand-container"
-              style={{
-                padding: '12px 16px 8px 16px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div
-                className="brand-pill sidebar-brand-pill"
-                onClick={handleBrandPillTap}
-                role="button"
-                tabIndex={0}
-                title="Road & Trail • Lagangilang Tourism System (Admin Access: Tap 5x)"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleBrandPillTap();
-                  }
-                }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 14px',
-                  borderRadius: 'var(--radius-full)',
-                  background: 'rgba(30, 41, 59, 0.85)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
-                  touchAction: 'manipulation',
-                  transition: 'transform 0.1s ease',
-                }}
-                onMouseDown={(e) => {
-                  e.currentTarget.style.transform = 'scale(0.96)';
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
-                onTouchStart={(e) => {
-                  e.currentTarget.style.transform = 'scale(0.96)';
-                }}
-                onTouchEnd={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
-              >
-                <span style={{ fontSize: '1rem' }}>🌲</span>
-                <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#f8fafc' }}>Road &amp; Trail</span>
-                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>• Lagangilang</span>
-              </div>
-            </div>
-          )}
           <div className="sidebar-header">
-            <div className="sidebar-tabs-group" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <div className="sidebar-tabs-group" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'nowrap', overflowX: 'auto' }}>
+              {/* Road & Trail Brand Pill (Tourist Mode: Placed directly among Spots, Routing, and X; Tap 5x for Admin) */}
+              {!isAdmin && (
+                <div
+                  className="brand-pill sidebar-brand-pill"
+                  onClick={handleBrandPillTap}
+                  role="button"
+                  tabIndex={0}
+                  title="Road & Trail • Lagangilang Tourism System (Admin Access: Tap 5x)"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleBrandPillTap();
+                    }
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-full)',
+                    background: 'rgba(30, 41, 59, 0.9)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    touchAction: 'manipulation',
+                    transition: 'transform 0.1s ease',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: '#f8fafc',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.transform = 'scale(0.96)';
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                  onTouchStart={(e) => {
+                    e.currentTarget.style.transform = 'scale(0.96)';
+                  }}
+                  onTouchEnd={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  <span>Road &amp; Trail</span>
+                </div>
+              )}
               <button
                 className={`sidebar-tab-btn ${sidebarTab === 'spots' ? 'active' : ''}`}
                 onClick={() => setSidebarTab('spots')}

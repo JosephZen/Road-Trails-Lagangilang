@@ -29,7 +29,7 @@ export default function AdminOsmManagerModal({ isOpen, onClose, onUpdate, showTo
 
       if (!geojson) {
         try {
-          const res = await fetch('/data/lagangilang-custom.geojson');
+          const res = await fetch(`/data/lagangilang-custom.geojson?v=${Date.now()}`);
           if (res.ok) {
             geojson = await res.json();
           }
@@ -203,7 +203,7 @@ export default function AdminOsmManagerModal({ isOpen, onClose, onUpdate, showTo
     setIsCustomOverride(false);
 
     try {
-      const res = await fetch('/data/lagangilang-custom.geojson');
+      const res = await fetch(`/data/lagangilang-custom.geojson?v=${Date.now()}`);
       if (res.ok) {
         const defaultGeoJSON = await res.json();
         setCurrentGeoJSON(defaultGeoJSON);

@@ -544,7 +544,7 @@ export default function MapView({
             if (parsed && Array.isArray(parsed.features)) return Promise.resolve(parsed);
           }
         } catch (_) {}
-        return fetch('/data/lagangilang-custom.geojson').then(r => r.json());
+        return fetch(`/data/lagangilang-custom.geojson?v=${Date.now()}`).then(r => r.json());
       };
 
       loadCustomOsmGeoJSON()
@@ -564,8 +564,8 @@ export default function MapView({
             filter: ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'tertiary']]],
             paint: {
               'line-color': '#f59e0b',
-              'line-width': 3,
-              'line-opacity': 0.8,
+              'line-width': 4,
+              'line-opacity': 0.95,
             },
             layout: { 'line-cap': 'round', 'line-join': 'round' },
           });
@@ -576,9 +576,9 @@ export default function MapView({
             source: 'custom-osm',
             filter: ['in', ['get', 'highway'], ['literal', ['residential', 'living_street', 'unclassified', 'service']]],
             paint: {
-              'line-color': '#fb923c',
-              'line-width': 2,
-              'line-opacity': 0.7,
+              'line-color': '#f97316',
+              'line-width': 3,
+              'line-opacity': 0.9,
             },
             layout: { 'line-cap': 'round', 'line-join': 'round' },
           });
@@ -590,9 +590,9 @@ export default function MapView({
             filter: ['in', ['get', 'highway'], ['literal', ['path', 'track', 'footway', 'steps', 'pedestrian', 'cycleway']]],
             paint: {
               'line-color': '#a3763d',
-              'line-width': 2,
+              'line-width': 2.5,
               'line-dasharray': [3, 2],
-              'line-opacity': 0.8,
+              'line-opacity': 0.9,
             },
           });
 
@@ -619,7 +619,7 @@ export default function MapView({
             },
           });
 
-          // Buildings
+          // Buildings fill
           mapRef.current.addLayer({
             id: 'custom-buildings',
             type: 'fill',
@@ -627,8 +627,21 @@ export default function MapView({
             filter: ['has', 'building'],
             paint: {
               'fill-color': '#6366f1',
-              'fill-opacity': 0.15,
-              'fill-outline-color': '#818cf8',
+              'fill-opacity': 0.45,
+              'fill-outline-color': '#312e81',
+            },
+          });
+
+          // Buildings crisp outline
+          mapRef.current.addLayer({
+            id: 'custom-buildings-outline',
+            type: 'line',
+            source: 'custom-osm',
+            filter: ['has', 'building'],
+            paint: {
+              'line-color': '#4338ca',
+              'line-width': 1.5,
+              'line-opacity': 0.9,
             },
           });
         })
@@ -1775,7 +1788,7 @@ export default function MapView({
             if (parsed && Array.isArray(parsed.features)) return Promise.resolve(parsed);
           }
         } catch (_) {}
-        return fetch('/data/lagangilang-custom.geojson').then(r => r.json());
+        return fetch(`/data/lagangilang-custom.geojson?v=${Date.now()}`).then(r => r.json());
       };
 
       loadCustomOsmGeoJSON()
@@ -1786,19 +1799,19 @@ export default function MapView({
             mapRef.current.addLayer({
               id: 'custom-roads-primary', type: 'line', source: 'custom-osm',
               filter: ['in', ['get', 'highway'], ['literal', ['primary', 'secondary', 'tertiary']]],
-              paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-opacity': 0.8 },
+              paint: { 'line-color': '#f59e0b', 'line-width': 4, 'line-opacity': 0.95 },
               layout: { 'line-cap': 'round', 'line-join': 'round' },
             });
             mapRef.current.addLayer({
               id: 'custom-roads-residential', type: 'line', source: 'custom-osm',
               filter: ['in', ['get', 'highway'], ['literal', ['residential', 'living_street', 'unclassified', 'service']]],
-              paint: { 'line-color': '#fb923c', 'line-width': 2, 'line-opacity': 0.7 },
+              paint: { 'line-color': '#f97316', 'line-width': 3, 'line-opacity': 0.9 },
               layout: { 'line-cap': 'round', 'line-join': 'round' },
             });
             mapRef.current.addLayer({
               id: 'custom-roads-paths', type: 'line', source: 'custom-osm',
               filter: ['in', ['get', 'highway'], ['literal', ['path', 'track', 'footway', 'steps', 'pedestrian', 'cycleway']]],
-              paint: { 'line-color': '#a3763d', 'line-width': 2, 'line-dasharray': [3, 2], 'line-opacity': 0.8 },
+              paint: { 'line-color': '#a3763d', 'line-width': 2.5, 'line-dasharray': [3, 2], 'line-opacity': 0.9 },
             });
             mapRef.current.addLayer({
               id: 'custom-barriers', type: 'circle', source: 'custom-osm',
@@ -1812,7 +1825,12 @@ export default function MapView({
             mapRef.current.addLayer({
               id: 'custom-buildings', type: 'fill', source: 'custom-osm',
               filter: ['has', 'building'],
-              paint: { 'fill-color': '#6366f1', 'fill-opacity': 0.15, 'fill-outline-color': '#818cf8' },
+              paint: { 'fill-color': '#6366f1', 'fill-opacity': 0.45, 'fill-outline-color': '#312e81' },
+            });
+            mapRef.current.addLayer({
+              id: 'custom-buildings-outline', type: 'line', source: 'custom-osm',
+              filter: ['has', 'building'],
+              paint: { 'line-color': '#4338ca', 'line-width': 1.5, 'line-opacity': 0.9 },
             });
           }
         })

@@ -326,24 +326,18 @@ body {
   }
 }
 
-.sidebar-brand-container {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 12px 16px 8px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
 .sidebar-brand-pill {
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
   transition: transform 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .sidebar-brand-pill:hover {
-  background: rgba(30, 41, 59, 0.95) !important;
+  background: rgba(51, 65, 85, 0.95) !important;
 }
 
 .sidebar-brand-pill:active {
