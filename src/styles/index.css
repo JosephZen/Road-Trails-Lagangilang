@@ -314,6 +314,42 @@ body {
   transform: scale(1.05);
 }
 
+/* Responsive Brand Pill & Mobile Drawer Placement */
+.brand-pill-desktop {
+  display: flex !important;
+}
+
+@media (max-width: 768px) {
+  /* On mobile devices, hide Road & Trail pill from top navbar so it never creates a horizontal scroll */
+  .brand-pill-desktop {
+    display: none !important;
+  }
+}
+
+.sidebar-brand-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 12px 16px 8px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-brand-pill {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.sidebar-brand-pill:hover {
+  background: rgba(30, 41, 59, 0.95) !important;
+}
+
+.sidebar-brand-pill:active {
+  transform: scale(0.96);
+}
+
 /* Map Theme Dropdown */
 .theme-dropdown-custom {
   display: inline-flex;

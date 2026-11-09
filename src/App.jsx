@@ -25,6 +25,7 @@ import EmergencyModal from './components/EmergencyModal';
 import ThemeSelector from './components/ThemeSelector';
 import WeatherWidget from './components/WeatherWidget';
 import OfflineGuideModal from './components/OfflineGuideModal';
+import AdminOsmManagerModal from './components/AdminOsmManagerModal';
 import hotlinesService from './services/hotlinesService';
 import globalSyncService, { GLOBAL_STATE_KEYS } from './services/globalSyncService';
 
@@ -66,6 +67,7 @@ export default function App() {
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [showOfflineModal, setShowOfflineModal] = useState(false);
   const [showCustomOSM, setShowCustomOSM] = useState(true);
+  const [showOsmManagerModal, setShowOsmManagerModal] = useState(false);
 
   // Right-click context menu state: { lat, lng, x, y } | null
   const [contextMenu, setContextMenu] = useState(null);
@@ -688,13 +690,22 @@ export default function App() {
       })
       .catch(() => {});
 
-    // 4. Background synchronization of aligned streetview sequences from Neon DB
+    // 4. Background synchronization of aligned streetview sequences (Bundled + Neon DB)
     streetviewAlignmentService
-      .syncWithNeon()
+      .syncWithBackend()
       .then(() => {
         setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
       })
       .catch(() => {});
+  }, []);
+
+  // Listen for aligned streetview updates from cloud sync or static bundling
+  useEffect(() => {
+    const handleAlignedUpdate = (evt) => {
+      setAlignedGeoJSON(evt.detail || streetviewAlignmentService.toGeoJSON());
+    };
+    window.addEventListener('aligned-sequences-updated', handleAlignedUpdate);
+    return () => window.removeEventListener('aligned-sequences-updated', handleAlignedUpdate);
   }, []);
 
   // Real-time synchronization when hotlines or DENR Checkpoints change
@@ -739,6 +750,7 @@ export default function App() {
           hotlinesService.saveAll(state[GLOBAL_STATE_KEYS.HOTLINES], false);
         }
         if (state && state[GLOBAL_STATE_KEYS.TRAILS]) {
+          streetviewAlignmentService.loadFromGlobalState(state[GLOBAL_STATE_KEYS.TRAILS]);
           setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
         }
         if (state && state[GLOBAL_STATE_KEYS.ADMIN_PASSWORD]?.password) {
@@ -1310,55 +1322,57 @@ export default function App() {
           ) : (
             /* Horizontally scrollable/dynamic action bar across all aspect ratios */
             <div className="nav-scroll-container">
-            {/* Tourism Brand Header Pill (5-tap secret Admin Access) */}
-            <div
-              className="brand-pill"
-              onClick={handleBrandPillTap}
-              role="button"
-              tabIndex={0}
-              title="Road & Trail • Lagangilang Tourism System"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleBrandPillTap();
-                }
-              }}
-              style={{
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                padding: '6px 14px',
-                borderRadius: 'var(--radius-full)',
-                background: 'rgba(15, 23, 42, 0.85)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: '#f8fafc',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                backdropFilter: 'blur(8px)',
-                boxShadow: 'none',
-                cursor: 'pointer',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                touchAction: 'manipulation',
-                transition: 'transform 0.1s ease, background 0.15s ease',
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = 'scale(0.95)';
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-              onTouchStart={(e) => {
-                e.currentTarget.style.transform = 'scale(0.95)';
-              }}
-              onTouchEnd={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              <span>Road & Trail</span>
-            </div>
+            {/* Tourism Brand Header Pill (Desktop only; hidden when Admin is active) */}
+            {!isAdmin && (
+              <div
+                className="brand-pill brand-pill-desktop"
+                onClick={handleBrandPillTap}
+                role="button"
+                tabIndex={0}
+                title="Road & Trail • Lagangilang Tourism System (Admin Access: Tap 5x)"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleBrandPillTap();
+                  }
+                }}
+                style={{
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#f8fafc',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  backdropFilter: 'blur(8px)',
+                  boxShadow: 'none',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  touchAction: 'manipulation',
+                  transition: 'transform 0.1s ease, background 0.15s ease',
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = 'scale(0.95)';
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+                onTouchStart={(e) => {
+                  e.currentTarget.style.transform = 'scale(0.95)';
+                }}
+                onTouchEnd={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <span>Road & Trail</span>
+              </div>
+            )}
 
             {/* Live Weather & Trail Advisory Pill (Online only) */}
             {isOnline && <WeatherWidget isCompact={true} />}
@@ -1561,6 +1575,63 @@ export default function App() {
 
         {/* Sidebar - Tabs: Tourist Spots, Route Planner */}
         <div className={`sidebar glass-panel ${sidebarOpen ? 'open' : ''}`}>
+          {/* Brand Header inside Hamburger Drawer (5-tap secret Admin Access; hidden when Admin is active) */}
+          {!isAdmin && (
+            <div
+              className="sidebar-brand-container"
+              style={{
+                padding: '12px 16px 8px 16px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div
+                className="brand-pill sidebar-brand-pill"
+                onClick={handleBrandPillTap}
+                role="button"
+                tabIndex={0}
+                title="Road & Trail • Lagangilang Tourism System (Admin Access: Tap 5x)"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleBrandPillTap();
+                  }
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'rgba(30, 41, 59, 0.85)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  touchAction: 'manipulation',
+                  transition: 'transform 0.1s ease',
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = 'scale(0.96)';
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+                onTouchStart={(e) => {
+                  e.currentTarget.style.transform = 'scale(0.96)';
+                }}
+                onTouchEnd={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <span style={{ fontSize: '1rem' }}>🌲</span>
+                <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#f8fafc' }}>Road &amp; Trail</span>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>• Lagangilang</span>
+              </div>
+            </div>
+          )}
           <div className="sidebar-header">
             <div className="sidebar-tabs-group" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button
@@ -1890,21 +1961,41 @@ export default function App() {
                   <span>{pinsDraggable ? '🔓 Unlocked' : '🔒 Locked'}</span>
                 </button>
 
-                <button
-                  className={`btn ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setShowCustomOSM(!showCustomOSM)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 14px',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  <span>🗺️ Custom OSM Overlay</span>
-                  <span>{showCustomOSM ? 'ON' : 'OFF'}</span>
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className={`btn ${showCustomOSM ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setShowCustomOSM(!showCustomOSM)}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 14px',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    <span>🗺️ Custom OSM Overlay</span>
+                    <span>{showCustomOSM ? 'ON' : 'OFF'}</span>
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setShowOsmManagerModal(true)}
+                    title="Manage, Import & Merge OSM Maps (.osm XML / GeoJSON)"
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      color: '#93c5fd',
+                    }}
+                  >
+                    ⚙️ Import / Merge
+                  </button>
+                </div>
 
                 <button
                   className={`btn ${aligningSequence || isSelectingAlignmentTarget ? 'btn-primary' : 'btn-secondary'}`}
@@ -2762,6 +2853,13 @@ export default function App() {
         onClose={() => setShowOfflineModal(false)}
         touristSpots={touristSpots}
         customGeoJSON={alignedGeoJSON}
+        showToast={showToast}
+      />
+
+      {/* ===== Custom OSM Map Manager & Area Merger Modal ===== */}
+      <AdminOsmManagerModal
+        isOpen={showOsmManagerModal}
+        onClose={() => setShowOsmManagerModal(false)}
         showToast={showToast}
       />
 

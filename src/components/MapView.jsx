@@ -535,9 +535,19 @@ export default function MapView({
 
       coneLayerAdded.current = true;
 
-      // Custom OSM Overlay (user's edited map.osm data)
-      fetch('/data/lagangilang-custom.geojson')
-        .then(r => r.json())
+      // Custom OSM Overlay (user's edited map.osm data & imported areas)
+      const loadCustomOsmGeoJSON = () => {
+        try {
+          const stored = localStorage.getItem('lagangilang_custom_osm_geojson');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && Array.isArray(parsed.features)) return Promise.resolve(parsed);
+          }
+        } catch (_) {}
+        return fetch('/data/lagangilang-custom.geojson').then(r => r.json());
+      };
+
+      loadCustomOsmGeoJSON()
         .then(geojson => {
           if (!mapRef.current) return;
           
@@ -564,7 +574,7 @@ export default function MapView({
             id: 'custom-roads-residential',
             type: 'line',
             source: 'custom-osm',
-            filter: ['==', ['get', 'highway'], 'residential'],
+            filter: ['in', ['get', 'highway'], ['literal', ['residential', 'living_street', 'unclassified', 'service']]],
             paint: {
               'line-color': '#fb923c',
               'line-width': 2,
@@ -577,7 +587,7 @@ export default function MapView({
             id: 'custom-roads-paths',
             type: 'line',
             source: 'custom-osm',
-            filter: ['in', ['get', 'highway'], ['literal', ['path', 'track', 'footway', 'steps']]],
+            filter: ['in', ['get', 'highway'], ['literal', ['path', 'track', 'footway', 'steps', 'pedestrian', 'cycleway']]],
             paint: {
               'line-color': '#a3763d',
               'line-width': 2,
@@ -1757,8 +1767,18 @@ export default function MapView({
       }
 
       // Custom OSM Overlay
-      fetch('/data/lagangilang-custom.geojson')
-        .then(r => r.json())
+      const loadCustomOsmGeoJSON = () => {
+        try {
+          const stored = localStorage.getItem('lagangilang_custom_osm_geojson');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && Array.isArray(parsed.features)) return Promise.resolve(parsed);
+          }
+        } catch (_) {}
+        return fetch('/data/lagangilang-custom.geojson').then(r => r.json());
+      };
+
+      loadCustomOsmGeoJSON()
         .then(geojson => {
           if (!mapRef.current) return;
           if (!mapRef.current.getSource('custom-osm')) {
@@ -1771,13 +1791,13 @@ export default function MapView({
             });
             mapRef.current.addLayer({
               id: 'custom-roads-residential', type: 'line', source: 'custom-osm',
-              filter: ['==', ['get', 'highway'], 'residential'],
+              filter: ['in', ['get', 'highway'], ['literal', ['residential', 'living_street', 'unclassified', 'service']]],
               paint: { 'line-color': '#fb923c', 'line-width': 2, 'line-opacity': 0.7 },
               layout: { 'line-cap': 'round', 'line-join': 'round' },
             });
             mapRef.current.addLayer({
               id: 'custom-roads-paths', type: 'line', source: 'custom-osm',
-              filter: ['in', ['get', 'highway'], ['literal', ['path', 'track', 'footway', 'steps']]],
+              filter: ['in', ['get', 'highway'], ['literal', ['path', 'track', 'footway', 'steps', 'pedestrian', 'cycleway']]],
               paint: { 'line-color': '#a3763d', 'line-width': 2, 'line-dasharray': [3, 2], 'line-opacity': 0.8 },
             });
             mapRef.current.addLayer({
@@ -2319,6 +2339,31 @@ export default function MapView({
       src.setData(alignedGeoJSON || streetviewAlignmentService.toGeoJSON());
     }
   }, [alignedGeoJSON]);
+
+  // Listen for dynamic updates to Aligned Streetview Lines and Custom OSM Map
+  useEffect(() => {
+    const handleAlignedUpdate = (e) => {
+      if (!mapRef.current) return;
+      const src = mapRef.current.getSource('aligned-streetview-source');
+      if (src) {
+        src.setData(e.detail || streetviewAlignmentService.toGeoJSON());
+      }
+    };
+    const handleOsmUpdate = (e) => {
+      if (!mapRef.current) return;
+      const src = mapRef.current.getSource('custom-osm');
+      if (src && e.detail) {
+        src.setData(e.detail);
+      }
+    };
+
+    window.addEventListener('aligned-sequences-updated', handleAlignedUpdate);
+    window.addEventListener('custom-osm-updated', handleOsmUpdate);
+    return () => {
+      window.removeEventListener('aligned-sequences-updated', handleAlignedUpdate);
+      window.removeEventListener('custom-osm-updated', handleOsmUpdate);
+    };
+  }, []);
 
   // Update Active Alignment Editor GeoJSON sources
   useEffect(() => {

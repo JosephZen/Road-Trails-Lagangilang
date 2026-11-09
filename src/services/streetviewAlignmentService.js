@@ -489,6 +489,7 @@ class StreetviewAlignmentService {
       delete this.alignedSequences[strId];
       this.saveLocal();
     }
+    this.notifyUpdate();
     return this.getExcludedSequences();
   }
 
@@ -497,26 +498,57 @@ class StreetviewAlignmentService {
     const strId = String(sequenceId);
     this.excludedSequences.delete(strId);
     this.saveExcludedLocal();
+    this.notifyUpdate();
     return this.getExcludedSequences();
   }
 
-  async syncWithBackend() {
-    // 1. Try Express backend API
-    try {
-      const res = await fetch('/api/aligned-sequences');
-      if (res.ok) {
-        const remote = await res.json();
-        if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
-          this.alignedSequences = { ...remote, ...this.alignedSequences };
-          this.saveLocal();
+  notifyUpdate() {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('aligned-sequences-updated', {
+          detail: this.toGeoJSON(),
+        })
+      );
+    }
+  }
+
+  loadFromGlobalState(trailsState) {
+    if (!trailsState || typeof trailsState !== 'object') return;
+    let updated = false;
+
+    if (trailsState.alignedSequences && typeof trailsState.alignedSequences === 'object') {
+      for (const [seqId, remoteRecord] of Object.entries(trailsState.alignedSequences)) {
+        if (this.excludedSequences.has(seqId)) continue;
+        const localRecord = this.alignedSequences[seqId];
+        const localTime = localRecord?.updatedAt || 0;
+        const remoteTime = remoteRecord?.updatedAt || 0;
+        if (!localRecord || remoteTime >= localTime) {
+          this.alignedSequences[seqId] = remoteRecord;
+          updated = true;
         }
       }
-    } catch (_) {}
+    }
 
-    // 2. Neon PostgreSQL synchronization (real-time cross-device alignment sync)
-    await this.syncWithNeon();
+    if (trailsState.sequenceBridges && typeof trailsState.sequenceBridges === 'object') {
+      this.sequenceBridges = { ...this.sequenceBridges, ...trailsState.sequenceBridges };
+      this.saveSequenceBridgesLocal();
+      updated = true;
+    }
 
-    // 3. Fallback for static hosting: load bundled aligned_sequences.json
+    if (trailsState.nodeOverrides && typeof trailsState.nodeOverrides === 'object') {
+      this.nodeOverrides = { ...this.nodeOverrides, ...trailsState.nodeOverrides };
+      this.saveNodeOverridesLocal();
+      updated = true;
+    }
+
+    if (updated) {
+      this.saveLocal();
+      this.notifyUpdate();
+    }
+  }
+
+  async syncWithBackend() {
+    // 1. Immediately load bundled static sequences for instant display on fresh devices & Vercel
     try {
       const staticRes = await fetch('/data/aligned_sequences.json');
       if (staticRes.ok) {
@@ -535,12 +567,29 @@ class StreetviewAlignmentService {
           }
           if (updated) {
             this.saveLocal();
+            this.notifyUpdate();
           }
         }
       }
     } catch (err) {
-      console.warn('Fallback aligned sequences load notice:', err);
+      console.warn('Bundled aligned sequences load notice:', err);
     }
+
+    // 2. Neon PostgreSQL synchronization (live cloud database across all devices)
+    await this.syncWithNeon();
+
+    // 3. Fallback check for Express API if running in local backend mode
+    try {
+      const res = await fetch('/api/aligned-sequences');
+      if (res.ok) {
+        const remote = await res.json();
+        if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
+          this.alignedSequences = { ...remote, ...this.alignedSequences };
+          this.saveLocal();
+          this.notifyUpdate();
+        }
+      }
+    } catch (_) {}
   }
 
   async syncWithNeon() {
@@ -548,6 +597,19 @@ class StreetviewAlignmentService {
       const dbUrl = getEffectiveNeonUrl();
       const { neon } = await import('@neondatabase/serverless');
       const sql = neon(dbUrl);
+
+      // Ensure table exists on fresh instances
+      await sql`
+        CREATE TABLE IF NOT EXISTS public.aligned_sequences (
+          sequence_id TEXT PRIMARY KEY,
+          name TEXT,
+          control_points JSONB,
+          coordinates JSONB,
+          images JSONB,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+
       const rows = await sql`
         SELECT sequence_id, name, control_points, coordinates, images, updated_at
         FROM public.aligned_sequences
@@ -573,6 +635,7 @@ class StreetviewAlignmentService {
         }
         if (updated) {
           this.saveLocal();
+          this.notifyUpdate();
         }
       }
     } catch (err) {
@@ -600,6 +663,7 @@ class StreetviewAlignmentService {
 
     this.alignedSequences[sequenceId] = record;
     this.saveLocal();
+    this.notifyUpdate();
 
     // 1. Save directly to Neon DB so ALL devices immediately receive it
     try {
@@ -657,12 +721,15 @@ class StreetviewAlignmentService {
       }));
     }
 
-    return await this.saveAlignedSequence(sequenceId, record);
+    const saved = await this.saveAlignedSequence(sequenceId, record);
+    this.notifyUpdate();
+    return saved;
   }
 
   async deleteAlignedSequence(sequenceId) {
     delete this.alignedSequences[sequenceId];
     this.saveLocal();
+    this.notifyUpdate();
 
     try {
       const dbUrl = getEffectiveNeonUrl();
