@@ -37,7 +37,8 @@
       "foot": "25-35 mins",
       "vehicle": "8-12 mins"
     },
-    "safety_guidelines": "Watch out for slippery river stones. Avoid swimming during sudden mountain rainfalls."
+    "safety_guidelines": "Watch out for slippery river stones. Avoid swimming during sudden mountain rainfalls.",
+    "primary_pano_id": "pano_1793021939916_3uzsf1"
   },
   {
     "id": "poi_quirsodan_dam",
@@ -59,8 +60,8 @@
     "pseudoTheme": "teal",
     "connected360": {
       "type": "local",
-      "targetId": "pano_1793057818556_2d5g",
-      "imageUrl": "/panoramas/pano_1793057818556_2d5g.jpg",
+      "targetId": "pano_1793897189825_5iaz",
+      "imageUrl": "/panoramas/pano_1793897189825_5iaz.jpg",
       "heading": 90,
       "pitch": 0
     },
@@ -77,7 +78,8 @@
       "foot": "35-45 mins",
       "vehicle": "10-15 mins"
     },
-    "safety_guidelines": "Stay clear of spillway edge during high water releases."
+    "safety_guidelines": "Stay clear of spillway edge during high water releases.",
+    "primary_pano_id": "pano_1793897189825_5iaz"
   },
   {
     "id": "poi_holy_cross_parish",
@@ -97,8 +99,8 @@
     "pseudoTheme": "amber",
     "connected360": {
       "type": "local",
-      "targetId": "pano_1793057117856_8drf",
-      "imageUrl": "/panoramas/pano_1793057117856_8drf.jpg",
+      "targetId": "pano_1793897139465_1s3u",
+      "imageUrl": "/panoramas/pano_1793897139465_1s3u.jpg",
       "heading": 180,
       "pitch": 0
     },
@@ -112,7 +114,8 @@
       "foot": "5-10 mins",
       "vehicle": "2 mins"
     },
-    "safety_guidelines": "Observe sacred church silence and proper attire."
+    "safety_guidelines": "Observe sacred church silence and proper attire.",
+    "primary_pano_id": "pano_1793897139465_1s3u"
   },
   {
     "id": "poi_galangugong_rocks",
@@ -203,8 +206,8 @@
     "pseudoTheme": "cyan",
     "connected360": {
       "type": "local",
-      "targetId": "pano_1785434840169_sqgpeq",
-      "imageUrl": "/panoramas/pano_1785434840169_sqgpeq.jpg",
+      "targetId": "pano_1793896873012_ekbq",
+      "imageUrl": "/panoramas/pano_1793896873012_ekbq.jpg",
       "heading": 180,
       "pitch": 0
     },
@@ -216,7 +219,8 @@
       "foot": "0-5 mins",
       "vehicle": "1 min"
     },
-    "safety_guidelines": "Follow university vehicle speed limit (15 km/h)."
+    "safety_guidelines": "Follow university vehicle speed limit (15 km/h).",
+    "primary_pano_id": "pano_1793896873012_ekbq"
   },
   {
     "id": "poi_ua_fish_pond",
@@ -238,8 +242,8 @@
     "pseudoTheme": "teal",
     "connected360": {
       "type": "local",
-      "targetId": "pano_1793057783543_na5k",
-      "imageUrl": "/panoramas/pano_1793057783543_na5k.jpg",
+      "targetId": "pano_1793896979111_l6k8",
+      "imageUrl": "/panoramas/pano_1793896979111_l6k8.jpg",
       "heading": 154,
       "pitch": 0
     },
@@ -256,7 +260,8 @@
       "foot": "5-10 mins",
       "vehicle": "2 mins"
     },
-    "safety_guidelines": "Keep away from muddy pond edges."
+    "safety_guidelines": "Keep away from muddy pond edges.",
+    "primary_pano_id": "pano_1793896979111_l6k8"
   },
   {
     "id": "poi_ua_tamarind_farm",
@@ -275,8 +280,9 @@
     "isPseudoImage": true,
     "pseudoTheme": "emerald",
     "connected360": {
-      "type": "mapillary",
-      "targetId": "2194203998167208",
+      "type": "local",
+      "targetId": "pano_1793896913772_zumk",
+      "imageUrl": "/panoramas/pano_1793896913772_zumk.jpg",
       "heading": 165,
       "pitch": 0
     },
@@ -290,7 +296,8 @@
       "foot": "10-15 mins",
       "vehicle": "3 mins"
     },
-    "safety_guidelines": "Do not harvest tamarind pods without staff permission."
+    "safety_guidelines": "Do not harvest tamarind pods without staff permission.",
+    "primary_pano_id": "pano_1793896913772_zumk"
   },
   {
     "id": "poi_ua_cacao_garden",
@@ -310,8 +317,8 @@
     "pseudoTheme": "orange",
     "connected360": {
       "type": "local",
-      "targetId": "pano_1793024621127_0wbwas",
-      "imageUrl": "/panoramas/pano_1793024621127_0wbwas.jpg",
+      "targetId": "pano_1793897029408_fbdj",
+      "imageUrl": "/panoramas/pano_1793897029408_fbdj.jpg",
       "heading": 154,
       "pitch": 0
     },
@@ -323,7 +330,8 @@
       "foot": "8-12 mins",
       "vehicle": "3 mins"
     },
-    "safety_guidelines": "Stay on designated farm walkways."
+    "safety_guidelines": "Stay on designated farm walkways.",
+    "primary_pano_id": "pano_1793897029408_fbdj"
   },
   {
     "id": "poi_dj_farm",
@@ -342,8 +350,9 @@
     "isPseudoImage": true,
     "pseudoTheme": "emerald",
     "connected360": {
-      "type": "mapillary",
-      "targetId": "1858716472228937",
+      "type": "local",
+      "targetId": "pano_1793897267395_umhm",
+      "imageUrl": "/panoramas/pano_1793897267395_umhm.jpg",
       "heading": 158,
       "pitch": 0
     },
@@ -357,7 +366,8 @@
       "foot": "20-25 mins",
       "vehicle": "6-8 mins"
     },
-    "safety_guidelines": "Family-friendly destination with fruit-bearing trees."
+    "safety_guidelines": "Family-friendly destination with fruit-bearing trees.",
+    "primary_pano_id": "pano_1793897267395_umhm"
   },
   {
     "id": "poi_rizalista_cave",
@@ -376,8 +386,9 @@
     "isPseudoImage": true,
     "pseudoTheme": "amber",
     "connected360": {
-      "type": "mapillary",
-      "targetId": "1761125488711823",
+      "type": "local",
+      "targetId": "pano_1793897380183_11ya",
+      "imageUrl": "/panoramas/pano_1793897380183_11ya.jpg",
       "heading": 161,
       "pitch": 0
     },
@@ -389,7 +400,8 @@
       "foot": "25-35 mins",
       "vehicle": "8-10 mins"
     },
-    "safety_guidelines": "Respect sacred religious artifacts and historical cave inscriptions."
+    "safety_guidelines": "Respect sacred religious artifacts and historical cave inscriptions.",
+    "primary_pano_id": "pano_1793897380183_11ya"
   },
   {
     "id": "poi_lagangilang_municipal_hall",
@@ -409,8 +421,8 @@
     "pseudoTheme": "cyan",
     "connected360": {
       "type": "local",
-      "targetId": "pano_1792907342452_r26dib",
-      "imageUrl": "/panoramas/pano_1792907342452_r26dib.jpg",
+      "targetId": "pano_1793896788201_vmvt",
+      "imageUrl": "/panoramas/pano_1793896788201_vmvt.jpg",
       "heading": 0,
       "pitch": 0
     },
@@ -424,7 +436,8 @@
       "foot": "5-8 mins",
       "vehicle": "2 mins"
     },
-    "safety_guidelines": "Municipal help desk, tourism brochures, and emergency response office on site."
+    "safety_guidelines": "Municipal help desk, tourism brochures, and emergency response office on site.",
+    "primary_pano_id": "pano_1793896788201_vmvt"
   },
   {
     "id": "poi_lagangilang_mdrrmo",

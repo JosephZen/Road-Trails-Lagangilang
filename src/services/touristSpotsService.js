@@ -1263,6 +1263,40 @@ export const touristSpotsService = {
   },
 
   /**
+   * Find matching panorama by label or coordinate proximity if ID has changed or is unlinked.
+   */
+  async findPanoForSpot(spotId, label, lat, lng) {
+    if (!label && (!lat || !lng)) return null;
+    try {
+      const rows = await this.executeNeonQuery(async (sql) => {
+        const parsedLat = parseFloat(lat) || 0;
+        const parsedLng = parseFloat(lng) || 0;
+        const cleanLabel = (label || '').trim();
+        return await sql`
+          SELECT id, image_data, thumbnail_data, latitude, longitude
+          FROM public.panoramas
+          WHERE (label IS NOT NULL AND label ILIKE ${'%' + cleanLabel + '%'})
+             OR (ABS(latitude - ${parsedLat}) < 0.005 AND ABS(longitude - ${parsedLng}) < 0.005)
+          ORDER BY captured_at DESC
+          LIMIT 1
+        `;
+      });
+      if (rows && rows.length > 0 && rows[0].image_data) {
+        this._panoCache.set(rows[0].id, {
+          imageData: rows[0].image_data,
+          thumbnailData: rows[0].thumbnail_data,
+          lat: rows[0].latitude,
+          lng: rows[0].longitude,
+        });
+        return rows[0].image_data;
+      }
+    } catch (e) {
+      console.warn('findPanoForSpot notice:', e.message);
+    }
+    return null;
+  },
+
+  /**
    * Fetch metadata list of all 360 Panoramas that have full image data in Neon Cloud.
    * Excludes the multi-megabyte image_data column so query executes instantly under 50ms and avoids Neon's 10MB limit.
    */

@@ -84,6 +84,7 @@ export default function TouristSpotModal({
   onSpotDeleted,
   initialCoords = null,
   editingSpot = null,
+  isAdmin = false,
 }) {
   const [spotType, setSpotType] = useState('tourist_spot'); // 'tourist_spot' | 'poi'
   const { searchNearby } = useMapillary();
@@ -217,7 +218,7 @@ export default function TouristSpotModal({
     }
   }, [editingSpot, initialCoords, isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !isAdmin) return null;
 
   const currentCategoryList = spotType === 'tourist_spot' ? TOURIST_CATEGORIES : POI_CATEGORIES;
 

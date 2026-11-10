@@ -23,6 +23,7 @@ export default function PanoramaViewer({
   onCloseViewer,
   onFallbackToMapillary,
   viewerLayout = 'split',
+  isAdmin = false,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
@@ -132,6 +133,12 @@ export default function PanoramaViewer({
           }
           if (!cloudTexture && panorama.targetId) {
             cloudTexture = await touristSpotsService.fetchPanoramaImageData(panorama.targetId);
+          }
+          if (!cloudTexture && panorama.primaryPanoId) {
+            cloudTexture = await touristSpotsService.fetchPanoramaImageData(panorama.primaryPanoId);
+          }
+          if (!cloudTexture && (panorama.spotId || panorama.label || panorama.lat)) {
+            cloudTexture = await touristSpotsService.findPanoForSpot(panorama.spotId, panorama.label, panorama.lat, panorama.lng);
           }
           if (cloudTexture && cloudTexture.length > 50000 && !isCancelled) {
             finalImageUrl = cloudTexture;
@@ -439,27 +446,31 @@ export default function PanoramaViewer({
         >
           <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📷</div>
           <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 700, color: '#60a5fa' }}>
-            360° Photo Needed
+            {isAdmin ? '360° Photo Needed' : '360° Photo Unavailable'}
           </h4>
           <p style={{ margin: '0 0 18px 0', fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.45 }}>
-            No 360° photosphere has been uploaded for <strong>{panorama?.label || 'this location'}</strong> yet.
+            {isAdmin
+              ? <>No 360° photosphere has been uploaded for <strong>{panorama?.label || 'this location'}</strong> yet.</>
+              : <>A dedicated 360° photosphere has not been recorded for <strong>{panorama?.label || 'this location'}</strong> yet. Explore the surrounding trail using Street View below.</>}
           </p>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button
-              className="btn btn-primary"
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                fontSize: '0.8rem',
-                padding: '7px 16px',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: 600,
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
-              }}
-            >
-              📷 Upload 360 Photo
-            </button>
+            {isAdmin && (
+              <button
+                className="btn btn-primary"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '7px 16px',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+                }}
+              >
+                📷 Upload 360 Photo
+              </button>
+            )}
             <button
               className="btn btn-secondary"
               onClick={() => onFallbackToMapillary?.()}

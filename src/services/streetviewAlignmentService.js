@@ -614,13 +614,15 @@ class StreetviewAlignmentService {
         SELECT sequence_id, name, control_points, coordinates, images, updated_at
         FROM public.aligned_sequences
       `;
+      const remoteMap = new Map();
       if (Array.isArray(rows) && rows.length > 0) {
         let updated = false;
         for (const row of rows) {
           if (!row.sequence_id) continue;
+          const remoteTime = new Date(row.updated_at || 0).getTime();
+          remoteMap.set(row.sequence_id, remoteTime);
           const localRecord = this.alignedSequences[row.sequence_id];
           const localTime = localRecord?.updatedAt || 0;
-          const remoteTime = new Date(row.updated_at || 0).getTime();
           if (!localRecord || remoteTime > localTime) {
             this.alignedSequences[row.sequence_id] = {
               sequenceId: row.sequence_id,
@@ -638,8 +640,154 @@ class StreetviewAlignmentService {
           this.notifyUpdate();
         }
       }
+
+      // TRUE BI-DIRECTIONAL SYNC:
+      // If this browser contains locally aligned sequences in localStorage that are not
+      // present in Neon or are newer than Neon's copy, upload them to Neon immediately.
+      let pushedCount = 0;
+      for (const [seqId, localRecord] of Object.entries(this.alignedSequences)) {
+        if (!seqId || !localRecord || !localRecord.coordinates || localRecord.coordinates.length < 2) continue;
+        const remoteTime = remoteMap.get(seqId);
+        const localTime = localRecord.updatedAt || 0;
+        if (remoteTime === undefined || localTime > remoteTime) {
+          try {
+            await sql`
+              INSERT INTO public.aligned_sequences (sequence_id, name, control_points, coordinates, images, updated_at)
+              VALUES (
+                ${seqId},
+                ${localRecord.name || ('Aligned Sequence ' + seqId.slice(0, 8))},
+                ${JSON.stringify(localRecord.controlPoints || [])}::jsonb,
+                ${JSON.stringify(localRecord.coordinates || [])}::jsonb,
+                ${JSON.stringify(localRecord.images || [])}::jsonb,
+                NOW()
+              )
+              ON CONFLICT (sequence_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                control_points = EXCLUDED.control_points,
+                coordinates = EXCLUDED.coordinates,
+                images = EXCLUDED.images,
+                updated_at = NOW();
+            `;
+            pushedCount++;
+          } catch (pushErr) {
+            console.warn(`[Neon Sync] Failed pushing sequence ${seqId}:`, pushErr);
+          }
+        }
+      }
+
+      if (pushedCount > 0) {
+        console.log(`[Neon Sync] Bi-directional sync pushed ${pushedCount} local sequence(s) to Neon Cloud!`);
+        globalSyncService.saveKey(GLOBAL_STATE_KEYS.TRAILS, {
+          alignedSequences: this.alignedSequences,
+          sequenceBridges: this.sequenceBridges,
+          nodeOverrides: this.nodeOverrides,
+          excludedSequences: Array.from(this.excludedSequences),
+          excludedImages: Array.from(this.excludedImages),
+        }).catch(() => {});
+      }
+
+      return {
+        success: true,
+        received: rows?.length || 0,
+        pushed: pushedCount,
+        total: Object.keys(this.alignedSequences).length,
+      };
     } catch (err) {
       console.warn('Neon aligned_sequences sync notice:', err?.message || err);
+      return { success: false, error: err?.message || String(err) };
+    }
+  }
+
+  /**
+   * Admin one-click manual force push of all local sequences to Neon
+   */
+  async pushAllLocalToNeon() {
+    try {
+      const dbUrl = getEffectiveNeonUrl();
+      const { neon } = await import('@neondatabase/serverless');
+      const sql = neon(dbUrl);
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS public.aligned_sequences (
+          sequence_id TEXT PRIMARY KEY,
+          name TEXT,
+          control_points JSONB,
+          coordinates JSONB,
+          images JSONB,
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+
+      let pushed = 0;
+      const entries = Object.entries(this.alignedSequences);
+      for (const [seqId, localRecord] of entries) {
+        if (!seqId || !localRecord) continue;
+        await sql`
+          INSERT INTO public.aligned_sequences (sequence_id, name, control_points, coordinates, images, updated_at)
+          VALUES (
+            ${seqId},
+            ${localRecord.name || ('Aligned Sequence ' + seqId.slice(0, 8))},
+            ${JSON.stringify(localRecord.controlPoints || [])}::jsonb,
+            ${JSON.stringify(localRecord.coordinates || [])}::jsonb,
+            ${JSON.stringify(localRecord.images || [])}::jsonb,
+            NOW()
+          )
+          ON CONFLICT (sequence_id) DO UPDATE SET
+            name = EXCLUDED.name,
+            control_points = EXCLUDED.control_points,
+            coordinates = EXCLUDED.coordinates,
+            images = EXCLUDED.images,
+            updated_at = NOW();
+        `;
+        pushed++;
+      }
+
+      await globalSyncService.saveKey(GLOBAL_STATE_KEYS.TRAILS, {
+        alignedSequences: this.alignedSequences,
+        sequenceBridges: this.sequenceBridges,
+        nodeOverrides: this.nodeOverrides,
+        excludedSequences: Array.from(this.excludedSequences),
+        excludedImages: Array.from(this.excludedImages),
+      });
+
+      return { success: true, pushed, total: entries.length };
+    } catch (err) {
+      console.error('pushAllLocalToNeon error:', err);
+      return { success: false, error: err?.message || String(err) };
+    }
+  }
+
+  /**
+   * Export all alignments to a JSON file (admin backup)
+   */
+  exportAlignmentsJson() {
+    return JSON.stringify(this.alignedSequences, null, 2);
+  }
+
+  /**
+   * Import alignments from JSON file
+   */
+  async importAlignmentsJson(jsonString) {
+    try {
+      const parsed = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+      if (!parsed || typeof parsed !== 'object') throw new Error('Invalid JSON format');
+      let count = 0;
+      for (const [seqId, record] of Object.entries(parsed)) {
+        if (record && record.coordinates) {
+          this.alignedSequences[seqId] = {
+            ...record,
+            sequenceId: seqId,
+            updatedAt: Date.now(),
+          };
+          count++;
+        }
+      }
+      this.saveLocal();
+      this.notifyUpdate();
+      await this.pushAllLocalToNeon();
+      return { success: true, imported: count };
+    } catch (err) {
+      return { success: false, error: err.message };
     }
   }
 

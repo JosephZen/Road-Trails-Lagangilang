@@ -2015,6 +2015,101 @@ export default function App() {
                   <span>{aligningSequence ? 'Exit' : isSelectingAlignmentTarget ? 'Cancel' : 'Select'}</span>
                 </button>
 
+                {/* Streetview Alignment Cloud Sync & Backup */}
+                <div style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'rgba(15, 23, 42, 0.75)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#38bdf8' }}>
+                      🌐 Cloud Streetview Lines
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                      {Object.keys(streetviewAlignmentService.getAlignedSequences()).length} local active
+                    </span>
+                  </div>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={async () => {
+                      showToast('⏳ Syncing local streetview alignments with Neon Cloud...');
+                      const res = await streetviewAlignmentService.pushAllLocalToNeon();
+                      if (res.success) {
+                        setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+                        showToast(`✅ Synced ${res.pushed} alignments to Neon Cloud! Available on all devices.`);
+                      } else {
+                        showToast(`⚠️ Sync failed: ${res.error}`);
+                      }
+                    }}
+                    style={{
+                      fontSize: '0.78rem',
+                      padding: '7px 10px',
+                      background: 'rgba(56, 189, 248, 0.15)',
+                      borderColor: 'rgba(56, 189, 248, 0.4)',
+                      color: '#38bdf8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span>☁️ Push Alignments to Cloud Database</span>
+                  </button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        const json = streetviewAlignmentService.exportAlignmentsJson();
+                        const blob = new Blob([json], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `lagangilang_alignments_backup_${new Date().toISOString().slice(0, 10)}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        showToast('📥 Downloaded alignments JSON backup');
+                      }}
+                      style={{ flex: 1, fontSize: '0.72rem', padding: '5px 8px' }}
+                      title="Download local alignments backup file"
+                    >
+                      📥 Export JSON
+                    </button>
+                    <label
+                      className="btn btn-secondary"
+                      style={{ flex: 1, fontSize: '0.72rem', padding: '5px 8px', textAlign: 'center', cursor: 'pointer', margin: 0 }}
+                      title="Restore alignments from a JSON backup file"
+                    >
+                      📤 Import JSON
+                      <input
+                        type="file"
+                        accept=".json"
+                        style={{ display: 'none' }}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const text = await file.text();
+                            const res = await streetviewAlignmentService.importAlignmentsJson(text);
+                            if (res.success) {
+                              setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+                              showToast(`✅ Imported ${res.imported} alignments and synced to Neon!`);
+                            } else {
+                              showToast(`⚠️ Import failed: ${res.error}`);
+                            }
+                          } catch (err) {
+                            showToast(`⚠️ Failed to read file: ${err.message}`);
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
                 {/* Sequence & Junction Bridges Master Toggle */}
                 <button
                   className={`btn ${showBridgePrompts ? 'btn-primary' : 'btn-secondary'}`}
@@ -2221,6 +2316,7 @@ export default function App() {
                 steerTarget={steerTarget}
                 onCloseViewer={handleCloseViewer}
                 onFallbackToMapillary={handleFallbackToMapillary}
+                isAdmin={isAdmin}
               />
             ) : viewerPanoMode === 'mapillary' ? (
               <MapillaryViewer
@@ -2740,6 +2836,7 @@ export default function App() {
       {/* ===== Tourist Spot Modal (Admin) ===== */}
       <TouristSpotModal
         isOpen={showSpotModal}
+        isAdmin={isAdmin}
         onClose={() => {
           setShowSpotModal(false);
           setEditingSpot(null);
