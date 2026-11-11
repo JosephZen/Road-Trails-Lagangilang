@@ -1,9 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import fallbackPois from '../src/data/tourist_spots.json' with { type: 'json' };
-import fallbackAlignedSequences from '../src/data/mapillary_aligned_sequences.json' with { type: 'json' };
-import fallbackBridges from '../src/data/mapillary_sequence_bridges.json' with { type: 'json' };
-import fallbackExcludedSequences from '../src/data/mapillary_excluded_sequences.json' with { type: 'json' };
-import fallbackExcludedImages from '../src/data/mapillary_excluded_images.json' with { type: 'json' };
+import { fallbackPois, fallbackHotlines, fallbackTrails } from './_fallbackData.js';
 
 export const config = {
   runtime: 'edge',
@@ -27,114 +23,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-};
-
-const fallbackHotlines = [
-  {
-    id: 'poi_denr_checkpoint_lagangilang',
-    name: 'DENR Environmental Checkpoint - Lagangilang',
-    category: 'DENR Checkpoint',
-    categoryIcon: '🌲',
-    phone: '0917-889-3321',
-    altPhone: '(074) 752-8234',
-    description: 'Timber & Wildlife Monitoring, Watershed Protection, Mountain Trail Registration & Environmental Safety Inspection',
-    operatingHours: '24/7 Official Monitoring & Registration Desk',
-    location: {
-      lat: 17.592176,
-      lng: 120.787685,
-      address: 'San Isidro, Lagangilang, Abra, Philippines',
-    },
-    notes: 'Required registration point for hikers traversing upland eco-trails and municipal forest corridors.',
-    spotType: 'poi',
-    isCheckpoint: true,
-  },
-  {
-    id: 'poi_lagangilang_mdrrmo',
-    name: 'Lagangilang MDRRMO (Disaster & Rescue)',
-    category: 'MDRRMO',
-    categoryIcon: '🚑',
-    phone: '0917-829-4501',
-    altPhone: '0920-948-2311',
-    description: '24/7 Search & Rescue, Medical Evacuation, Flood/Typhoon Monitoring, Mountain Assistance',
-    operatingHours: '24/7 Disaster Operations Center',
-    location: {
-      lat: 17.612657,
-      lng: 120.733619,
-      address: 'Municipal Hall Complex, Poblacion, Lagangilang, Abra',
-    },
-    spotType: 'poi',
-  },
-  {
-    id: 'poi_lagangilang_pnp',
-    name: 'PNP Lagangilang Municipal Police',
-    category: 'Police',
-    categoryIcon: '👮',
-    phone: '0998-598-7742',
-    altPhone: '0917-123-7670',
-    description: 'Public Safety, Peace & Order, Highway Patrols, Tourist Security Assistance',
-    operatingHours: '24/7 Police Desk & Mobile Patrols',
-    location: {
-      lat: 17.606671,
-      lng: 120.736502,
-      address: 'Police Station, Municipal Hall Complex, Poblacion',
-    },
-    spotType: 'poi',
-  },
-  {
-    id: 'poi_lagangilang_bfp',
-    name: 'BFP Lagangilang Fire Station',
-    category: 'Fire Station',
-    categoryIcon: '🚒',
-    phone: '0915-384-9122',
-    altPhone: '(074) 752-8111',
-    description: 'Fire Suppression, Emergency Medical Response, Search & Rescue Operations',
-    operatingHours: '24/7 Fire Station Readiness',
-    location: {
-      lat: 17.60848,
-      lng: 120.735801,
-      address: 'Kalinga Road, Poblacion, Lagangilang, Abra',
-    },
-    spotType: 'poi',
-  },
-  {
-    id: 'poi_lagangilang_rhu',
-    name: 'Lagangilang Rural Health Unit (RHU)',
-    category: 'Health / RHU',
-    categoryIcon: '🏥',
-    phone: '(074) 752-8012',
-    altPhone: '0977-802-3490',
-    description: 'Emergency Medical Care, Outpatient Consultation, First Aid & Antivenom Administration',
-    operatingHours: '8:00 AM - 5:00 PM (24/7 On-Call Emergency)',
-    location: {
-      lat: 17.607668,
-      lng: 120.735759,
-      address: 'Health Center, Poblacion, Lagangilang, Abra',
-    },
-    spotType: 'poi',
-  },
-  {
-    id: 'poi_lagangilang_tourism_office',
-    name: 'Lagangilang Municipal Tourism Office',
-    category: 'Tourism',
-    categoryIcon: '🌴',
-    phone: '0917-504-2299',
-    altPhone: '(074) 752-8001',
-    description: 'Trail Information, Tourist Assistance, Tour Guide Accreditation & Cultural Advisories',
-    operatingHours: '8:00 AM - 5:00 PM Monday to Friday',
-    location: {
-      lat: 17.61267,
-      lng: 120.733661,
-      address: 'Tourism Desk, Presidencia Ti Lagangilang, Poblacion',
-    },
-    spotType: 'poi',
-  },
-];
-
-const fallbackTrails = {
-  alignedSequences: fallbackAlignedSequences || {},
-  sequenceBridges: fallbackBridges || {},
-  excludedSequences: fallbackExcludedSequences || [],
-  excludedImages: fallbackExcludedImages || [],
 };
 
 export default async function handler(req) {
@@ -178,7 +66,7 @@ export default async function handler(req) {
     if (!hotlines || hotlines.length < fallbackHotlines.length) {
       hotlines = fallbackHotlines;
     }
-    if (!trails || !trails.alignedSequences || Object.keys(trails.alignedSequences).length === 0) {
+    if (!trails || !trails.sequenceBridges || Object.keys(trails.sequenceBridges).length === 0) {
       trails = fallbackTrails;
     }
 

@@ -1,19 +1,8 @@
 import { neon } from '@neondatabase/serverless';
-import fallbackPois from '../src/data/tourist_spots.json' with { type: 'json' };
-import fallbackAlignedSequences from '../src/data/mapillary_aligned_sequences.json' with { type: 'json' };
-import fallbackBridges from '../src/data/mapillary_sequence_bridges.json' with { type: 'json' };
-import fallbackExcludedSequences from '../src/data/mapillary_excluded_sequences.json' with { type: 'json' };
-import fallbackExcludedImages from '../src/data/mapillary_excluded_images.json' with { type: 'json' };
+import { fallbackPois, fallbackTrails } from './_fallbackData.js';
 
 export const config = {
   runtime: 'edge',
-};
-
-const fallbackTrails = {
-  alignedSequences: fallbackAlignedSequences || {},
-  sequenceBridges: fallbackBridges || {},
-  excludedSequences: fallbackExcludedSequences || [],
-  excludedImages: fallbackExcludedImages || [],
 };
 
 const ACTIVE_NEON_URL =
