@@ -24,6 +24,9 @@ export default function PanoramaViewer({
   onFallbackToMapillary,
   viewerLayout = 'split',
   isAdmin = false,
+  nearestNode = null,
+  onAssignNearestNode = null,
+  onPickNodeFromMap = null,
 }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
@@ -66,7 +69,13 @@ export default function PanoramaViewer({
 
   // Initialize or update the viewer when panorama changes
   useEffect(() => {
-    if (!viewerReady || !panorama || !containerRef.current) return;
+    if (!viewerReady || !containerRef.current) return;
+
+    if (!panorama || (!panorama.id && !panorama.targetId && !panorama.primaryPanoId && !panorama.imageUrl && !panorama.imageData)) {
+      setIsLoading(false);
+      setHasLoadError(true);
+      return;
+    }
 
     // Guard: Prevent re-initialization if the exact same panorama and texture is already loaded and active
     const panoTextureKey = `${panorama.id}_${panorama.imageData ? panorama.imageData.length : ''}_${panorama.imageUrl || ''}`;
@@ -433,50 +442,109 @@ export default function PanoramaViewer({
             transform: 'translate(-50%, -50%)',
             background: 'rgba(15, 23, 42, 0.95)',
             backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(239, 68, 68, 0.4)',
-            borderRadius: '12px',
+            border: '1px solid rgba(56, 189, 248, 0.3)',
+            borderRadius: '16px',
             padding: '24px 20px',
             textAlign: 'center',
             zIndex: 60,
-            maxWidth: 'min(380px, 90vw)',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.7)',
+            maxWidth: 'min(420px, 92vw)',
+            boxShadow: '0 20px 45px rgba(0,0,0,0.75)',
             color: '#f8fafc',
             animation: 'fadeInUp 0.3s ease',
           }}
         >
           <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📷</div>
-          <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 700, color: '#60a5fa' }}>
-            {isAdmin ? '360° Photo Needed' : '360° Photo Unavailable'}
+          <h4 style={{ margin: '0 0 6px 0', fontSize: '1.05rem', fontWeight: 700, color: '#38bdf8' }}>
+            No 360° image of this location
           </h4>
-          <p style={{ margin: '0 0 18px 0', fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.45 }}>
+          <p style={{ margin: '0 0 14px 0', fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.45 }}>
             {isAdmin
-              ? <>No 360° photosphere has been uploaded for <strong>{panorama?.label || 'this location'}</strong> yet.</>
-              : <>A dedicated 360° photosphere has not been recorded for <strong>{panorama?.label || 'this location'}</strong> yet. Explore the surrounding trail using Street View below.</>}
+              ? <>A dedicated 360° photo has not been captured for <strong>{panorama?.label || 'this location'}</strong> yet. You can assign a streetview cyan node or upload a photo.</>
+              : <>A dedicated 360° photo has not been recorded for <strong>{panorama?.label || 'this location'}</strong> yet. Explore the surrounding trail using Street View below.</>}
           </p>
+
+          {nearestNode && (
+            <div style={{
+              background: 'rgba(56, 189, 248, 0.1)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              marginBottom: '16px',
+              fontSize: '0.75rem',
+              color: '#38bdf8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}>
+              <span>📍</span>
+              <span>Nearest Cyan Node: <strong>#{String(nearestNode.image?.id || nearestNode.imgId || '').slice(-6)}</strong> (~{Math.round(nearestNode.distance || 0)}m away on road)</span>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            {isAdmin && (
+            {isAdmin && nearestNode && (
               <button
                 className="btn btn-primary"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => onAssignNearestNode?.(nearestNode)}
                 style={{
                   fontSize: '0.8rem',
-                  padding: '7px 16px',
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  padding: '8px 16px',
+                  background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
                   border: 'none',
                   cursor: 'pointer',
                   fontWeight: 600,
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+                  boxShadow: '0 4px 12px rgba(14, 165, 233, 0.4)',
                 }}
+                title={`Assign nearest cyan node #${String(nearestNode.image?.id || nearestNode.imgId || '').slice(-6)} as the 360 view for this landmark`}
               >
-                📷 Upload 360 Photo
+                🔗 Assign Nearest Node
               </button>
             )}
+
+            {isAdmin && (
+              <button
+                className="btn btn-secondary"
+                onClick={() => onPickNodeFromMap?.()}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '8px 14px',
+                  background: 'rgba(56, 189, 248, 0.15)',
+                  borderColor: 'rgba(56, 189, 248, 0.4)',
+                  color: '#38bdf8',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+                title="Click any cyan dot on the map to assign it to this landmark"
+              >
+                🎯 Pick Node on Map
+              </button>
+            )}
+
+            {isAdmin && (
+              <button
+                className="btn btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '8px 14px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  color: '#cbd5e1',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                📷 Upload 360
+              </button>
+            )}
+
             <button
               className="btn btn-secondary"
               onClick={() => onFallbackToMapillary?.()}
               style={{
                 fontSize: '0.8rem',
-                padding: '7px 16px',
+                padding: '8px 16px',
                 background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 border: 'none',
                 color: '#fff',
@@ -486,10 +554,11 @@ export default function PanoramaViewer({
             >
               🚗 View Street View
             </button>
+
             <button
               className="btn btn-secondary"
               onClick={onCloseViewer}
-              style={{ fontSize: '0.8rem', padding: '7px 16px', cursor: 'pointer' }}
+              style={{ fontSize: '0.8rem', padding: '8px 16px', cursor: 'pointer' }}
             >
               ✕ Close
             </button>

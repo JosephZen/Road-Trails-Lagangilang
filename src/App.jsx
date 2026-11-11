@@ -118,6 +118,7 @@ export default function App() {
   const [viewerPanoMode, setViewerPanoMode] = useState('dedicated'); // 'dedicated' | 'google' | 'mapillary'
   const [localPanoramas, setLocalPanoramas] = useState([]);
   const [mapCenterPos, setMapCenterPos] = useState(null);
+  const [assigningNodeForSpot, setAssigningNodeForSpot] = useState(null);
   const { searchNearby } = useMapillary();
 
   // Admin Master Toggle for Sequence & Junction Bridges (Default OFF / Hidden per Phase 6)
@@ -788,6 +789,70 @@ export default function App() {
     [localPanoramas]
   );
 
+  // Compute the closest aligned cyan node to the currently active spot (across all active sequences)
+  const nearestAlignedForActiveSpot = useMemo(() => {
+    if (!activeTouristSpot) return null;
+    const lat = activeTouristSpot.location?.lat ?? activeTouristSpot.lat;
+    const lng = activeTouristSpot.location?.lng ?? activeTouristSpot.lng;
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    return streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, Infinity);
+  }, [activeTouristSpot, alignedGeoJSON]);
+
+  // Admin action: Assign a specific cyan node as the 360 street view for a landmark
+  const handleAssignNearestNodeToSpot = useCallback(
+    async (nodeInfo, spotToAssign = null) => {
+      const targetSpot = spotToAssign || activeTouristSpot;
+      if (!targetSpot || !nodeInfo) return;
+      const imgId = String(nodeInfo.image?.id || nodeInfo.id || nodeInfo.imgId || '');
+      if (!imgId) return;
+
+      const nodeLat = nodeInfo.image?.lat ?? nodeInfo.lat;
+      const nodeLng = nodeInfo.image?.lng ?? nodeInfo.lng;
+      const nodeHeading = nodeInfo.image?.alignedHeading ?? nodeInfo.image?.heading ?? 0;
+
+      const updates = {
+        connected360: {
+          type: 'mapillary',
+          targetId: imgId,
+          sequenceId: nodeInfo.sequenceId || targetSpot.connected360?.sequenceId,
+          lat: nodeLat,
+          lng: nodeLng,
+          heading: nodeHeading,
+          pitch: 0,
+        },
+        primary_pano_id: imgId,
+        sync_status: 'staged_local',
+        updated_at: new Date().toISOString(),
+      };
+
+      try {
+        await touristSpotsService.updateSpot(targetSpot.id, updates);
+        await touristSpotsService.syncToNeonCloud(targetSpot.id).catch(() => {});
+        loadTouristSpots();
+        const refreshedSpot = { ...targetSpot, ...updates };
+        setActiveTouristSpot(refreshedSpot);
+        setMapillaryImageId(imgId);
+        setStreetViewPos({
+          lat: nodeLat ?? targetSpot.lat,
+          lng: nodeLng ?? targetSpot.lng,
+          id: imgId,
+        });
+        setViewerPanoMode('mapillary');
+        showToast(`✅ Assigned cyan node #${imgId.slice(-6)} to "${targetSpot.name}" & synced to Neon Cloud!`);
+      } catch (err) {
+        showToast(`⚠️ Failed to assign node: ${err.message}`);
+      }
+    },
+    [activeTouristSpot, loadTouristSpots, showToast]
+  );
+
+  const handleStartPickNodeFromMap = useCallback(() => {
+    if (!activeTouristSpot) return;
+    setAssigningNodeForSpot(activeTouristSpot);
+    setViewerOpen(false);
+    showToast(`🎯 Tap any cyan node on the road map to assign it to "${activeTouristSpot.name}"`);
+  }, [activeTouristSpot, showToast]);
+
   // Handle selecting a Tourist Spot (POI) from map or sidebar
   const handleSelectTouristSpot = useCallback(
     async (spot) => {
@@ -797,35 +862,42 @@ export default function App() {
       const lat = spot.location?.lat ?? spot.lat;
       const lng = spot.location?.lng ?? spot.lng;
 
-      // 1. If landmark has its own dedicated 360 image (uploaded or linked)
+      // 1. Check if spot has a verified dedicated uploaded photosphere
       const customPanoId = spot.connected360?.targetId || spot.primary_pano_id;
       const isLocalPano = spotHasDedicatedPano(spot);
 
-      // Dedicated Mapillary pano ID (exclude if it's already a dedicated local panorama or UA gate)
-      const isDedicatedPanoId =
+      // 2. Check if spot has an assigned Mapillary 360 cyan node
+      const isAssignedMapillary =
         !isLocalPano &&
+        spot.connected360?.type === 'mapillary' &&
         customPanoId &&
         String(customPanoId).length >= 10 &&
-        /^\d+$/.test(String(customPanoId)) &&
-        (String(customPanoId) !== '1532761357806896' || spot.id === 'poi_ua_main_gate');
+        /^\d+$/.test(String(customPanoId));
 
-      // 2. Find nearest cyan node along any aligned streetview sequence across Lagangilang
+      // 3. Find closest cyan node along ALL active re-aligned road sequences in Lagangilang
       const nearestAligned = (typeof lat === 'number' && typeof lng === 'number')
-        ? streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, 3000)
+        ? streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, Infinity)
         : null;
       const nearestMapillaryId = nearestAligned?.image?.id ? String(nearestAligned.image.id) : null;
-      const effectiveMapillaryId = isDedicatedPanoId
+      const effectiveMapillaryId = isAssignedMapillary
         ? String(customPanoId)
         : (nearestMapillaryId || MAPILLARY_CAMPUS_GATE_IMAGE_ID);
 
-      // Always preset mapillaryImageId so switching to Mapillary jumps directly to the closest cyan node
+      // Preset mapillaryImageId so switching to Mapillary jumps directly to the closest cyan node
       setMapillaryImageId(effectiveMapillaryId);
 
       if (isLocalPano) {
         setViewerPanoMode('dedicated');
         setStreetViewPos({ lat, lng, id: String(customPanoId || spot.id) });
-      } else if (viewerPanoMode === 'mapillary' || isInsideUACampus(lat, lng) || isDedicatedPanoId) {
-        // Area inside UA Campus or user already in Mapillary mode: position directly on the nearest cyan node
+      } else if (isAssignedMapillary) {
+        setViewerPanoMode('mapillary');
+        setStreetViewPos({
+          lat: spot.connected360?.lat ?? nearestAligned?.image?.lat ?? lat,
+          lng: spot.connected360?.lng ?? nearestAligned?.image?.lng ?? lng,
+          id: String(customPanoId),
+        });
+      } else if (viewerPanoMode === 'mapillary') {
+        // User was already exploring in Mapillary mode: position directly on the nearest cyan node along road
         setViewerPanoMode('mapillary');
         setStreetViewPos({
           lat: nearestAligned?.image?.lat ?? lat,
@@ -835,10 +907,10 @@ export default function App() {
       } else {
         // Default to Google Street View for general road / highway locations
         setViewerPanoMode('google');
-        setStreetViewPos({ lat, lng, id: String(customPanoId || spot.id) });
+        setStreetViewPos({ lat, lng, id: String(spot.id) });
       }
 
-      // 3. Orient the 360 viewer toward the landmark's heading
+      // 4. Orient the 360 viewer toward the landmark's heading
       if (spot.connected360?.heading !== undefined) {
         const spotHeading = parseFloat(spot.connected360.heading) || 0;
         const spotPitch = parseFloat(spot.connected360.pitch) || 0;
@@ -850,31 +922,37 @@ export default function App() {
         });
       }
     },
-    [viewerPanoMode]
+    [spotHasDedicatedPano, viewerPanoMode]
   );
 
   const handleToggleViewerMode = useCallback((mode, spot = null) => {
-    setViewerPanoMode(mode);
+    const targetSpot = spot || activeTouristSpot;
+    const targetLat = targetSpot?.location?.lat ?? targetSpot?.lat ?? streetViewPos?.lat;
+    const targetLng = targetSpot?.location?.lng ?? targetSpot?.lng ?? streetViewPos?.lng;
+
     if (mode === 'mapillary') {
-      const targetSpot = spot || activeTouristSpot;
+      setViewerPanoMode('mapillary');
       const customPanoId = targetSpot?.connected360?.targetId || targetSpot?.primary_pano_id;
-      const isDedicatedPanoId =
+      const isAssignedMapillary =
+        targetSpot?.connected360?.type === 'mapillary' &&
         customPanoId &&
         String(customPanoId).length >= 10 &&
-        /^\d+$/.test(String(customPanoId)) &&
-        (String(customPanoId) !== '1532761357806896' || targetSpot?.id === 'poi_ua_main_gate');
+        /^\d+$/.test(String(customPanoId));
 
-      if (isDedicatedPanoId) {
+      if (isAssignedMapillary) {
         const dedicatedId = String(customPanoId);
         setMapillaryImageId(dedicatedId);
-        setStreetViewPos((prev) => (prev ? { ...prev, id: dedicatedId } : { lat: 17.60811, lng: 120.73816, id: dedicatedId }));
+        setStreetViewPos({
+          lat: targetSpot?.connected360?.lat ?? targetLat ?? 17.60811,
+          lng: targetSpot?.connected360?.lng ?? targetLng ?? 120.73816,
+          id: dedicatedId,
+        });
         return;
       }
 
-      const targetLat = targetSpot?.location?.lat ?? targetSpot?.lat ?? streetViewPos?.lat;
-      const targetLng = targetSpot?.location?.lng ?? targetSpot?.lng ?? streetViewPos?.lng;
+      // Switch to the nearest cyan node along ALL active re-aligned sequences in Lagangilang
       if (typeof targetLat === 'number' && typeof targetLng === 'number') {
-        const nearest = streetviewAlignmentService.findClosestImageAcrossAll(targetLat, targetLng, 3000);
+        const nearest = streetviewAlignmentService.findClosestImageAcrossAll(targetLat, targetLng, Infinity);
         if (nearest?.image?.id) {
           const nearestId = String(nearest.image.id);
           setMapillaryImageId(nearestId);
@@ -886,7 +964,41 @@ export default function App() {
           return;
         }
       }
+
       setMapillaryImageId(MAPILLARY_CAMPUS_GATE_IMAGE_ID);
+      return;
+    }
+
+    if (mode === 'google') {
+      setViewerPanoMode('google');
+      if (typeof targetLat === 'number' && typeof targetLng === 'number') {
+        setStreetViewPos((prev) => ({
+          lat: targetLat,
+          lng: targetLng,
+          id: targetSpot?.id || prev?.id || 'google_view',
+        }));
+      }
+      return;
+    }
+
+    if (mode === 'dedicated') {
+      const customPanoId = targetSpot?.connected360?.targetId || targetSpot?.primary_pano_id;
+      const isAssignedMapillary =
+        targetSpot?.connected360?.type === 'mapillary' &&
+        customPanoId &&
+        String(customPanoId).length >= 10 &&
+        /^\d+$/.test(String(customPanoId));
+      if (isAssignedMapillary) {
+        setViewerPanoMode('mapillary');
+        setMapillaryImageId(String(customPanoId));
+        setStreetViewPos({
+          lat: targetSpot?.connected360?.lat ?? targetLat,
+          lng: targetSpot?.connected360?.lng ?? targetLng,
+          id: String(customPanoId),
+        });
+        return;
+      }
+      setViewerPanoMode('dedicated');
     }
   }, [activeTouristSpot, streetViewPos]);
 
@@ -1048,6 +1160,36 @@ export default function App() {
         handleMapClickForRouting(lat, lng);
         return;
       }
+
+      // If we are currently assigning a cyan node to a landmark spot
+      if (assigningNodeForSpot) {
+        const targetSpot = assigningNodeForSpot;
+        setAssigningNodeForSpot(null);
+        let resolvedNode = null;
+        if (clickedMapillaryId && String(clickedMapillaryId).length >= 10) {
+          resolvedNode = { id: String(clickedMapillaryId), lat, lng };
+        } else {
+          const nearest = streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, 60);
+          if (nearest?.image?.id) {
+            resolvedNode = {
+              id: String(nearest.image.id),
+              lat: nearest.image.lat,
+              lng: nearest.image.lng,
+              heading: nearest.image.alignedHeading ?? nearest.image.heading ?? 0,
+              sequenceId: nearest.sequenceId,
+            };
+          }
+        }
+
+        if (resolvedNode) {
+          await handleAssignNearestNodeToSpot(resolvedNode, targetSpot);
+          setViewerOpen(true);
+          return;
+        } else {
+          showToast('⚠️ No cyan node clicked. Please tap directly on a cyan dot or streetview line.');
+          return;
+        }
+      }
       
       // If clicked directly on a Mapillary dot or sequence with a verified 64-bit Mapillary image ID
       const isValidId = clickedMapillaryId && String(clickedMapillaryId).length >= 10 && /^\d+$/.test(String(clickedMapillaryId));
@@ -1073,7 +1215,7 @@ export default function App() {
         }
       }
     },
-    [routingMode, pickingTarget, handleMapClickForRouting, searchNearby]
+    [routingMode, pickingTarget, handleMapClickForRouting, assigningNodeForSpot, handleAssignNearestNodeToSpot, searchNearby, showToast]
   );
 
   // Resize handle logic
@@ -1109,28 +1251,27 @@ export default function App() {
     }, 60);
   }, []);
 
-  // Gracefully fallback to Street View if custom 360 photo fails or cloud quota is exceeded
+  // Gracefully switch to Street View if 360 photo unavailable
   const handleFallbackToMapillary = useCallback(() => {
     showToast('🔄 Switching to Street View...');
-    if (activeTouristSpot?.id) {
-      touristSpotsService.healSpotToSeed(activeTouristSpot.id);
-      loadTouristSpots();
-    }
     const lat = activeTouristSpot?.location?.lat ?? activeTouristSpot?.lat;
     const lng = activeTouristSpot?.location?.lng ?? activeTouristSpot?.lng;
-    if (lat && lng && isInsideUACampus(lat, lng)) {
-      setViewerPanoMode('mapillary');
-      const nearest = streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, 3000);
-      const fallbackId = nearest?.image?.id ? String(nearest.image.id) : MAPILLARY_CAMPUS_GATE_IMAGE_ID;
-      setMapillaryImageId(fallbackId);
-      setStreetViewPos({ lat: nearest?.image?.lat ?? lat, lng: nearest?.image?.lng ?? lng, id: fallbackId });
-    } else if (lat && lng) {
-      setViewerPanoMode('google');
-      setStreetViewPos({ lat, lng, id: activeTouristSpot?.id || 'streetview' });
-    } else {
-      setViewerPanoMode('google');
+    if (typeof lat === 'number' && typeof lng === 'number') {
+      const nearest = streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, Infinity);
+      if (nearest?.image?.id) {
+        const nearestId = String(nearest.image.id);
+        setViewerPanoMode('mapillary');
+        setMapillaryImageId(nearestId);
+        setStreetViewPos({
+          lat: nearest.image.lat,
+          lng: nearest.image.lng,
+          id: nearestId,
+        });
+        return;
+      }
     }
-  }, [activeTouristSpot, showToast, loadTouristSpots]);
+    setViewerPanoMode('google');
+  }, [activeTouristSpot, showToast]);
 
   // Configure custom Neon Cloud Database URL (Admin)
   const handleConfigureNeonUrl = useCallback(() => {
@@ -1517,6 +1658,29 @@ export default function App() {
                 ✕ Cancel
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Floating banner when Admin is picking a cyan node on the map for a landmark */}
+        {assigningNodeForSpot && (
+          <div
+            className="alignment-selection-banner glass-panel"
+            style={{
+              borderColor: 'rgba(56, 189, 248, 0.5)',
+              background: 'rgba(15, 23, 42, 0.95)',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.65)',
+            }}
+          >
+            <span>🎯 Tap any cyan node on the road map to assign it to <strong>{assigningNodeForSpot.name}</strong></span>
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={() => {
+                setAssigningNodeForSpot(null);
+                setViewerOpen(true);
+              }}
+            >
+              ✕ Cancel
+            </button>
           </div>
         )}
 
@@ -2291,25 +2455,27 @@ export default function App() {
             )}
 
             {/* 360 Viewer: Dedicated Uploaded Panorama (Pannellum), Mapillary or Google Street View */}
-            {activeTouristSpot && spotHasDedicatedPano(activeTouristSpot) && viewerPanoMode === 'dedicated' ? (
+            {viewerPanoMode === 'dedicated' ? (
               <PanoramaViewer
                 viewerLayout={viewerLayout}
-                panorama={{
-                  id: activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || activeTouristSpot.id,
+                panorama={activeTouristSpot ? {
+                  id: activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || null,
                   spotId: activeTouristSpot.id,
-                  targetId: activeTouristSpot.connected360?.targetId,
-                  primaryPanoId: activeTouristSpot.primary_pano_id,
-                  filename: `${activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id || activeTouristSpot.id}.jpg`,
+                  targetId: activeTouristSpot.connected360?.targetId || null,
+                  primaryPanoId: activeTouristSpot.primary_pano_id || null,
+                  filename: (activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id) ? `${activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id}.jpg` : null,
                   imageUrl:
-                    activeTouristSpot.connected360?.imageUrl ||
-                    activeTouristSpot.image ||
-                    `${API_BASE}/panoramas/${activeTouristSpot.connected360?.targetId || activeTouristSpot.primary_pano_id}.jpg`,
+                    (activeTouristSpot.connected360?.imageUrl && !activeTouristSpot.connected360.imageUrl.includes('/panoramas/pano_null') && !activeTouristSpot.connected360.imageUrl.includes('undefined'))
+                      ? activeTouristSpot.connected360.imageUrl
+                      : (activeTouristSpot.image && !activeTouristSpot.image.includes('undefined'))
+                      ? activeTouristSpot.image
+                      : null,
                   heading: activeTouristSpot.connected360?.heading || 0,
                   pitch: activeTouristSpot.connected360?.pitch || 0,
                   lat: activeTouristSpot.location?.lat ?? activeTouristSpot.lat,
                   lng: activeTouristSpot.location?.lng ?? activeTouristSpot.lng,
                   label: activeTouristSpot.name,
-                }}
+                } : null}
                 panoramas={localPanoramas}
                 viewerHeading={viewerHeading}
                 onHeadingChange={setViewerHeading}
@@ -2317,6 +2483,9 @@ export default function App() {
                 onCloseViewer={handleCloseViewer}
                 onFallbackToMapillary={handleFallbackToMapillary}
                 isAdmin={isAdmin}
+                nearestNode={nearestAlignedForActiveSpot}
+                onAssignNearestNode={handleAssignNearestNodeToSpot}
+                onPickNodeFromMap={handleStartPickNodeFromMap}
               />
             ) : viewerPanoMode === 'mapillary' ? (
               <MapillaryViewer

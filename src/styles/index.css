@@ -1598,16 +1598,16 @@ body {
 
 /* Sky Blue Transport & Services Pin */
 .poi-marker-pin.pin-service {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.6) !important;
-  border: 2px solid #ffffff !important;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.6);
+  border: 2px solid #ffffff;
 }
 
 /* Emerald Green Bank & ATM Pin */
 .poi-marker-pin.pin-bank {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6) !important;
-  border: 2px solid #ffffff !important;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6);
+  border: 2px solid #ffffff;
 }
 
 @keyframes pulse-checkpoint {

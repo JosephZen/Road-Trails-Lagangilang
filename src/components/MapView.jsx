@@ -1995,7 +1995,7 @@ export default function MapView({
       el.title = canDrag ? `${spot.name} • Drag to reposition` : spot.name;
 
       const customPinStyle = visual.palette?.bg
-        ? `background: ${visual.palette.bg} !important; border-color: ${visual.palette.border || '#ffffff'} !important; ${visual.palette.shadow ? `box-shadow: 0 4px 14px ${visual.palette.shadow} !important;` : ''}`
+        ? `background: ${visual.palette.bg}; border-color: ${visual.palette.border || '#ffffff'}; ${visual.palette.shadow ? `box-shadow: 0 4px 14px ${visual.palette.shadow};` : ''}`
         : '';
 
       el.innerHTML = `

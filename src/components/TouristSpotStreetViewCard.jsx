@@ -515,36 +515,40 @@ export default function TouristSpotStreetViewCard({
             <span>Mapillary</span>
           </button>
 
-          {hasDedicatedPano && (
-            <button
-              onClick={() => onToggleViewerMode?.('dedicated', spot)}
-              style={{
-                flex: 1,
-                padding: '4px 2px',
-                fontSize: '0.66rem',
-                fontWeight: 700,
-                borderRadius: 'var(--radius-sm)',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '3px',
-                background:
-                  viewerPanoMode === 'dedicated'
-                    ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-                    : 'transparent',
-                color: viewerPanoMode === 'dedicated' ? '#ffffff' : '#94a3b8',
-                boxShadow: viewerPanoMode === 'dedicated' ? '0 2px 8px rgba(59, 130, 246, 0.4)' : 'none',
-                transition: 'all var(--transition-fast)',
-                whiteSpace: 'nowrap',
-              }}
-              title="View dedicated uploaded 360 panorama for this landmark"
-            >
-              <span>📷</span>
-              <span>Dedicated</span>
-            </button>
-          )}
+          <button
+            onClick={() => onToggleViewerMode?.('dedicated', spot)}
+            style={{
+              flex: 1,
+              padding: '4px 2px',
+              fontSize: '0.66rem',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '3px',
+              background:
+                viewerPanoMode === 'dedicated'
+                  ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                  : 'transparent',
+              color: viewerPanoMode === 'dedicated' ? '#ffffff' : '#94a3b8',
+              boxShadow: viewerPanoMode === 'dedicated' ? '0 2px 8px rgba(59, 130, 246, 0.4)' : 'none',
+              transition: 'all var(--transition-fast)',
+              whiteSpace: 'nowrap',
+            }}
+            title={
+              hasDedicatedPano
+                ? 'View dedicated uploaded 360 photo'
+                : (spot.connected360?.type === 'mapillary' && spot.connected360?.targetId)
+                ? 'View assigned 360 cyan node'
+                : 'Check 360 photo or assign node'
+            }
+          >
+            <span>{hasDedicatedPano ? '📷' : (spot.connected360?.type === 'mapillary' && spot.connected360?.targetId) ? '🔵' : '📷'}</span>
+            <span>{hasDedicatedPano ? '360° Photo' : (spot.connected360?.type === 'mapillary' && spot.connected360?.targetId) ? '360° Node' : '360°'}</span>
+          </button>
         </div>
       )}
 
