@@ -770,18 +770,6 @@ export const touristSpotsService = {
     });
     this.saveAllSpots(updated);
 
-    // Fast granular update to serverless update-pin-location API
-    fetch(`${API_BASE}/api/update-pin-location`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: spotId,
-        type: spotId.startsWith('poi_denr_') || spotId.startsWith('poi_lagangilang_') ? 'hotline' : 'poi',
-        lat: parsedLat,
-        lng: parsedLng,
-      }),
-    }).catch(() => {});
-
     // Fast granular update to serverless Neon API
     fetch(`${API_BASE}/api/item-location`, {
       method: 'PUT',
@@ -796,23 +784,8 @@ export const touristSpotsService = {
       body: JSON.stringify({ lat: parsedLat, lng: parsedLng }),
     }).catch(() => {});
 
-    // Direct Neon Cloud DB persistence (tables: tourist_spots, lagangilang_pois, lagangilang_hotlines, lagangilang_global_state)
-    this.updateSpotLocationDirectNeon(spotId, parsedLat, parsedLng).catch((err) =>
-      console.warn('Neon direct location update error:', err)
-    );
-
-    return updated.find((s) => s.id === spotId);
-  },
-
-  /**
-   * Direct Neon Cloud DB location persistence
-   */
-  async updateSpotLocationDirectNeon(spotId, lat, lng) {
-    const parsedLat = parseFloat(Number(lat).toFixed(6));
-    const parsedLng = parseFloat(Number(lng).toFixed(6));
-    const isHotline = spotId.startsWith('poi_denr_') || spotId.startsWith('poi_lagangilang_');
-
-    return this.executeNeonQuery(async (sql) => {
+    // Asynchronously mirror update to Neon Cloud DB (tables: tourist_spots, lagangilang_pois, lagangilang_global_state)
+    this.executeNeonQuery(async (sql) => {
       // 1. Update public.tourist_spots
       await sql`
         UPDATE public.tourist_spots
@@ -820,43 +793,19 @@ export const touristSpotsService = {
         WHERE id = ${spotId}
       `.catch(() => {});
 
-      // 2. Upsert lagangilang_pois
-      await sql`
-        INSERT INTO lagangilang_pois (id, lat, lng, updated_at)
-        VALUES (${spotId}, ${parsedLat}, ${parsedLng}, NOW())
-        ON CONFLICT (id) DO UPDATE SET
-          lat = EXCLUDED.lat,
-          lng = EXCLUDED.lng,
-          updated_at = NOW();
-      `.catch(() => {});
-
-      // 3. Upsert lagangilang_hotlines if hotline
-      if (isHotline) {
-        await sql`
-          INSERT INTO lagangilang_hotlines (id, lat, lng, updated_at)
-          VALUES (${spotId}, ${parsedLat}, ${parsedLng}, NOW())
-          ON CONFLICT (id) DO UPDATE SET
-            lat = EXCLUDED.lat,
-            lng = EXCLUDED.lng,
-            updated_at = NOW();
-        `.catch(() => {});
-      }
-
-      // 4. Update data jsonb in lagangilang_pois if row has data
+      // 2. Update lagangilang_pois
       await sql.query(
         `UPDATE lagangilang_pois
          SET data = jsonb_set(
-                      jsonb_set(COALESCE(data, '{}'::jsonb), '{lat}', to_jsonb($2::numeric)),
+                      jsonb_set(data, '{lat}', to_jsonb($2::numeric)),
                       '{lng}', to_jsonb($3::numeric)
                     ),
-             lat = $2,
-             lng = $3,
              updated_at = NOW()
          WHERE id = $1`,
         [spotId, parsedLat, parsedLng]
       ).catch(() => {});
 
-      // 5. Update in lagangilang_global_state
+      // 3. Update in lagangilang_global_state
       const rows = await sql.query(
         `SELECT state_key, payload FROM lagangilang_global_state
          WHERE state_key IN ('pois_and_landmarks', 'hotlines_and_checkpoints')`
@@ -877,7 +826,6 @@ export const touristSpotsService = {
                   lat: parsedLat,
                   lng: parsedLng,
                 },
-                updated_at: new Date().toISOString(),
               };
             }
             return item;
@@ -892,7 +840,9 @@ export const touristSpotsService = {
           }
         }
       }
-    });
+    }).catch((err) => console.warn('Neon direct location update error:', err));
+
+    return updated.find((s) => s.id === spotId);
   },
 
   /**

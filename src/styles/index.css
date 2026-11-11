@@ -1529,47 +1529,45 @@ body {
   width: 32px;
   height: 32px;
   border-radius: 50% 50% 50% 0;
-  background: #F59E0B;
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
   transform: rotate(-45deg);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
-  border: 2px solid #B45309;
+  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.5);
+  border: 2px solid #ffffff;
   transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .poi-marker-pin.pin-tourist {
-  background: #F59E0B !important;
-  border-color: #B45309 !important;
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45) !important;
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.5);
 }
 
 .poi-marker-pin.pin-poi {
-  background: #0284C7 !important;
-  border-color: #0369A1 !important;
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45) !important;
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.55);
 }
 
-/* DENR Environmental Checkpoint & Monitoring Station Pin: Forest Green #15803D */
+/* DENR Environmental Checkpoint & Monitoring Station Pin */
 .poi-marker-pin.pin-checkpoint {
-  background: #15803D !important;
-  border-color: #14532D !important;
-  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.45) !important;
+  background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important;
+  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.7), 0 0 0 2px rgba(74, 222, 128, 0.6) !important;
+  border: 2px solid #ffffff !important;
   animation: pulse-checkpoint 2.5s infinite ease-in-out;
 }
 
-/* Crimson Red Emergency Pin (MDRRMO, Police, Fire, RHU): #DC2626 */
+/* Crimson Red Emergency Pin (MDRRMO, Police, Fire, RHU) */
 .poi-marker-pin.pin-emergency {
-  background: #DC2626 !important;
-  border-color: #991B1B !important;
-  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45) !important;
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.7), 0 0 0 2px rgba(248, 113, 113, 0.6) !important;
+  border: 2px solid #ffffff !important;
   animation: pulse-emergency 2.5s infinite ease-in-out;
 }
 
 @keyframes pulse-emergency {
   0%, 100% {
-    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45), 0 0 0 2px rgba(248, 113, 113, 0.6);
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.7), 0 0 0 2px rgba(248, 113, 113, 0.6);
   }
   50% {
     box-shadow: 0 4px 20px rgba(220, 38, 38, 0.95), 0 0 0 5px rgba(248, 113, 113, 0.3);
@@ -1578,38 +1576,38 @@ body {
 
 /* Emerald Nature & Eco-Tourism Pin */
 .poi-marker-pin.pin-nature {
-  background: #F59E0B !important;
-  border-color: #B45309 !important;
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45) !important;
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.6) !important;
+  border: 2px solid #ffffff !important;
 }
 
-/* Vibrant Gold Tourist Spots & Heritage Sites (Holy Cross Parish, Landmarks): #F59E0B */
+/* Vibrant Gold Tourist Spots & Heritage Sites (Holy Cross Parish, Landmarks) */
 .poi-marker-pin.pin-heritage,
 .poi-marker-pin.pin-tourist {
-  background: #F59E0B !important;
-  border-color: #B45309 !important;
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45) !important;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.75), 0 0 10px rgba(217, 119, 6, 0.4) !important;
+  border: 2px solid #b45309 !important;
 }
 
-/* Warm Terracotta / Orange Cafe & Bakery Pin: #EA580C */
+/* Warm Terracotta / Orange Cafe & Bakery Pin */
 .poi-marker-pin.pin-cafe {
-  background: #EA580C !important;
-  border-color: #9A3412 !important;
-  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.45) !important;
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%) !important;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.65) !important;
+  border: 2px solid #ffffff !important;
 }
 
-/* Sky Blue Transport & Services Pin: #0284C7 */
+/* Sky Blue Transport & Services Pin */
 .poi-marker-pin.pin-service {
-  background: #0284C7 !important;
-  border-color: #0369A1 !important;
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45) !important;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.6);
+  border: 2px solid #ffffff;
 }
 
 /* Emerald Green Bank & ATM Pin */
 .poi-marker-pin.pin-bank {
-  background: #059669 !important;
-  border-color: #047857 !important;
-  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.45) !important;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6);
+  border: 2px solid #ffffff;
 }
 
 @keyframes pulse-checkpoint {

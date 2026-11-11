@@ -653,71 +653,43 @@ export default function App() {
       })
       .catch(() => {});
 
-    // 3. Background cloud synchronization with Neon PostgreSQL via /api/public-state (online only)
-    const apiBase = import.meta.env.VITE_API_BASE || '';
-    fetch(`${apiBase}/api/public-state?t=${Date.now()}`, {
-      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
-        if (data.success && ((data.pois && data.pois.length > 0) || (data.hotlines && data.hotlines.length > 0))) {
-          if (Array.isArray(data.pois) && data.pois.length > 0) {
-            touristSpotsService.saveAllSpots(data.pois);
-          }
-          if (Array.isArray(data.hotlines) && data.hotlines.length > 0) {
-            hotlinesService.saveAll(data.hotlines, false);
-          }
-          const freshHotlines = data.hotlines || hotlinesService.asMapPois();
-          const merged = [...(data.pois || touristSpotsService.getAllSpots())];
+    // 3. Background cloud synchronization with Neon PostgreSQL (online only)
+    touristSpotsService
+      .fetchFromCloud()
+      .then((cloudSpots) => {
+        if (Array.isArray(cloudSpots) && cloudSpots.length > 0) {
+          const freshHotlines = hotlinesService.asMapPois();
+          const mergedCloud = [...cloudSpots];
           freshHotlines.forEach((hp) => {
-            const idx = merged.findIndex((s) => s.id === hp.id);
+            const idx = mergedCloud.findIndex((s) => s.id === hp.id);
             if (idx >= 0) {
-              merged[idx] = { ...hp, ...merged[idx] };
+              const hpTime = new Date(hp.updated_at || 0).getTime();
+              const cloudTime = new Date(mergedCloud[idx].updated_at || 0).getTime();
+              const preferredLat = hpTime > cloudTime ? hp.lat : (mergedCloud[idx].location?.lat ?? mergedCloud[idx].lat ?? hp.lat);
+              const preferredLng = hpTime > cloudTime ? hp.lng : (mergedCloud[idx].location?.lng ?? mergedCloud[idx].lng ?? hp.lng);
+              mergedCloud[idx] = {
+                ...hp,
+                ...mergedCloud[idx],
+                phone: mergedCloud[idx].phone || hp.phone,
+                altPhone: mergedCloud[idx].altPhone || hp.altPhone,
+                operatingHours: mergedCloud[idx].operatingHours || hp.operatingHours,
+                lat: preferredLat,
+                lng: preferredLng,
+                location: {
+                  ...(hp.location || {}),
+                  ...(mergedCloud[idx].location || {}),
+                  lat: preferredLat,
+                  lng: preferredLng,
+                },
+              };
             } else {
-              merged.push(hp);
+              mergedCloud.push(hp);
             }
           });
-          setTouristSpots(merged);
-        } else {
-          // Fallback to fetchFromCloud direct Neon query
-          touristSpotsService.fetchFromCloud().then((cloudSpots) => {
-            if (Array.isArray(cloudSpots) && cloudSpots.length > 0) {
-              const freshHotlines = hotlinesService.asMapPois();
-              const mergedCloud = [...cloudSpots];
-              freshHotlines.forEach((hp) => {
-                const idx = mergedCloud.findIndex((s) => s.id === hp.id);
-                if (idx >= 0) {
-                  mergedCloud[idx] = { ...hp, ...mergedCloud[idx] };
-                } else {
-                  mergedCloud.push(hp);
-                }
-              });
-              setTouristSpots(mergedCloud);
-            }
-          }).catch(() => {});
+          setTouristSpots(mergedCloud);
         }
       })
-      .catch(() => {
-        // Fallback to direct Neon query
-        touristSpotsService.fetchFromCloud().then((cloudSpots) => {
-          if (Array.isArray(cloudSpots) && cloudSpots.length > 0) {
-            const freshHotlines = hotlinesService.asMapPois();
-            const mergedCloud = [...cloudSpots];
-            freshHotlines.forEach((hp) => {
-              const idx = mergedCloud.findIndex((s) => s.id === hp.id);
-              if (idx >= 0) {
-                mergedCloud[idx] = { ...hp, ...mergedCloud[idx] };
-              } else {
-                mergedCloud.push(hp);
-              }
-            });
-            setTouristSpots(mergedCloud);
-          }
-        }).catch(() => {});
-      });
+      .catch(() => {});
 
     // 4. Background synchronization of aligned streetview sequences (Bundled + Neon DB)
     streetviewAlignmentService
@@ -763,51 +735,6 @@ export default function App() {
   useEffect(() => {
     loadTouristSpots();
   }, [loadTouristSpots]);
-
-  // First-time user cloud initialization flow (No hardcoded overwrites)
-  useEffect(() => {
-    let isCancelled = false;
-    async function loadGlobalData() {
-      if (!isOnline) return;
-      try {
-        const apiBase = import.meta.env.VITE_API_BASE || '';
-        const res = await fetch(`${apiBase}/api/public-state?t=${Date.now()}`, {
-          headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' },
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (isCancelled) return;
-
-        if (data.success) {
-          if (Array.isArray(data.pois) && data.pois.length > 0) {
-            touristSpotsService.saveAllSpots(data.pois);
-          }
-          if (Array.isArray(data.hotlines) && data.hotlines.length > 0) {
-            hotlinesService.saveAll(data.hotlines, false);
-          }
-          if ((data.pois && data.pois.length > 0) || (data.hotlines && data.hotlines.length > 0)) {
-            const freshHotlines = data.hotlines || hotlinesService.asMapPois();
-            const merged = [...(data.pois || touristSpotsService.getAllSpots())];
-            freshHotlines.forEach((hp) => {
-              const idx = merged.findIndex((s) => s.id === hp.id);
-              if (idx >= 0) {
-                merged[idx] = { ...hp, ...merged[idx] };
-              } else {
-                merged.push(hp);
-              }
-            });
-            setTouristSpots(merged);
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to load global cloud state from /api/public-state:', e);
-      }
-    }
-    loadGlobalData();
-    return () => {
-      isCancelled = true;
-    };
-  }, [isOnline]);
 
   // Master Real-Time Global Cloud Sync with Neon PostgreSQL (One Global Truth across devices)
   useEffect(() => {
@@ -1110,87 +1037,20 @@ export default function App() {
     }
   };
 
-  // Handle dragging ANY Tourist Spot / POI / Hotline marker directly on the 2D map
+  // Handle dragging a Tourist Spot / POI marker directly on the 2D map
   const handleSpotLocationChange = useCallback(
-    async (spotId, newLat, newLng, spotObj) => {
+    (spotId, newLat, newLng) => {
       const lat = parseFloat(Number(newLat).toFixed(6));
       const lng = parseFloat(Number(newLng).toFixed(6));
-      const spot = spotObj || touristSpots.find((s) => s.id === spotId);
-      const spotName = spot?.name || 'Landmark';
-      const rawCat = (spot?.category || spot?.type || '').toLowerCase();
-      const isHotline =
-        spotId.startsWith('poi_denr_') ||
-        spotId.startsWith('poi_lagangilang_') ||
-        rawCat.includes('hotline') ||
-        rawCat.includes('emergency') ||
-        rawCat.includes('checkpoint') ||
-        rawCat.includes('police') ||
-        rawCat.includes('fire') ||
-        rawCat.includes('rhu') ||
-        rawCat.includes('mdrrmo');
-      const spotType = isHotline ? 'hotline' : (spot?.spotType || spot?.type || 'poi');
-
-      // 1. Immediately update in frontend state without reloading the page
-      setTouristSpots((prev) =>
-        prev.map((s) =>
-          s.id === spotId
-            ? { ...s, location: { ...(s.location || {}), lat, lng }, lat, lng, updated_at: new Date().toISOString() }
-            : s
-        )
-      );
-
-      if (activeTouristSpot?.id === spotId) {
-        setActiveTouristSpot((prev) =>
-          prev ? { ...prev, location: { ...(prev.location || {}), lat, lng }, lat, lng } : null
-        );
-      }
-
-      // Fast local cache updates
+      
+      // Fast granular updates to local and Neon DB
       touristSpotsService.updateSpotLocation(spotId, lat, lng);
       hotlinesService.updateCoordinates(spotId, { lat, lng });
 
-      // Haptic feedback for touch devices
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        try {
-          navigator.vibrate([30, 20, 30]);
-        } catch (_) {}
-      }
-
-      // 2. Immediately dispatch authenticated API request to /api/update-pin-location
-      const adminToken = sessionStorage.getItem('lagangilang_admin_token') || 'authenticated-admin';
-      const apiBase = import.meta.env.VITE_API_BASE || '';
-
-      try {
-        const res = await fetch(`${apiBase}/api/update-pin-location`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-token': adminToken,
-          },
-          body: JSON.stringify({
-            id: spotId,
-            type: spotType,
-            lat: lat,
-            lng: lng,
-          }),
-        });
-
-        if (!res.ok) {
-          throw new Error(`Database update failed with HTTP ${res.status}`);
-        }
-
-        showToast(`📍 Saved new position for ${spotName} globally`);
-      } catch (err) {
-        console.error('Failed to sync pin location:', err);
-        // Direct Neon DB fallback
-        try {
-          await touristSpotsService.updateSpotLocationDirectNeon(spotId, lat, lng);
-          showToast(`📍 Saved new position for ${spotName} globally (Direct DB)`);
-        } catch (dbErr) {
-          console.error('Direct DB persistence failed:', dbErr);
-          alert('⚠️ Could not save location to cloud database. Please verify your connection.');
-        }
-      }
+      const updatedSpots = touristSpots.map((s) =>
+        s.id === spotId ? { ...s, location: { ...(s.location || {}), lat, lng }, lat, lng, updated_at: new Date().toISOString() } : s
+      );
+      setTouristSpots(updatedSpots);
 
       // Keep active routing destination in sync if user dragged the destination pin
       if (routeDestination && typeof routeDestination[0] === 'number' && typeof routeDestination[1] === 'number') {
@@ -1215,6 +1075,23 @@ export default function App() {
           }
         }
       }
+
+      if (activeTouristSpot?.id === spotId) {
+        setActiveTouristSpot((prev) =>
+          prev ? { ...prev, location: { ...(prev.location || {}), lat, lng }, lat, lng } : null
+        );
+      }
+
+      // Haptic feedback for touch devices
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try {
+          navigator.vibrate([30, 20, 30]);
+        } catch (_) {}
+      }
+
+      const spot = touristSpots.find((s) => s.id === spotId);
+      const spotName = spot?.name || 'Landmark';
+      showToast(`📍 ${spotName} moved to [${lat.toFixed(5)}, ${lng.toFixed(5)}] — Synced to Cloud`);
 
       // Real-time route recalculation if current origin or destination was pointing to this moved spot
       const oldLat = spot?.location?.lat ?? spot?.lat;

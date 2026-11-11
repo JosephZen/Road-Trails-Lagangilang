@@ -445,34 +445,25 @@ class OfflineCacheService {
       line-height: 1;
     }
     .pin-tourist {
-      background: #f59e0b !important;
-      border-color: #b45309 !important;
-      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45) !important;
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+      border-color: #ffd700 !important;
+      box-shadow: 0 0 14px rgba(245, 158, 11, 0.7) !important;
     }
     .pin-checkpoint {
-      background: #15803d !important;
-      border-color: #14532d !important;
-      box-shadow: 0 4px 14px rgba(21, 128, 61, 0.45) !important;
+      background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important;
+      border-color: #4ade80 !important;
     }
     .pin-emergency {
-      background: #dc2626 !important;
-      border-color: #991b1b !important;
-      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45) !important;
-    }
-    .pin-cafe {
-      background: #ea580c !important;
-      border-color: #9a3412 !important;
-      box-shadow: 0 4px 14px rgba(234, 88, 12, 0.45) !important;
+      background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important;
+      border-color: #f87171 !important;
     }
     .pin-nature {
-      background: #f59e0b !important;
-      border-color: #b45309 !important;
-      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45) !important;
+      background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important;
+      border-color: #5eead4 !important;
     }
     .pin-service {
-      background: #0284c7 !important;
-      border-color: #0369a1 !important;
-      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45) !important;
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+      border-color: #7dd3fc !important;
     }
 
     /* MapLibre Popup Styles */
@@ -740,50 +731,14 @@ class OfflineCacheService {
     }), 'bottom-right');
     document.getElementById('all-count').textContent = spots.length;
 
-    // Helper: determine pin icon, class, label, and category group adhering to Canonical Color Palette
+    // Helper: determine pin icon, class, label, and category group
     function getVisual(spot) {
       const name = (spot.name || '').toLowerCase();
-      const cat = (spot.category || spot.type || '').toLowerCase();
+      const cat = (spot.category || '').toLowerCase();
       const spotType = (spot.spotType || spot.type || '').toLowerCase();
       const customIcon = spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon;
 
-      // 1. Government & Emergency Hotlines -> Crimson Red #DC2626
-      if (
-        cat.includes('government') ||
-        cat.includes('hotline') ||
-        cat.includes('police') ||
-        cat.includes('pnp') ||
-        cat.includes('bfp') ||
-        cat.includes('rhu') ||
-        cat.includes('mdrrmo') ||
-        cat.includes('rescue') ||
-        cat.includes('emergency') ||
-        cat.includes('fire') ||
-        cat.includes('health') ||
-        name.includes('police') ||
-        name.includes('pnp') ||
-        name.includes('bfp') ||
-        name.includes('rhu') ||
-        name.includes('mdrrmo') ||
-        name.includes('disaster') ||
-        name.includes('fire station')
-      ) {
-        let ic = '🚨';
-        if (name.includes('mdrrmo') || cat.includes('rescue')) ic = '🚑';
-        else if (name.includes('police') || cat.includes('pnp')) ic = '👮';
-        else if (name.includes('fire') || cat.includes('bfp')) ic = '🚒';
-        else if (name.includes('health') || name.includes('rhu')) ic = '🏥';
-        return {
-          pinClass: 'pin-emergency',
-          badgeClass: 'spot-badge-emergency',
-          icon: customIcon || ic,
-          categoryGroup: '🚨 Emergency Units & Hotlines',
-          label: spot.category || 'Government / Emergency'
-        };
-      }
-
-      // 2. DENR Environmental Checkpoints -> Forest Green #15803D
-      if (spot.isCheckpoint || cat.includes('checkpoint') || cat.includes('denr') || name.includes('checkpoint') || name.includes('denr')) {
+      if (spot.isCheckpoint || cat.includes('checkpoint') || cat.includes('denr') || name.includes('checkpoint')) {
         return {
           pinClass: 'pin-checkpoint',
           badgeClass: 'spot-badge-checkpoint',
@@ -792,85 +747,68 @@ class OfflineCacheService {
           label: spot.category || 'DENR Checkpoint'
         };
       }
+      if (cat.includes('emergency') || cat.includes('police') || cat.includes('rescue') || cat.includes('fire') || cat.includes('medical') || name.includes('police') || name.includes('mdrrmo')) {
+        let ic = '🚨';
+        if (name.includes('mdrrmo') || cat.includes('rescue')) ic = '🚑';
+        else if (name.includes('police')) ic = '👮';
+        else if (name.includes('fire')) ic = '🚒';
+        else if (name.includes('health') || name.includes('rhu')) ic = '🏥';
+        return {
+          pinClass: 'pin-emergency',
+          badgeClass: 'spot-badge-emergency',
+          icon: customIcon || ic,
+          categoryGroup: '🚨 Emergency Units & Stations',
+          label: spot.category || 'Emergency Unit'
+        };
+      }
 
-      // 3. Tourist Spots, Heritage, Culture, Nature & Religious Sites -> Gold / Amber #F59E0B
-      if (
-        cat.includes('tourist') ||
-        cat.includes('heritage') ||
-        cat.includes('religious') ||
-        cat.includes('church') ||
-        cat.includes('parish') ||
-        cat.includes('spiritual') ||
-        cat.includes('history') ||
-        cat.includes('nature') ||
-        cat.includes('cave') ||
-        cat.includes('river') ||
-        cat.includes('viewpoint') ||
-        cat.includes('adventure') ||
-        cat.includes('spring') ||
-        cat.includes('waterfall') ||
-        name.includes('holy cross') ||
-        name.includes('church') ||
-        name.includes('parish') ||
-        name.includes('cave') ||
-        name.includes('river') ||
-        name.includes('dam') ||
-        name.includes('falls') ||
-        spotType === 'tourist_spot'
-      ) {
+      // Check if spot is a POI (explicitly marked as POI, or public facility/service)
+      const isPoi = spotType === 'poi' || (spotType !== 'tourist_spot' && (cat.includes('school') || cat.includes('campus') || cat.includes('service') || cat.includes('terminal') || cat.includes('gas') || cat.includes('convenience') || cat.includes('market')));
+
+      if (!isPoi && (cat.includes('nature') || cat.includes('river') || cat.includes('cave') || cat.includes('spring') || cat.includes('viewpoint') || cat.includes('adventure') || cat.includes('waterfall'))) {
+        let ic = '🏞️';
+        if (cat.includes('cave') || name.includes('cave')) ic = '🧗';
+        else if (cat.includes('spring') || name.includes('river')) ic = '🌊';
+        return {
+          pinClass: 'pin-nature',
+          badgeClass: 'spot-badge-tourist',
+          icon: customIcon || ic,
+          categoryGroup: '🏞️ Tourist Spots & Nature Trails',
+          label: spot.category || 'Nature & Eco-Tourism'
+        };
+      }
+      if (!isPoi && (cat.includes('heritage') || cat.includes('religious') || cat.includes('church') || cat.includes('civic') || cat.includes('tourist') || spotType === 'tourist_spot')) {
         let ic = '🏛️';
-        if (cat.includes('religious') || name.includes('church') || name.includes('parish') || name.includes('holy cross')) ic = '⛪';
-        else if (cat.includes('cave') || name.includes('cave')) ic = '🧗';
-        else if (cat.includes('spring') || name.includes('river') || name.includes('waterfall')) ic = '🌊';
-        else if (cat.includes('viewpoint')) ic = '🌄';
+        if (cat.includes('religious') || name.includes('church') || name.includes('parish')) ic = '⛪';
         else if (name.includes('university') || name.includes('school')) ic = '🏫';
         return {
           pinClass: 'pin-tourist',
           badgeClass: 'spot-badge-tourist',
           icon: customIcon || ic,
-          categoryGroup: '🏛️ Tourist Spots & Heritage Landmarks',
-          label: spot.category || 'Tourist Spot / Heritage'
+          categoryGroup: '🏛️ Heritage & Campus Landmarks',
+          label: spot.category || 'Tourist & Heritage'
         };
       }
 
-      // 4. Cafes, Bakeries & Eateries -> Terracotta / Orange #EA580C
-      if (
-        cat.includes('cafe') ||
-        cat.includes('bakery') ||
-        cat.includes('coffee') ||
-        cat.includes('eatery') ||
-        cat.includes('carinderia') ||
-        cat.includes('kape') ||
-        name.includes('cafe') ||
-        name.includes('bakery') ||
-        name.includes('coffee') ||
-        name.includes('kape')
-      ) {
-        return {
-          pinClass: 'pin-cafe',
-          badgeClass: 'spot-badge-service',
-          icon: customIcon || '☕',
-          categoryGroup: '☕ Cafes & Eateries',
-          label: spot.category || 'Cafe & Bakery'
-        };
-      }
-
-      // 5. Default: Terminals & Commercial Services -> Sky Blue #0284C7
       let sIcon = '📍';
       if (cat.includes('school') || cat.includes('campus') || name.includes('university') || name.includes('school')) sIcon = '🏫';
-      else if (cat.includes('transport') || cat.includes('terminal') || name.includes('terminal')) sIcon = '🚌';
-      else if (cat.includes('gas') || name.includes('gas') || cat.includes('fuel')) sIcon = '⛽';
+      else if (cat.includes('transport') || cat.includes('terminal')) sIcon = '🚌';
+      else if (cat.includes('gas') || cat.includes('fuel')) sIcon = '⛽';
       else if (name.includes('water')) sIcon = '💧';
-      else if (cat.includes('store') || cat.includes('market') || cat.includes('convenience') || cat.includes('commercial')) sIcon = '🛒';
-      else if (cat.includes('hotel')) sIcon = '🏨';
+      else if (cat.includes('store') || cat.includes('market') || cat.includes('commercial') || cat.includes('convenience')) sIcon = '🛒';
+      else if (cat.includes('cafe') || cat.includes('bakery')) sIcon = '☕';
+
+      // For school/campus POIs, ensure an appropriate school icon rather than classical heritage temple
+      const chosenIcon = ((cat.includes('school') || cat.includes('campus') || name.includes('university')) && (!customIcon || customIcon === '🏛️'))
+        ? '🏫'
+        : (customIcon || sIcon);
 
       return {
         pinClass: 'pin-service',
-        badgeClass: 'spot-badge-service',
-        icon: customIcon || sIcon,
-        categoryGroup: '🏪 Commercial & Public Services',
-        label: spot.category || 'Commercial / Public Service'
-      };
+        badgeClass: 'spot-badge-poi',
+        icon: chosenIcon,
+        categoryGroup: '🏪 Local Services, Terminals & POIs',
+        label: spot.category || 'Local Service & POI'
       };
     }
 
