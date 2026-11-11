@@ -814,6 +814,217 @@ app.delete('/api/aligned-sequences/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// ============ Global Authoritative Pin Location & Public State ============
+const NEON_DB_URL =
+  process.env.VITE_NEON_DATABASE_URL ||
+  process.env.NEON_DATABASE_URL ||
+  'postgresql://neondb_owner:npg_lHhZV7o5xvMt@ep-silent-heart-azsxtkkj-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+
+app.post('/api/update-pin-location', async (req, res) => {
+  try {
+    const { id, type, lat, lng } = req.body;
+    if (!id || lat === undefined || lng === undefined) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const latNum = parseFloat(Number(lat).toFixed(6));
+    const lngNum = parseFloat(Number(lng).toFixed(6));
+
+    const { neon } = require('@neondatabase/serverless');
+    const sql = neon(NEON_DB_URL);
+
+    if (type === 'hotline') {
+      await sql`
+        INSERT INTO lagangilang_hotlines (id, lat, lng, updated_at)
+        VALUES (${id}, ${latNum}, ${lngNum}, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          lat = EXCLUDED.lat,
+          lng = EXCLUDED.lng,
+          updated_at = NOW();
+      `;
+    } else {
+      await sql`
+        INSERT INTO lagangilang_pois (id, lat, lng, updated_at)
+        VALUES (${id}, ${latNum}, ${lngNum}, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          lat = EXCLUDED.lat,
+          lng = EXCLUDED.lng,
+          updated_at = NOW();
+      `;
+    }
+
+    try {
+      await sql`
+        UPDATE public.tourist_spots
+        SET latitude = ${latNum}, longitude = ${lngNum}, updated_at = NOW()
+        WHERE id = ${id};
+      `;
+    } catch (_) {}
+
+    try {
+      await sql.query(
+        `UPDATE lagangilang_pois
+         SET data = jsonb_set(
+                      jsonb_set(COALESCE(data, '{}'::jsonb), '{lat}', to_jsonb($2::numeric)),
+                      '{lng}', to_jsonb($3::numeric)
+                    ),
+             lat = $2,
+             lng = $3,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [id, latNum, lngNum]
+      );
+    } catch (_) {}
+
+    try {
+      const rows = await sql.query(
+        `SELECT state_key, payload FROM lagangilang_global_state
+         WHERE state_key IN ('pois_and_landmarks', 'hotlines_and_checkpoints')`
+      );
+
+      for (const row of rows) {
+        if (Array.isArray(row.payload)) {
+          let updated = false;
+          const newList = row.payload.map((item) => {
+            if (item.id === id) {
+              updated = true;
+              return {
+                ...item,
+                lat: latNum,
+                lng: lngNum,
+                location: {
+                  ...(item.location || {}),
+                  lat: latNum,
+                  lng: lngNum,
+                },
+                updated_at: new Date().toISOString(),
+              };
+            }
+            return item;
+          });
+
+          if (updated) {
+            await sql.query(
+              `UPDATE lagangilang_global_state
+               SET payload = $2, updated_at = NOW()
+               WHERE state_key = $1`,
+              [row.state_key, JSON.stringify(newList)]
+            );
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Also update local tourist_spots.json file on disk if it matches
+    try {
+      const localSpots = readLocalSpots();
+      const updatedLocal = localSpots.map((s) => {
+        if (s.id === id) {
+          return {
+            ...s,
+            location: { ...(s.location || {}), lat: latNum, lng: lngNum },
+            lat: latNum,
+            lng: lngNum,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return s;
+      });
+      writeLocalSpots(updatedLocal);
+    } catch (_) {}
+
+    res.json({ success: true, id, type, lat: latNum, lng: lngNum });
+  } catch (err) {
+    console.error('Express /api/update-pin-location error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/public-state', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  try {
+    const { neon } = require('@neondatabase/serverless');
+    const sql = neon(NEON_DB_URL);
+
+    let stateRows = [];
+    try {
+      stateRows = await sql`
+        SELECT state_key, payload, updated_at
+        FROM lagangilang_global_state
+        WHERE state_key IN ('pois_and_landmarks', 'hotlines_and_checkpoints')
+      `;
+    } catch (_) {}
+
+    let rawPois = [];
+    let rawHotlines = [];
+
+    stateRows.forEach((r) => {
+      if (r.state_key === 'pois_and_landmarks' && Array.isArray(r.payload)) rawPois = r.payload;
+      if (r.state_key === 'hotlines_and_checkpoints' && Array.isArray(r.payload)) rawHotlines = r.payload;
+    });
+
+    const overrides = new Map();
+    try {
+      const poiRows = await sql`SELECT id, lat, lng, updated_at FROM lagangilang_pois WHERE lat IS NOT NULL AND lng IS NOT NULL`;
+      poiRows.forEach((r) => overrides.set(r.id, { lat: parseFloat(r.lat), lng: parseFloat(r.lng), updated_at: r.updated_at }));
+    } catch (_) {}
+
+    try {
+      const tsRows = await sql`SELECT id, latitude, longitude, updated_at FROM tourist_spots WHERE latitude IS NOT NULL AND longitude IS NOT NULL`;
+      tsRows.forEach((r) => {
+        const existing = overrides.get(r.id);
+        const tsTime = new Date(r.updated_at || 0).getTime();
+        const exTime = new Date(existing?.updated_at || 0).getTime();
+        if (!existing || tsTime >= exTime) {
+          overrides.set(r.id, { lat: parseFloat(r.latitude), lng: parseFloat(r.longitude), updated_at: r.updated_at });
+        }
+      });
+    } catch (_) {}
+
+    try {
+      const hlRows = await sql`SELECT id, lat, lng, updated_at FROM lagangilang_hotlines WHERE lat IS NOT NULL AND lng IS NOT NULL`;
+      hlRows.forEach((r) => overrides.set(r.id, { lat: parseFloat(r.lat), lng: parseFloat(r.lng), updated_at: r.updated_at }));
+    } catch (_) {}
+
+    const finalPois = rawPois.map((p) => {
+      const ov = overrides.get(p.id);
+      if (ov) {
+        return {
+          ...p,
+          lat: ov.lat,
+          lng: ov.lng,
+          location: { ...(p.location || {}), lat: ov.lat, lng: ov.lng },
+          updated_at: ov.updated_at || p.updated_at,
+        };
+      }
+      return p;
+    });
+
+    const finalHotlines = rawHotlines.map((h) => {
+      const ov = overrides.get(h.id);
+      if (ov) {
+        return {
+          ...h,
+          lat: ov.lat,
+          lng: ov.lng,
+          location: { ...(h.location || {}), lat: ov.lat, lng: ov.lng },
+          updated_at: ov.updated_at || h.updated_at,
+        };
+      }
+      return h;
+    });
+
+    res.json({
+      success: true,
+      pois: finalPois,
+      hotlines: finalHotlines,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Express /api/public-state error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============ Start Server ============
 async function startServer() {
   if (pgPool) {

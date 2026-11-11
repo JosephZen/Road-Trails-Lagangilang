@@ -237,8 +237,15 @@ class HotlinesService {
       };
       this.saveAll(list);
 
-      // Fast per-item location update to Neon PostgreSQL
+      // Fast per-item location update via /api/update-pin-location
       const apiBase = import.meta.env.VITE_API_BASE || '';
+      fetch(`${apiBase}/api/update-pin-location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, type: 'hotline', lat: parsedLat, lng: parsedLng }),
+      }).catch((e) => console.warn('Hotline update-pin-location sync warning:', e));
+
+      // Fast per-item location update to Neon PostgreSQL
       fetch(`${apiBase}/api/item-location`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -253,9 +260,20 @@ class HotlinesService {
         const NEON_URL = (customUrl && customUrl.includes('ep-silent-heart-azsxtkkj')) ? customUrl
           : (envUrl && envUrl.includes('ep-silent-heart-azsxtkkj')) ? envUrl
           : fallbackUrl;
-        import('@neondatabase/serverless').then(({ neon }) => {
+        import('@neondatabase/serverless').then(async ({ neon }) => {
           const sql = neon(NEON_URL);
-          sql`
+          // 1. Upsert lagangilang_hotlines
+          await sql`
+            INSERT INTO lagangilang_hotlines (id, lat, lng, updated_at)
+            VALUES (${id}, ${parsedLat}, ${parsedLng}, NOW())
+            ON CONFLICT (id) DO UPDATE SET
+              lat = EXCLUDED.lat,
+              lng = EXCLUDED.lng,
+              updated_at = NOW();
+          `.catch(() => {});
+
+          // 2. Update public.tourist_spots
+          await sql`
             UPDATE public.tourist_spots
             SET latitude = ${parsedLat}, longitude = ${parsedLng}, updated_at = NOW()
             WHERE id = ${id}
