@@ -1,4 +1,8 @@
 import globalSyncService, { GLOBAL_STATE_KEYS } from './globalSyncService';
+import bundledAlignedSequences from '../data/mapillary_aligned_sequences.json';
+import bundledBridges from '../data/mapillary_sequence_bridges.json';
+import bundledExcludedSequences from '../data/mapillary_excluded_sequences.json';
+import bundledExcludedImages from '../data/mapillary_excluded_images.json';
 
 /**
  * Streetview Line Alignment & Bending Service
@@ -39,7 +43,9 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
 }
 
 // Default excluded sequences (e.g. erratic/unwanted traces like the school-pond campus line)
-const DEFAULT_EXCLUDED_SEQUENCES = ['daygfFRm94o2xOpPQNsG0l', '6ILqHDUO8mdl7iJNbfezgn'];
+const DEFAULT_EXCLUDED_SEQUENCES = Array.isArray(bundledExcludedSequences) && bundledExcludedSequences.length > 0
+  ? bundledExcludedSequences
+  : ['daygfFRm94o2xOpPQNsG0l', '6ILqHDUO8mdl7iJNbfezgn'];
 
 class StreetviewAlignmentService {
   constructor() {
@@ -69,10 +75,11 @@ class StreetviewAlignmentService {
   loadLocal() {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
-      return data ? JSON.parse(data) : {};
+      const local = data ? JSON.parse(data) : {};
+      return { ...(bundledAlignedSequences || {}), ...local };
     } catch (e) {
       console.warn('Failed to load aligned sequences from localStorage:', e);
-      return {};
+      return { ...(bundledAlignedSequences || {}) };
     }
   }
 
@@ -89,7 +96,7 @@ class StreetviewAlignmentService {
       const data = localStorage.getItem(EXCLUDED_STORAGE_KEY);
       if (data) {
         const parsed = JSON.parse(data);
-        if (Array.isArray(parsed)) return new Set(parsed);
+        if (Array.isArray(parsed)) return new Set([...DEFAULT_EXCLUDED_SEQUENCES, ...parsed]);
       }
       return new Set(DEFAULT_EXCLUDED_SEQUENCES);
     } catch (e) {
@@ -114,12 +121,12 @@ class StreetviewAlignmentService {
       const data = localStorage.getItem(EXCLUDED_IMAGES_STORAGE_KEY);
       if (data) {
         const parsed = JSON.parse(data);
-        if (Array.isArray(parsed)) return new Set(parsed);
+        if (Array.isArray(parsed)) return new Set([...(bundledExcludedImages || []), ...parsed]);
       }
-      return new Set();
+      return new Set(bundledExcludedImages || []);
     } catch (e) {
       console.warn('Failed to load excluded images from localStorage:', e);
-      return new Set();
+      return new Set(bundledExcludedImages || []);
     }
   }
 
@@ -260,10 +267,11 @@ class StreetviewAlignmentService {
   loadSequenceBridgesLocal() {
     try {
       const data = localStorage.getItem(SEQUENCE_BRIDGES_STORAGE_KEY);
-      return data ? JSON.parse(data) : {};
+      const local = data ? JSON.parse(data) : {};
+      return { ...(bundledBridges || {}), ...local };
     } catch (e) {
       console.warn('Failed to load sequence bridges from localStorage:', e);
-      return {};
+      return { ...(bundledBridges || {}) };
     }
   }
 

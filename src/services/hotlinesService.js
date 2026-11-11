@@ -25,9 +25,9 @@ export const INITIAL_HOTLINES_AND_CHECKPOINTS = [
     description: 'Timber & Wildlife Monitoring, Watershed Protection, Mountain Trail Registration & Environmental Safety Inspection',
     operatingHours: '24/7 Official Monitoring & Registration Desk',
     location: {
-      lat: 17.60386,
-      lng: 120.741372,
-      address: 'Abra-Kalinga National Highway, Poblacion, Lagangilang, Abra',
+      lat: 17.592176,
+      lng: 120.787685,
+      address: 'San Isidro, Lagangilang, Abra, Philippines',
     },
     notes: 'Required registration point for hikers traversing upland eco-trails and municipal forest corridors.',
     spotType: 'poi',

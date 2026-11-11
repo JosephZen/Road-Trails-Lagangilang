@@ -1,7 +1,19 @@
 import { neon } from '@neondatabase/serverless';
+import fallbackPois from '../src/data/tourist_spots.json' with { type: 'json' };
+import fallbackAlignedSequences from '../src/data/mapillary_aligned_sequences.json' with { type: 'json' };
+import fallbackBridges from '../src/data/mapillary_sequence_bridges.json' with { type: 'json' };
+import fallbackExcludedSequences from '../src/data/mapillary_excluded_sequences.json' with { type: 'json' };
+import fallbackExcludedImages from '../src/data/mapillary_excluded_images.json' with { type: 'json' };
 
 export const config = {
   runtime: 'edge',
+};
+
+const fallbackTrails = {
+  alignedSequences: fallbackAlignedSequences || {},
+  sequenceBridges: fallbackBridges || {},
+  excludedSequences: fallbackExcludedSequences || [],
+  excludedImages: fallbackExcludedImages || [],
 };
 
 const ACTIVE_NEON_URL =
@@ -83,10 +95,29 @@ export default async function handler(req) {
         }
       );
     } catch (e) {
+      console.warn('[GlobalState] Database read error, serving fallback state:', e.message);
+      const url = new URL(req.url);
+      const requestedKey = url.searchParams.get('key');
+      const fallbackMap = {
+        pois_and_landmarks: fallbackPois,
+        trail_alignments_and_bridges: fallbackTrails,
+      };
+
+      const stateMap = requestedKey
+        ? { [requestedKey]: fallbackMap[requestedKey] || null }
+        : fallbackMap;
+
       return new Response(
-        JSON.stringify({ success: false, error: e.message }),
+        JSON.stringify({
+          success: true,
+          fallback: true,
+          state: stateMap,
+          rowsCount: Object.keys(stateMap).length,
+          warning: e.message,
+          timestamp: new Date().toISOString(),
+        }),
         {
-          status: 500,
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );

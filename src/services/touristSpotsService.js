@@ -347,6 +347,26 @@ export const touristSpotsService = {
               s.spotType = seedMatch.spotType || 'tourist_spot';
               changed = true;
             }
+            // Auto-heal coordinates if device has older initial un-dragged seed coordinates
+            if (seedMatch.lat && seedMatch.lng) {
+              const seedTime = new Date(seedMatch.updated_at || '2026-11-10').getTime();
+              const localTime = new Date(s.updated_at || '2026-10-01').getTime();
+              if (seedTime >= localTime || !s.lat || !s.location?.lat) {
+                s.lat = seedMatch.lat;
+                s.lng = seedMatch.lng;
+                if (!s.location) s.location = {};
+                s.location.lat = seedMatch.lat;
+                s.location.lng = seedMatch.lng;
+                if (seedMatch.location?.address) s.location.address = seedMatch.location.address;
+                changed = true;
+              }
+            }
+            if (seedMatch.connected360 && (!s.connected360 || !s.connected360.targetId)) {
+              if (seedMatch.connected360.targetId) {
+                s.connected360 = seedMatch.connected360;
+                changed = true;
+              }
+            }
           } else {
             // Normalize custom spots
             const normalized = normalizeCategoryName(s.category);

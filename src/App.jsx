@@ -45,8 +45,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState('spots'); // 'spots' | 'routing'
   
-  // Tourist Spots & POI State
-  const [touristSpots, setTouristSpots] = useState([]);
+  // Tourist Spots & POI State (Offline-first initialized with all 45 authoritative spots)
+  const [touristSpots, setTouristSpots] = useState(() => touristSpotsService.getAllSpots());
   const [activeTouristSpot, setActiveTouristSpot] = useState(null);
   const [spotFilter, setSpotFilter] = useState('all'); // 'all' | 'tourist_spot' | 'poi'
   const [barangayFilter, setBarangayFilter] = useState('all'); // 'all' | specific barangay
@@ -780,7 +780,7 @@ export default function App() {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.pois && Array.isArray(data.pois) && data.pois.length > 0) {
+          if (data.pois && Array.isArray(data.pois) && data.pois.length >= 40) {
             touristSpotsService.saveAllSpots(data.pois, false);
             setTouristSpots(data.pois);
           }
