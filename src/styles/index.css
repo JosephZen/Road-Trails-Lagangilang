@@ -1539,29 +1539,38 @@ body {
   transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.poi-marker-pin.pin-tourist {
-  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
-  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.5);
+.poi-marker-pin.pin-tourist,
+.poi-marker-pin.pin-heritage {
+  background: #f59e0b !important;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.75), 0 0 10px rgba(217, 119, 6, 0.4) !important;
+  border: 2px solid #b45309 !important;
 }
 
-.poi-marker-pin.pin-poi {
-  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.55);
+.poi-marker-pin.pin-poi,
+.poi-marker-pin.pin-service,
+.poi-marker-pin.pin-terminal,
+.poi-marker-pin.pin-commercial {
+  background: #0284c7 !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.6) !important;
+  border: 2px solid #0369a1 !important;
 }
 
 /* DENR Environmental Checkpoint & Monitoring Station Pin */
-.poi-marker-pin.pin-checkpoint {
-  background: linear-gradient(135deg, #15803d 0%, #166534 100%) !important;
-  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.7), 0 0 0 2px rgba(74, 222, 128, 0.6) !important;
-  border: 2px solid #ffffff !important;
+.poi-marker-pin.pin-checkpoint,
+.poi-marker-pin.pin-denr {
+  background: #15803d !important;
+  box-shadow: 0 4px 14px rgba(21, 128, 61, 0.7), 0 0 0 2px rgba(74, 222, 128, 0.6) !important;
+  border: 2px solid #14532d !important;
   animation: pulse-checkpoint 2.5s infinite ease-in-out;
 }
 
-/* Crimson Red Emergency Pin (MDRRMO, Police, Fire, RHU) */
-.poi-marker-pin.pin-emergency {
-  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%) !important;
+/* Crimson Red Emergency Pin (MDRRMO, Police, Fire, RHU, Municipal & Barangay Halls) */
+.poi-marker-pin.pin-emergency,
+.poi-marker-pin.pin-government,
+.poi-marker-pin.pin-hotline {
+  background: #dc2626 !important;
   box-shadow: 0 4px 14px rgba(220, 38, 38, 0.7), 0 0 0 2px rgba(248, 113, 113, 0.6) !important;
-  border: 2px solid #ffffff !important;
+  border: 2px solid #991b1b !important;
   animation: pulse-emergency 2.5s infinite ease-in-out;
 }
 
@@ -1576,38 +1585,24 @@ body {
 
 /* Emerald Nature & Eco-Tourism Pin */
 .poi-marker-pin.pin-nature {
-  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important;
-  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.6) !important;
-  border: 2px solid #ffffff !important;
-}
-
-/* Vibrant Gold Tourist Spots & Heritage Sites (Holy Cross Parish, Landmarks) */
-.poi-marker-pin.pin-heritage,
-.poi-marker-pin.pin-tourist {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.75), 0 0 10px rgba(217, 119, 6, 0.4) !important;
+  background: #f59e0b !important;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.75) !important;
   border: 2px solid #b45309 !important;
 }
 
 /* Warm Terracotta / Orange Cafe & Bakery Pin */
-.poi-marker-pin.pin-cafe {
-  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%) !important;
+.poi-marker-pin.pin-cafe,
+.poi-marker-pin.pin-eatery {
+  background: #ea580c !important;
   box-shadow: 0 4px 12px rgba(234, 88, 12, 0.65) !important;
-  border: 2px solid #ffffff !important;
-}
-
-/* Sky Blue Transport & Services Pin */
-.poi-marker-pin.pin-service {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.6);
-  border: 2px solid #ffffff;
+  border: 2px solid #9a3412 !important;
 }
 
 /* Emerald Green Bank & ATM Pin */
 .poi-marker-pin.pin-bank {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6);
-  border: 2px solid #ffffff;
+  background: #059669 !important;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.65) !important;
+  border: 2px solid #047857 !important;
 }
 
 @keyframes pulse-checkpoint {

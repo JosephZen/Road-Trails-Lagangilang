@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PseudoImage from './PseudoImage';
 import { normalizeCategoryName } from '../services/touristSpotsService';
+import { getPinTheme } from '../utils/poiIconRegistry';
 
 /**
  * Floating Street View Card for Tourist Spots & POIs.
@@ -58,6 +59,7 @@ export default function TouristSpotStreetViewCard({
 
   const isVerified = spot.sync_status === 'verified';
   const isPoi = (spot.spotType || spot.type) === 'poi';
+  const spotTheme = getPinTheme(spot);
   const categoryName = normalizeCategoryName(spot.category);
   const displayIcon = spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon || (isPoi ? '🏪' : '⭐');
 
@@ -88,7 +90,7 @@ export default function TouristSpotStreetViewCard({
           borderRadius: 'var(--radius-full, 9999px)',
           boxShadow: '0 8px 28px rgba(0,0,0,0.6)',
           backdropFilter: 'blur(16px)',
-          border: isPoi ? '1.5px solid rgba(6, 214, 160, 0.45)' : '1.5px solid rgba(255, 215, 0, 0.45)',
+          border: `1.5px solid ${spotTheme.border || spotTheme.color || 'rgba(6, 214, 160, 0.45)'}`,
           animation: 'fadeInUp 0.25s ease-out',
           userSelect: 'none',
         }}
@@ -182,7 +184,7 @@ export default function TouristSpotStreetViewCard({
         borderRadius: 'var(--radius-lg, 12px)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
         backdropFilter: 'blur(16px)',
-        border: isPoi ? '1.5px solid rgba(6, 214, 160, 0.45)' : '1.5px solid rgba(255, 215, 0, 0.45)',
+        border: `1.5px solid ${spotTheme.border || spotTheme.color || 'rgba(6, 214, 160, 0.45)'}`,
         animation: 'fadeInUp 0.25s ease-out',
         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
@@ -206,9 +208,9 @@ export default function TouristSpotStreetViewCard({
                 textTransform: 'uppercase',
                 padding: '1px 6px',
                 borderRadius: '4px',
-                background: isPoi ? 'rgba(6, 214, 160, 0.2)' : 'rgba(255, 215, 0, 0.2)',
-                color: isPoi ? '#34d399' : '#ffd700',
-                border: isPoi ? '1px solid rgba(6, 214, 160, 0.4)' : '1px solid rgba(255, 215, 0, 0.4)',
+                background: `${spotTheme.color || '#34d399'}22`,
+                color: spotTheme.color || (isPoi ? '#34d399' : '#ffd700'),
+                border: `1px solid ${spotTheme.border || spotTheme.color || 'rgba(6, 214, 160, 0.4)'}`,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '3px',

@@ -8,7 +8,7 @@ import { normalizeCategoryName, getDefaultCategoryIcon } from '../services/touri
 import { streetviewAlignmentService } from '../services/streetviewAlignmentService';
 import { calculateAdvancedETAs, getRouteElevationProfile } from '../services/routeConditionService';
 import offlineMapManager from '../services/offlineMapManager';
-import { getPoiVisualConfig } from '../utils/poiIconRegistry';
+import { getPoiVisualConfig, getPinTheme } from '../utils/poiIconRegistry';
 
 // MapLibre GL worker initialization
 setWorkerUrl(maplibreWorkerUrl);
@@ -1971,6 +1971,7 @@ export default function MapView({
       if (lat === undefined || lng === undefined) return;
 
       const visual = getPoiVisualConfig(spot);
+      const theme = visual.theme || getPinTheme(spot);
       const cleanCategory = spot.category || visual.label;
       const canDrag = !!isAdmin && !!isDraggable;
 
@@ -1994,9 +1995,13 @@ export default function MapView({
       el.dataset.poiId = spot.id;
       el.title = canDrag ? `${spot.name} • Drag to reposition` : spot.name;
 
-      const customPinStyle = visual.palette?.bg
-        ? `background: ${visual.palette.bg}; border-color: ${visual.palette.border || '#ffffff'}; ${visual.palette.shadow ? `box-shadow: 0 4px 14px ${visual.palette.shadow};` : ''}`
-        : '';
+      const pinBg = theme.bg || visual.palette?.bg || '#0284c7';
+      const pinBorder = theme.border || visual.palette?.border || '#ffffff';
+      const pinGlow = theme.glow || visual.palette?.shadow;
+
+      const customPinStyle = `background: ${pinBg} !important; border-color: ${pinBorder} !important; ${
+        pinGlow ? `box-shadow: 0 4px 14px ${pinGlow} !important;` : ''
+      }`;
 
       el.innerHTML = `
         <div class="poi-marker-inner">
@@ -2037,7 +2042,9 @@ export default function MapView({
         marker.on('dragend', () => {
           el.classList.remove('is-dragging');
           const pos = marker.getLngLat();
-          onSpotLocationChange?.(spot.id, pos.lat, pos.lng);
+          const latNum = Number(pos.lat.toFixed(6));
+          const lngNum = Number(pos.lng.toFixed(6));
+          onSpotLocationChange?.(spot.id, latNum, lngNum);
           // Suppress click right after drop
           setTimeout(() => {
             wasDragged = false;

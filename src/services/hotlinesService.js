@@ -237,8 +237,14 @@ class HotlinesService {
       };
       this.saveAll(list);
 
-      // Fast per-item location update to Neon PostgreSQL
+      // Fast per-item location update to Neon PostgreSQL (/api/update-pin-location and /api/item-location)
       const apiBase = import.meta.env.VITE_API_BASE || '';
+      fetch(`${apiBase}/api/update-pin-location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, type: 'hotline', lat: parsedLat, lng: parsedLng }),
+      }).catch((e) => console.warn('Hotline update-pin-location warning:', e));
+
       fetch(`${apiBase}/api/item-location`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -253,8 +259,24 @@ class HotlinesService {
         const NEON_URL = (customUrl && customUrl.includes('ep-silent-heart-azsxtkkj')) ? customUrl
           : (envUrl && envUrl.includes('ep-silent-heart-azsxtkkj')) ? envUrl
           : fallbackUrl;
-        import('@neondatabase/serverless').then(({ neon }) => {
+        import('@neondatabase/serverless').then(async ({ neon }) => {
           const sql = neon(NEON_URL);
+          // 1. Update in lagangilang_global_state
+          try {
+            const rows = await sql`SELECT payload FROM lagangilang_global_state WHERE state_key = 'hotlines_and_checkpoints'`;
+            if (rows && rows[0] && Array.isArray(rows[0].payload)) {
+              const updatedList = rows[0].payload.map((item) =>
+                item.id === id ? { ...item, lat: parsedLat, lng: parsedLng, location: { ...(item.location || {}), lat: parsedLat, lng: parsedLng } } : item
+              );
+              await sql`
+                UPDATE lagangilang_global_state
+                SET payload = ${JSON.stringify(updatedList)}::jsonb, updated_at = NOW()
+                WHERE state_key = 'hotlines_and_checkpoints'
+              `;
+            }
+          } catch (_) {}
+
+          // 2. Update tourist_spots table
           sql`
             UPDATE public.tourist_spots
             SET latitude = ${parsedLat}, longitude = ${parsedLng}, updated_at = NOW()

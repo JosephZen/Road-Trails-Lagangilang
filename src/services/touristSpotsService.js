@@ -770,7 +770,13 @@ export const touristSpotsService = {
     });
     this.saveAllSpots(updated);
 
-    // Fast granular update to serverless Neon API
+    // Fast granular update to serverless Neon API routes (/api/update-pin-location and /api/item-location)
+    fetch(`${API_BASE}/api/update-pin-location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: spotId, type: 'poi', lat: parsedLat, lng: parsedLng }),
+    }).catch(() => {});
+
     fetch(`${API_BASE}/api/item-location`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

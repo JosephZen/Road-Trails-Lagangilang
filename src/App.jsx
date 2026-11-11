@@ -28,6 +28,7 @@ import OfflineGuideModal from './components/OfflineGuideModal';
 import AdminOsmManagerModal from './components/AdminOsmManagerModal';
 import hotlinesService from './services/hotlinesService';
 import globalSyncService, { GLOBAL_STATE_KEYS } from './services/globalSyncService';
+import { getPinTheme } from './utils/poiIconRegistry';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -768,6 +769,36 @@ export default function App() {
     };
   }, []);
 
+  // Initial authoritative global state fetch on startup (guarantees dragged pins propagate to first-time users)
+  useEffect(() => {
+    async function loadGlobalPublicState() {
+      try {
+        const res = await fetch(`/api/public-state?t=${Date.now()}`, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pois && Array.isArray(data.pois) && data.pois.length > 0) {
+            touristSpotsService.saveAllSpots(data.pois, false);
+            setTouristSpots(data.pois);
+          }
+          if (data.hotlines && Array.isArray(data.hotlines) && data.hotlines.length > 0) {
+            hotlinesService.saveAll(data.hotlines, false);
+          }
+          if (data.trails) {
+            streetviewAlignmentService.loadFromGlobalState(data.trails);
+            setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load global cloud state from /api/public-state:', e);
+      }
+    }
+    loadGlobalPublicState();
+  }, []);
+
   // Helper: check if a tourist spot has a dedicated local 360 panorama (either in Neon Cloud DB, local files, or explicit type)
   const spotHasDedicatedPano = useCallback(
     (spot) => {
@@ -1047,6 +1078,26 @@ export default function App() {
       touristSpotsService.updateSpotLocation(spotId, lat, lng);
       hotlinesService.updateCoordinates(spotId, { lat, lng });
 
+      // Direct POST to authoritative backend endpoint /api/update-pin-location
+      const spot = touristSpots.find((s) => s.id === spotId);
+      const spotType = spot?.spotType || spot?.type || (spotId.startsWith('poi_denr') || spotId.startsWith('poi_lagangilang_mdrrmo') || spotId.startsWith('poi_lagangilang_pnp') || spotId.startsWith('poi_lagangilang_bfp') || spotId.startsWith('poi_lagangilang_rhu') ? 'hotline' : 'poi');
+      const spotName = spot?.name || 'Landmark';
+
+      fetch('/api/update-pin-location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: spotId,
+          type: spotType,
+          lat,
+          lng,
+        }),
+      })
+        .then((res) => {
+          if (!res.ok) console.warn('[App] /api/update-pin-location non-200 response');
+        })
+        .catch((err) => console.warn('[App] /api/update-pin-location call warning:', err));
+
       const updatedSpots = touristSpots.map((s) =>
         s.id === spotId ? { ...s, location: { ...(s.location || {}), lat, lng }, lat, lng, updated_at: new Date().toISOString() } : s
       );
@@ -1089,9 +1140,7 @@ export default function App() {
         } catch (_) {}
       }
 
-      const spot = touristSpots.find((s) => s.id === spotId);
-      const spotName = spot?.name || 'Landmark';
-      showToast(`📍 ${spotName} moved to [${lat.toFixed(5)}, ${lng.toFixed(5)}] — Synced to Cloud`);
+      showToast(`📍 Saved new position for "${spotName}" globally`);
 
       // Real-time route recalculation if current origin or destination was pointing to this moved spot
       const oldLat = spot?.location?.lat ?? spot?.lat;
@@ -1926,6 +1975,7 @@ export default function App() {
                 ) : (
                   displayedSpots.map((spot) => {
                     const isPoi = (spot.spotType || spot.type) === 'poi';
+                    const spotTheme = getPinTheme(spot);
                     return (
                       <div
                         key={spot.id}
@@ -1961,7 +2011,7 @@ export default function App() {
                                 {spot.name}
                               </h4>
                             </div>
-                            <p style={{ fontSize: '0.72rem', color: isPoi ? '#34d399' : '#ffd700', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <p style={{ fontSize: '0.72rem', color: spotTheme.color || (isPoi ? '#34d399' : '#ffd700'), margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {spot.customIcon || spot.icon || spot.cardVisualIcon || spot.categoryIcon || (isPoi ? '🏪' : '⭐')} {spot.category} • Brgy. {spot.barangay}
                             </p>
                             <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
