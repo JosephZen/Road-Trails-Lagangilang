@@ -155,6 +155,8 @@ class StreetviewAlignmentService {
     const strId = String(imageId);
     this.excludedImages.add(strId);
     this.saveExcludedImagesLocal();
+    this.notifyUpdate();
+    this.syncExclusionsToCloud();
     return this.getExcludedImages();
   }
 
@@ -163,6 +165,8 @@ class StreetviewAlignmentService {
     const strId = String(imageId);
     this.excludedImages.delete(strId);
     this.saveExcludedImagesLocal();
+    this.notifyUpdate();
+    this.syncExclusionsToCloud();
     return this.getExcludedImages();
   }
 
@@ -498,6 +502,7 @@ class StreetviewAlignmentService {
       this.saveLocal();
     }
     this.notifyUpdate();
+    this.syncExclusionsToCloud();
     return this.getExcludedSequences();
   }
 
@@ -507,7 +512,22 @@ class StreetviewAlignmentService {
     this.excludedSequences.delete(strId);
     this.saveExcludedLocal();
     this.notifyUpdate();
+    this.syncExclusionsToCloud();
     return this.getExcludedSequences();
+  }
+
+  async syncExclusionsToCloud() {
+    try {
+      await globalSyncService.saveKey(GLOBAL_STATE_KEYS.TRAILS, {
+        alignedSequences: this.alignedSequences,
+        sequenceBridges: this.sequenceBridges,
+        nodeOverrides: this.nodeOverrides,
+        excludedSequences: Array.from(this.excludedSequences),
+        excludedImages: Array.from(this.excludedImages),
+      });
+    } catch (e) {
+      console.warn('Failed to sync exclusions to global state cloud:', e);
+    }
   }
 
   notifyUpdate() {
@@ -524,6 +544,29 @@ class StreetviewAlignmentService {
     if (!trailsState || typeof trailsState !== 'object') return;
     let updated = false;
 
+    // 1. Sync excluded sequences from cloud
+    if (Array.isArray(trailsState.excludedSequences) && trailsState.excludedSequences.length > 0) {
+      trailsState.excludedSequences.forEach((id) => this.excludedSequences.add(String(id)));
+      this.saveExcludedLocal();
+      updated = true;
+    }
+
+    // 2. Sync excluded individual image keys from cloud
+    if (Array.isArray(trailsState.excludedImages) && trailsState.excludedImages.length > 0) {
+      trailsState.excludedImages.forEach((id) => this.excludedImages.add(String(id)));
+      this.saveExcludedImagesLocal();
+      updated = true;
+    }
+
+    // 3. Remove any aligned sequences that are now excluded
+    for (const seqId of this.excludedSequences) {
+      if (this.alignedSequences[seqId]) {
+        delete this.alignedSequences[seqId];
+        updated = true;
+      }
+    }
+
+    // 4. Ingest updated aligned sequences
     if (trailsState.alignedSequences && typeof trailsState.alignedSequences === 'object') {
       for (const [seqId, remoteRecord] of Object.entries(trailsState.alignedSequences)) {
         if (this.excludedSequences.has(seqId)) continue;
@@ -556,7 +599,29 @@ class StreetviewAlignmentService {
   }
 
   async syncWithBackend() {
-    // 1. Immediately load bundled static sequences for instant display on fresh devices & Vercel
+    // 1. Ingest baseline excluded sequences & images from public/data
+    try {
+      const [seqRes, imgRes] = await Promise.all([
+        fetch('/data/excluded_sequences.json').catch(() => null),
+        fetch('/data/excluded_images.json').catch(() => null),
+      ]);
+      if (seqRes && seqRes.ok) {
+        const seqData = await seqRes.json();
+        if (Array.isArray(seqData)) {
+          seqData.forEach((s) => this.excludedSequences.add(String(s)));
+          this.saveExcludedLocal();
+        }
+      }
+      if (imgRes && imgRes.ok) {
+        const imgData = await imgRes.json();
+        if (Array.isArray(imgData)) {
+          imgData.forEach((i) => this.excludedImages.add(String(i)));
+          this.saveExcludedImagesLocal();
+        }
+      }
+    } catch (_) {}
+
+    // 2. Immediately load bundled static sequences for instant display on fresh devices & Vercel
     try {
       const staticRes = await fetch('/data/aligned_sequences.json');
       if (staticRes.ok) {

@@ -175,7 +175,13 @@ export default function MapillaryViewer({
 
     let viewer;
     let isMounted = true;
-    const targetId = isValidMapillaryId(imageId) ? String(imageId) : DEFAULT_IMAGE_ID;
+    let targetId = isValidMapillaryId(imageId) ? String(imageId) : DEFAULT_IMAGE_ID;
+    const initialExcludedSeq = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
+    const initialExcludedImg = Array.isArray(excludedImageKeys) ? excludedImageKeys.map(String) : [];
+    const initialSeqId = streetviewAlignmentService.getSequenceIdForImage(targetId);
+    if (initialExcludedImg.includes(targetId) || (initialSeqId && initialExcludedSeq.includes(String(initialSeqId)))) {
+      targetId = DEFAULT_IMAGE_ID;
+    }
     currentImageIdRef.current = targetId;
 
     try {
@@ -190,6 +196,10 @@ export default function MapillaryViewer({
           spatialData: true,
           zoom: true,
         },
+      });
+
+      viewer.on('load', () => {
+        if (isMounted) applyFilter();
       });
 
       // Event: Image displayed in viewer
@@ -387,9 +397,12 @@ export default function MapillaryViewer({
     const targetIdStr = String(imageId);
     if (targetIdStr === currentImageIdRef.current) return;
 
-    // Check if blacklisted
-    if (excludedImageKeys.includes(targetIdStr)) {
-      console.warn(`Target image ${targetIdStr} is blacklisted.`);
+    // Check if blacklisted or in an excluded sequence
+    const checkExcludedSeq = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
+    const checkExcludedImg = Array.isArray(excludedImageKeys) ? excludedImageKeys.map(String) : [];
+    const targetSeqId = streetviewAlignmentService.getSequenceIdForImage(targetIdStr);
+    if (checkExcludedImg.includes(targetIdStr) || (targetSeqId && checkExcludedSeq.includes(String(targetSeqId)))) {
+      console.warn(`Target image ${targetIdStr} is excluded (sequence: ${targetSeqId}). Aborting navigation.`);
       return;
     }
 

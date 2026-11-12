@@ -46,3 +46,46 @@ export function isNearCampusJunction(lat, lng, thresholdMeters = 220) {
   const distToHighway = haversineDistance(parsedLat, parsedLng, UA_HIGHWAY_JUNCTION.lat, UA_HIGHWAY_JUNCTION.lng);
   return distToGate <= thresholdMeters || distToHighway <= thresholdMeters;
 }
+
+/**
+ * Determine if a given coordinate is located along the official Google Street View coverage
+ * corridor in Lagangilang (Abra-Kalinga Road Route 204, Poblacion, Laang, and Balais).
+ * Google Street View vehicle covered the national road and municipal center,
+ * but did NOT enter UA campus interior grounds or remote nature trails/caves.
+ */
+export function isNearGoogleStreetViewCorridor(lat, lng, spot = null) {
+  if (lat == null || lng == null) return false;
+  const parsedLat = parseFloat(lat);
+  const parsedLng = parseFloat(lng);
+
+  // If inside UA Campus grounds, Google Street View has no vehicle coverage
+  if (isInsideUACampus(parsedLat, parsedLng)) return false;
+
+  // Remote nature trails, caves, and rivers without road vehicle access
+  const spotName = (spot?.name || '').toLowerCase();
+  const spotCategory = (spot?.category || '').toLowerCase();
+  if (
+    spotName.includes('cave') ||
+    spotName.includes('dam') ||
+    spotName.includes('ugiao') ||
+    spotName.includes('rock formation') ||
+    spotName.includes('galangugong') ||
+    spotName.includes('banat') ||
+    spotCategory.includes('cave') ||
+    spotCategory.includes('trekking') ||
+    spotCategory.includes('adventure')
+  ) {
+    return false;
+  }
+
+  // Google Street View National Highway corridor in Lagangilang spans:
+  // Lat: ~17.580 to ~17.635
+  // Lng: ~120.730 to ~120.765 along Route 204
+  return (
+    parsedLat >= 17.580 &&
+    parsedLat <= 17.635 &&
+    parsedLng >= 120.730 &&
+    parsedLng <= 120.765
+  );
+}
+

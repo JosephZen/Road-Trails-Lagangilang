@@ -162,8 +162,20 @@ export default function PanoramaViewer({
       // 4. Fallback to static URL (only full panorama files, NEVER low-res thumbnails or non-existent dynamic paths)
       if (!finalImageUrl) {
         const candidateUrl =
-          (panorama.imageUrl && !panorama.imageUrl.includes('_thumb.') && !panorama.imageUrl.startsWith('data:') && !panorama.imageUrl.includes('/panoramas/pano_') ? panorama.imageUrl : null) ||
-          (panorama.filename && !panorama.filename.includes('_thumb.') && !panorama.filename.startsWith('pano_') ? `${API_BASE}/panoramas/${panorama.filename}` : null) ||
+          (panorama.imageUrl && !panorama.imageUrl.includes('_thumb.') && !panorama.imageUrl.startsWith('data:')
+            ? panorama.imageUrl
+            : null) ||
+          (panorama.filename && !panorama.filename.includes('_thumb.')
+            ? (panorama.filename.startsWith('/') || panorama.filename.startsWith('http')
+                ? panorama.filename
+                : `/panoramas/${panorama.filename}`)
+            : null) ||
+          (panorama.targetId && String(panorama.targetId).startsWith('pano_')
+            ? `/panoramas/${panorama.targetId}.jpg`
+            : null) ||
+          (panorama.id && String(panorama.id).startsWith('pano_')
+            ? `/panoramas/${panorama.id}.jpg`
+            : null) ||
           (getCachedUrl ? getCachedUrl(panorama.id) : null);
 
         if (candidateUrl && !candidateUrl.includes('_thumb.')) {

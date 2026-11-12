@@ -12,6 +12,7 @@ import { formatCoords } from './utils/geoUtils';
 import {
   isInsideUACampus,
   isNearCampusJunction,
+  isNearGoogleStreetViewCorridor,
   UA_CAMPUS_GATE,
   MAPILLARY_CAMPUS_GATE_IMAGE_ID,
 } from './utils/streetViewJunctions';
@@ -705,6 +706,8 @@ export default function App() {
   useEffect(() => {
     const handleAlignedUpdate = (evt) => {
       setAlignedGeoJSON(evt.detail || streetviewAlignmentService.toGeoJSON());
+      setExcludedSequences(streetviewAlignmentService.getExcludedSequences());
+      setExcludedImageKeys(streetviewAlignmentService.getExcludedImages());
     };
     window.addEventListener('aligned-sequences-updated', handleAlignedUpdate);
     return () => window.removeEventListener('aligned-sequences-updated', handleAlignedUpdate);
@@ -753,6 +756,8 @@ export default function App() {
         }
         if (state && state[GLOBAL_STATE_KEYS.TRAILS]) {
           streetviewAlignmentService.loadFromGlobalState(state[GLOBAL_STATE_KEYS.TRAILS]);
+          setExcludedSequences(streetviewAlignmentService.getExcludedSequences());
+          setExcludedImageKeys(streetviewAlignmentService.getExcludedImages());
           setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
         }
         if (state && state[GLOBAL_STATE_KEYS.ADMIN_PASSWORD]?.password) {
@@ -789,6 +794,8 @@ export default function App() {
           }
           if (data.trails) {
             streetviewAlignmentService.loadFromGlobalState(data.trails);
+            setExcludedSequences(streetviewAlignmentService.getExcludedSequences());
+            setExcludedImageKeys(streetviewAlignmentService.getExcludedImages());
             setAlignedGeoJSON(streetviewAlignmentService.toGeoJSON());
           }
         }
@@ -927,18 +934,28 @@ export default function App() {
           lng: spot.connected360?.lng ?? nearestAligned?.image?.lng ?? lng,
           id: String(customPanoId),
         });
-      } else if (viewerPanoMode === 'mapillary') {
-        // User was already exploring in Mapillary mode: position directly on the nearest cyan node along road
-        setViewerPanoMode('mapillary');
-        setStreetViewPos({
-          lat: nearestAligned?.image?.lat ?? lat,
-          lng: nearestAligned?.image?.lng ?? lng,
-          id: effectiveMapillaryId,
-        });
-      } else {
-        // Default to Google Street View for general road / highway locations
+      } else if (spot.connected360?.type === 'google') {
+        // Explicitly set to Google Street View
         setViewerPanoMode('google');
         setStreetViewPos({ lat, lng, id: String(spot.id) });
+      } else {
+        // Smart determination between Google Street View and Mapillary:
+        const insideCampus = isInsideUACampus(lat, lng);
+        const nearGoogleCorridor = isNearGoogleStreetViewCorridor(lat, lng, spot);
+
+        // If inside UA Campus grounds or remote nature trail (Caves, Dam, River, Rock Formation):
+        if (insideCampus || !nearGoogleCorridor) {
+          setViewerPanoMode('mapillary');
+          setStreetViewPos({
+            lat: nearestAligned?.image?.lat ?? lat,
+            lng: nearestAligned?.image?.lng ?? lng,
+            id: effectiveMapillaryId,
+          });
+        } else {
+          // National Highway Route 204 / Poblacion / Laang / Balais corridor covered by Google Street View
+          setViewerPanoMode('google');
+          setStreetViewPos({ lat, lng, id: String(spot.id) });
+        }
       }
 
       // 4. Orient the 360 viewer toward the landmark's heading
@@ -1306,6 +1323,17 @@ export default function App() {
     const lat = activeTouristSpot?.location?.lat ?? activeTouristSpot?.lat;
     const lng = activeTouristSpot?.location?.lng ?? activeTouristSpot?.lng;
     if (typeof lat === 'number' && typeof lng === 'number') {
+      const insideCampus = isInsideUACampus(lat, lng);
+      const nearGoogle = isNearGoogleStreetViewCorridor(lat, lng, activeTouristSpot);
+
+      // If location is outside UA campus along the official Google Street View highway corridor
+      if (!insideCampus && nearGoogle) {
+        setViewerPanoMode('google');
+        setStreetViewPos({ lat, lng, id: String(activeTouristSpot?.id || 'google_view') });
+        return;
+      }
+
+      // Otherwise find nearest cyan node along trails / campus
       const nearest = streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, Infinity);
       if (nearest?.image?.id) {
         const nearestId = String(nearest.image.id);
@@ -2578,9 +2606,18 @@ export default function App() {
                 showBridgePrompts={showBridgePrompts}
                 onSwitchToMapillary={(opts) => {
                   setViewerPanoMode('mapillary');
-                  if (opts?.imageId) setMapillaryImageId(opts.imageId);
-                  if (opts?.lat && opts?.lng) {
-                    setStreetViewPos({ lat: opts.lat, lng: opts.lng, id: opts.imageId });
+                  const targetLat = opts?.lat ?? activeTouristSpot?.location?.lat ?? activeTouristSpot?.lat ?? streetViewPos?.lat;
+                  const targetLng = opts?.lng ?? activeTouristSpot?.location?.lng ?? activeTouristSpot?.lng ?? streetViewPos?.lng;
+                  let targetImageId = opts?.imageId;
+                  if (!targetImageId && typeof targetLat === 'number' && typeof targetLng === 'number') {
+                    const nearest = streetviewAlignmentService.findClosestImageAcrossAll(targetLat, targetLng, Infinity);
+                    if (nearest?.image?.id) {
+                      targetImageId = String(nearest.image.id);
+                    }
+                  }
+                  if (targetImageId) setMapillaryImageId(targetImageId);
+                  if (targetLat && targetLng) {
+                    setStreetViewPos({ lat: targetLat, lng: targetLng, id: targetImageId });
                   }
                 }}
               />
