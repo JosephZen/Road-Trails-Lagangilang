@@ -40,6 +40,7 @@ export const POI_CATEGORIES = [
   { name: 'Hospital & Health Unit (RHU)', icon: '🏥' },
   { name: 'Disaster & Rescue (MDRRMO)', icon: '🚑' },
   { name: 'DENR Environmental Checkpoint', icon: '🌲' },
+  { name: 'Auto Repair Shop & Auto Repair Services', icon: '🔧' },
 ];
 
 export const PRESET_ICONS = [
@@ -50,7 +51,7 @@ export const PRESET_ICONS = [
   // Agriculture & Products
   '🌾', '🐟', '🍫', '🌴', '🌻',
   // Services & POI & Dining
-  '⛽', '🏪', '🍽️', '🍲', '☕', '🥤', '🏨', '💊', '🏧', '🚌', '🏥', '🚨', '🛒',
+  '⛽', '🏪', '🍽️', '🍲', '☕', '🥤', '🏨', '💊', '🏧', '🚌', '🏥', '🚨', '🛒', '🔧',
   // Markers & Highlights
   '⭐', '📍', '✨', '🎯'
 ];

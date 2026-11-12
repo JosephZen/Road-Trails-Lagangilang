@@ -606,7 +606,10 @@ export default function App() {
     const hotlinePois = hotlinesService.asMapPois();
     const merged = [...spots];
     hotlinePois.forEach((hp) => {
-      const idx = merged.findIndex((s) => s.id === hp.id);
+      const idx = merged.findIndex(
+        (s) => s.id === hp.id ||
+        (s.name && hp.name && s.name.trim().toLowerCase() === hp.name.trim().toLowerCase())
+      );
       if (idx >= 0) {
         const hpTime = new Date(hp.updated_at || 0).getTime();
         const spotTime = new Date(merged[idx].updated_at || 0).getTime();
@@ -939,21 +942,35 @@ export default function App() {
         setViewerPanoMode('google');
         setStreetViewPos({ lat, lng, id: String(spot.id) });
       } else {
-        // Smart determination between Google Street View and Mapillary:
+        // Smart determination between Google Street View, Mapillary, and Dedicated No-Pano modal:
         const insideCampus = isInsideUACampus(lat, lng);
         const nearGoogleCorridor = isNearGoogleStreetViewCorridor(lat, lng, spot);
+        const hasCloseMapillaryNode = nearestAligned && nearestAligned.distance <= 80;
 
-        // If inside UA Campus grounds or remote nature trail (Caves, Dam, River, Rock Formation):
-        if (insideCampus || !nearGoogleCorridor) {
+        if (insideCampus && hasCloseMapillaryNode) {
+          // Inside UA Campus grounds with active Mapillary trail
           setViewerPanoMode('mapillary');
           setStreetViewPos({
-            lat: nearestAligned?.image?.lat ?? lat,
-            lng: nearestAligned?.image?.lng ?? lng,
+            lat: nearestAligned.image?.lat ?? lat,
+            lng: nearestAligned.image?.lng ?? lng,
+            id: effectiveMapillaryId,
+          });
+        } else if (nearGoogleCorridor) {
+          // National Highway Route 204 / Poblacion / Laang / Balais corridor covered by Google Street View
+          setViewerPanoMode('google');
+          setStreetViewPos({ lat, lng, id: String(spot.id) });
+        } else if (hasCloseMapillaryNode) {
+          // Remote trail with an aligned Mapillary node within 80 meters
+          setViewerPanoMode('mapillary');
+          setStreetViewPos({
+            lat: nearestAligned.image?.lat ?? lat,
+            lng: nearestAligned.image?.lng ?? lng,
             id: effectiveMapillaryId,
           });
         } else {
-          // National Highway Route 204 / Poblacion / Laang / Balais corridor covered by Google Street View
-          setViewerPanoMode('google');
+          // Neither Google Street View nor Mapillary imagery exists at this location (e.g. DENR Checkpoint in San Isidro)
+          // Gracefully open dedicated mode displaying "No 360° image of this location yet"
+          setViewerPanoMode('dedicated');
           setStreetViewPos({ lat, lng, id: String(spot.id) });
         }
       }
@@ -1333,8 +1350,8 @@ export default function App() {
         return;
       }
 
-      // Otherwise find nearest cyan node along trails / campus
-      const nearest = streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, Infinity);
+      // Otherwise find nearest cyan node along trails / campus within reasonable walking distance
+      const nearest = streetviewAlignmentService.findClosestImageAcrossAll(lat, lng, 120);
       if (nearest?.image?.id) {
         const nearestId = String(nearest.image.id);
         setViewerPanoMode('mapillary');
@@ -1346,6 +1363,9 @@ export default function App() {
         });
         return;
       }
+
+      showToast('ℹ️ No Street View imagery recorded near this location yet');
+      return;
     }
     setViewerPanoMode('google');
   }, [activeTouristSpot, showToast]);

@@ -1605,6 +1605,14 @@ body {
   border: 2px solid #047857 !important;
 }
 
+/* Indigo Auto Repair Shop & Automotive Services Pin */
+.poi-marker-pin.pin-auto,
+.poi-marker-pin.pin-repair {
+  background: #4f46e5 !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.65) !important;
+  border: 2px solid #3730a3 !important;
+}
+
 @keyframes pulse-checkpoint {
   0%, 100% {
     box-shadow: 0 4px 14px rgba(22, 101, 52, 0.7), 0 0 0 2px rgba(74, 222, 128, 0.6);

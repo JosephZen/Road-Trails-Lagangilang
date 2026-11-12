@@ -29,7 +29,7 @@ export function isInsideUACampus(lat, lng) {
   return (
     parsedLat >= 17.6078 &&
     parsedLat <= 17.6165 &&
-    parsedLng >= 120.7360 &&
+    parsedLng >= 120.7365 &&
     parsedLng <= 120.7430
   );
 }

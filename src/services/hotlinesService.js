@@ -16,7 +16,7 @@ const STORAGE_KEY = 'lagangilang_hotlines_checkpoints_v2';
 
 export const INITIAL_HOTLINES_AND_CHECKPOINTS = [
   {
-    id: 'poi_denr_checkpoint_lagangilang',
+    id: 'poi_1794059470145_3f7lk',
     name: 'DENR Environmental Checkpoint - Lagangilang',
     category: 'DENR Checkpoint',
     categoryIcon: '🌲',
@@ -140,8 +140,12 @@ class HotlinesService {
                 (item.id === 'poi_lagangilang_pnp' && Math.abs(itemLat - 17.6141) < 0.001) ||
                 (item.id === 'poi_lagangilang_bfp' && Math.abs(itemLat - 17.6138) < 0.001) ||
                 (item.id === 'poi_lagangilang_rhu' && Math.abs(itemLat - 17.6152) < 0.001) ||
-                (item.id === 'poi_denr_checkpoint_lagangilang' && Math.abs(itemLat - 17.6185) < 0.001)
+                ((item.id === 'poi_denr_checkpoint_lagangilang' || item.id === 'poi_1794059470145_3f7lk') && Math.abs(itemLat - 17.6185) < 0.001)
               );
+              if (item.id === 'poi_denr_checkpoint_lagangilang') {
+                item.id = 'poi_1794059470145_3f7lk';
+                modified = true;
+              }
               if (isOldSpawn) {
                 modified = true;
                 return {

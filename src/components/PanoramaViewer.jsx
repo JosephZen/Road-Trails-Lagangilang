@@ -472,7 +472,9 @@ export default function PanoramaViewer({
           <p style={{ margin: '0 0 14px 0', fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.45 }}>
             {isAdmin
               ? <>A dedicated 360° photo has not been captured for <strong>{panorama?.label || 'this location'}</strong> yet. You can assign a streetview cyan node or upload a photo.</>
-              : <>A dedicated 360° photo has not been recorded for <strong>{panorama?.label || 'this location'}</strong> yet. Explore the surrounding trail using Street View below.</>}
+              : (nearestNode && nearestNode.distance <= 120)
+                ? <>A dedicated 360° photo has not been recorded for <strong>{panorama?.label || 'this location'}</strong> yet. Explore the surrounding trail using Street View below.</>
+                : <>No 360° photo or street-level imagery has been recorded for <strong>{panorama?.label || 'this location'}</strong> yet.</>}
           </p>
 
           {nearestNode && (
@@ -490,7 +492,11 @@ export default function PanoramaViewer({
               gap: '6px'
             }}>
               <span>📍</span>
-              <span>Nearest Cyan Node: <strong>#{String(nearestNode.image?.id || nearestNode.imgId || '').slice(-6)}</strong> (~{Math.round(nearestNode.distance || 0)}m away on road)</span>
+              {nearestNode.distance <= 120 ? (
+                <span>Nearest Cyan Node: <strong>#{String(nearestNode.image?.id || nearestNode.imgId || '').slice(-6)}</strong> (~{Math.round(nearestNode.distance || 0)}m away on road)</span>
+              ) : (
+                <span>No Street View mapped in this immediate area (~{Math.round(nearestNode.distance)}m to nearest road node)</span>
+              )}
             </div>
           )}
 
@@ -551,21 +557,23 @@ export default function PanoramaViewer({
               </button>
             )}
 
-            <button
-              className="btn btn-secondary"
-              onClick={() => onFallbackToMapillary?.()}
-              style={{
-                fontSize: '0.8rem',
-                padding: '8px 16px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-                color: '#fff',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-            >
-              🚗 View Street View
-            </button>
+            {(!nearestNode || nearestNode.distance <= 120) && (
+              <button
+                className="btn btn-secondary"
+                onClick={() => onFallbackToMapillary?.()}
+                style={{
+                  fontSize: '0.8rem',
+                  padding: '8px 16px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                🚗 View Street View
+              </button>
+            )}
 
             <button
               className="btn btn-secondary"

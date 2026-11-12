@@ -48,6 +48,7 @@ export const CATEGORY_DEFINITIONS = {
   cat_transport: { id: 'cat_transport', name: 'Transport Terminal', icon: '🚌' },
   cat_emergency: { id: 'cat_emergency', name: 'Government & Emergency Services', icon: '🏛️' },
   cat_checkpoint: { id: 'cat_checkpoint', name: 'DENR Environmental Checkpoint', icon: '🌲' },
+  cat_auto_repair: { id: 'cat_auto_repair', name: 'Auto Repair Shop & Auto Repair Services', icon: '🔧' },
 };
 
 /**

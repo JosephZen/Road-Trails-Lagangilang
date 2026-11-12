@@ -68,6 +68,16 @@ export const PIN_CATEGORY_THEMES = {
     pinClass: 'pin-bank',
   },
 
+  // 🔧 Indigo / Steel: Auto Repair Shops & Automotive Services
+  auto_repair: {
+    bg: '#4F46E5',
+    border: '#3730A3',
+    glow: 'rgba(79, 70, 229, 0.45)',
+    label: 'Auto Repair & Services',
+    color: '#818CF8',
+    pinClass: 'pin-auto',
+  },
+
   // ☕ Terracotta / Warm Orange: Cafes, Bakeries & Eateries
   cafe: {
     bg: '#EA580C',
@@ -228,6 +238,22 @@ export function getPinTheme(item = {}) {
     return PIN_CATEGORY_THEMES.bank;
   }
 
+  // 3b. Auto Repair Shops & Automotive Services (e.g. Motor Repair Shop) -> Indigo
+  if (
+    rawCat.includes('auto repair') ||
+    rawCat.includes('motor repair') ||
+    rawCat.includes('vulcanizing') ||
+    rawCat.includes('mechanic') ||
+    rawCat.includes('auto service') ||
+    rawName.includes('motor repair') ||
+    rawName.includes('auto repair') ||
+    rawName.includes('vulcanizing') ||
+    rawName.includes('motor shop') ||
+    rawName.includes('repair shop')
+  ) {
+    return PIN_CATEGORY_THEMES.auto_repair;
+  }
+
   // 4. Cafes, Bakeries & Eateries -> Terracotta / Warm Orange
   if (
     rawCat.includes('cafe') ||
@@ -360,6 +386,22 @@ function _resolvePoiVisualConfig(spot = {}, theme = null) {
       pinClass: 'pin-bank',
       icon: customSelectedIcon || '🏧',
       label: spot.category || 'Bank & ATM',
+      palette: {
+        bg: activeTheme.bg,
+        color: activeTheme.color,
+        border: activeTheme.border,
+        shadow: activeTheme.glow,
+      },
+    };
+  }
+
+  // 3b. Auto Repair Shop & Auto Repair Services
+  if (activeTheme === PIN_CATEGORY_THEMES.auto_repair) {
+    return {
+      typeKey: 'auto_repair',
+      pinClass: 'pin-auto',
+      icon: customSelectedIcon || '🔧',
+      label: spot.category || 'Auto Repair Shop & Auto Repair Services',
       palette: {
         bg: activeTheme.bg,
         color: activeTheme.color,

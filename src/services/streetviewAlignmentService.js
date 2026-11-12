@@ -490,6 +490,21 @@ class StreetviewAlignmentService {
     return this.excludedSequences.has(String(sequenceId));
   }
 
+  getSequenceIdForImage(imageId) {
+    if (!imageId) return null;
+    const strId = String(imageId);
+    for (const [seqId, aligned] of Object.entries(this.alignedSequences || {})) {
+      if (Array.isArray(aligned?.images)) {
+        for (const img of aligned.images) {
+          if (img && String(img.id) === strId) {
+            return seqId;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   excludeSequence(sequenceId) {
     if (!sequenceId) return;
     const strId = String(sequenceId);

@@ -178,7 +178,9 @@ export default function MapillaryViewer({
     let targetId = isValidMapillaryId(imageId) ? String(imageId) : DEFAULT_IMAGE_ID;
     const initialExcludedSeq = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
     const initialExcludedImg = Array.isArray(excludedImageKeys) ? excludedImageKeys.map(String) : [];
-    const initialSeqId = streetviewAlignmentService.getSequenceIdForImage(targetId);
+    const initialSeqId = typeof streetviewAlignmentService?.getSequenceIdForImage === 'function'
+      ? streetviewAlignmentService.getSequenceIdForImage(targetId)
+      : null;
     if (initialExcludedImg.includes(targetId) || (initialSeqId && initialExcludedSeq.includes(String(initialSeqId)))) {
       targetId = DEFAULT_IMAGE_ID;
     }
@@ -400,7 +402,9 @@ export default function MapillaryViewer({
     // Check if blacklisted or in an excluded sequence
     const checkExcludedSeq = Array.isArray(excludedSequences) ? excludedSequences.map(String) : [];
     const checkExcludedImg = Array.isArray(excludedImageKeys) ? excludedImageKeys.map(String) : [];
-    const targetSeqId = streetviewAlignmentService.getSequenceIdForImage(targetIdStr);
+    const targetSeqId = typeof streetviewAlignmentService?.getSequenceIdForImage === 'function'
+      ? streetviewAlignmentService.getSequenceIdForImage(targetIdStr)
+      : null;
     if (checkExcludedImg.includes(targetIdStr) || (targetSeqId && checkExcludedSeq.includes(String(targetSeqId)))) {
       console.warn(`Target image ${targetIdStr} is excluded (sequence: ${targetSeqId}). Aborting navigation.`);
       return;

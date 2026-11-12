@@ -1158,7 +1158,7 @@ export const EMERGENCY_HOTLINES = [
     icon: '🌴',
   },
   {
-    spotId: 'poi_denr_checkpoint_lagangilang',
+    spotId: 'poi_1794059470145_3f7lk',
     name: 'DENR Environmental Checkpoint - Lagangilang',
     number: '0917-889-3321',
     altNumber: '(074) 752-8234',
